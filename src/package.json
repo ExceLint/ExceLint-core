@@ -5,8 +5,16 @@
   "version": "1.0.0",
   "scripts": {
     "lint": "tslint --project tsconfig.json",
-    "build": "npm run clean && webpack --mode production --config config/webpack.prod.js --colors --progress --bail"
+    "build": "tsc --project tsconfig.json"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@types/node": "^14.0.13",
+    "@types/prop-types": "^15.7.3",
+    "@types/sjcl": "^1.0.29",
+    "crypto-js": "^4.0.0",
+    "sjcl": "^1.0.8",
+    "xlsx": "^0.16.2",
+    "yargs": "^15.3.1"
+  },
   "devDependencies": {}
 }

@@ -1,8 +1,8 @@
-import { rgb2hex, GroupedList } from 'office-ui-fabric-react';
+//import { rgb2hex, GroupedList } from 'office-ui-fabric-react';
 import { ColorUtils } from './colorutils';
 import { ExcelUtils } from './excelutils';
 import { RectangleUtils } from './rectangleutils';
-import { ExcelUtilities } from '@microsoft/office-js-helpers';
+//import { ExcelUtilities } from '@microsoft/office-js-helpers';
 import { Timer } from './timer';
 import { JSONclone } from './jsonclone';
 import { find_all_proposed_fixes } from './groupme';
