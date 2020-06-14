@@ -70,7 +70,7 @@ export class ColorUtils {
 
 
     private static rgb_ex = new RegExp('#([A-Za-z0-9][A-Za-z0-9])([A-Za-z0-9][A-Za-z0-9])([A-Za-z0-9][A-Za-z0-9])');
-    
+
     public static adjust_brightness(color: string, multiplier: number): string {
         let c = ColorUtils.rgb_ex.exec(color);
         let [r, g, b] = [parseInt(c[1], 16), parseInt(c[2], 16), parseInt(c[3], 16)];

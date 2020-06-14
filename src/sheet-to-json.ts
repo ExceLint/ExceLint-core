@@ -45,8 +45,8 @@ for (let filename of files) {
     let output = ExcelJSON.processWorkbook(base, filename);
     const outputFile = (base + filename).replace('.xlsx', '.json').replace('.xls', '.json');
     fs.writeFileSync(outputFile, JSON.stringify(output));
-//    console.log(JSON.stringify(output));
-//    outputs.push(output);
+    //    console.log(JSON.stringify(output));
+    //    outputs.push(output);
 }
 // Pretty-print
 // console.log(JSON.stringify(outputs, null, 4));

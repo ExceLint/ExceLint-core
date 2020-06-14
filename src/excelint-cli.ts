@@ -176,7 +176,7 @@ for (let parms of parameters) {
 
     for (let fname of allFiles) {
         // Read from file.
-	console.warn('processing ' + fname);
+        console.warn('processing ' + fname);
         inp = ExcelJSON.processWorkbook(base, fname);
 
         let output = {
@@ -223,132 +223,134 @@ for (let parms of parameters) {
                 }
             }
 
-	    let example_fixes_r1c1 = [];
-	    {
-		let totalNumericDiff = 0.0;
-		if (adjusted_fixes.length > 0) {
-		    for (let ind = 0; ind < adjusted_fixes.length; ind++) {
-			let direction = "";
-			if (adjusted_fixes[ind][1][0][0] === adjusted_fixes[ind][2][0][0]) {
-			    direction = "vertical";
-			} else {
-			    direction = "horizontal";
-			}
-			let formulas = [];              // actual formulas
-			let print_formulas = [];        // formulas with a preface (the cell name containing each)
-			let r1c1_formulas = [];         // formulas in R1C1 format
-			let r1c1_print_formulas = [];   // as above, but for R1C1 formulas
-			let all_numbers = [];           // all the numeric constants in each formula
-			let numbers = [];               // the sum of all the numeric constants in each formula
-			let dependence_count = [];      // the number of dependent cells
-			let absolute_refs = [];         // the number of absolute references in each formula
-			let dependence_vectors = [];
-			for (let i = 0; i < 2; i++) {
-			     // the coordinates of the cell containing the first formula in the proposed fix range
-			    const formulaCoord = adjusted_fixes[ind][i+1][0];
-			    const formulaX = formulaCoord[1]-1;                   // row
-			    const formulaY = formulaCoord[0]-1;                   // column
-			    const formula = sheet.formulas[formulaX][formulaY];   // the formula itself
-			    const numeric_constants = ExcelUtils.numeric_constants(formula); // all numeric constants in the formula
-			    all_numbers.push(numeric_constants);
-			    numbers.push(numbers.reduce((a,b) => a + b, 0));      // the sum of all numeric constants
-			    const dependences_wo_constants = ExcelUtils.all_cell_dependencies(formula, formulaY+1, formulaX+1, false);
-			    dependence_count.push(dependences_wo_constants.length);
-			    const r1c1 = ExcelUtils.formulaToR1C1(formula, formulaY+1, formulaX+1);
-			    const preface = ExcelUtils.column_index_to_name(formulaY+1) + (formulaX+1) + ":";
-			    const cellPlusFormula = preface + r1c1;
-			    // Add the formulas plus their prefaces (the latter for printing).
-			    r1c1_formulas.push(r1c1);
-			    r1c1_print_formulas.push(cellPlusFormula);
-			    formulas.push(formula);
-			    print_formulas.push(preface + formula);
-			    absolute_refs.push((formula.match(/\$/g) || []).length);
-			    // console.log(preface + JSON.stringify(dependences_wo_constants));
-			    dependence_vectors.push(dependences_wo_constants);
-			}
-			totalNumericDiff = Math.abs(numbers[0] - numbers[1]);
-			// Binning.
-			let bin = [];
-			// Check for recurrent formulas.
-			for (let i = 0; i < dependence_vectors.length; i++) {
-			    // If there are at least two dependencies and one of them is -1 in the column (row),
-			    // it is a recurrence (the common recurrence relation of starting at a value and
-			    // referencing, say, =B10+1).
-			    if (dependence_vectors[i].length > 0) {
-				if ((direction === "vertical") && ((dependence_vectors[i][0][0] === 0) && (dependence_vectors[i][0][1] === -1))) {
-				    bin.push("recurrent-formula");
-				    break;
-				}
-				if ((direction === "horizontal") && ((dependence_vectors[i][0][0] === -1) && (dependence_vectors[i][0][1] === 0))) {
-				    bin.push("recurrent-formula");
-				    break;
-				}
-			    }
-			}
-			// Different number of referents (dependencies).
-			if (dependence_count[0] !== dependence_count[1]) {
-			    bin.push("different-referent-count");
-			}
-			// Different number of constants.
-			if (all_numbers[0].length !== all_numbers[1].length) {
-			    if (Math.abs(all_numbers[0].length - all_numbers[1].length) === 1) {
-				bin.push("one-extra-constant");
-			    } else {
-				bin.push("number-of-constants-mismatch");
-			    }
-			}
-			// Both constants.
-			if ((all_numbers[0].length > 0) && (all_numbers[1].length > 0)) {
-			    // Both have numbers.
-			    if (dependence_count[0] + dependence_count[1] === 0) {
-				// Both have no dependents.
-				bin.push("both-constants");
-			    } else {
-				if (dependence_count[0] * dependence_count[1] === 0) {
-				    // One is a constant.
-				    bin.push("one-is-all-constants");
-				}
-			    }
-			}
-			// Mismatched R1C1 representation.
-			if (r1c1_formulas[0] !== r1c1_formulas[1]) {
-			    // The formulas don't match, but it could
-			    // be because of the presence of (possibly
-			    // different) constants instead of the
-			    // dependencies being different. Do a deep comparison
-			    // here.
-			    if (JSON.stringify(dependence_vectors[0].sort()) !== JSON.stringify(dependence_vectors[1].sort())) {
-				bin.push("r1c1-mismatch");
-			    }
-			}
-			// Different number of absolute ($, a.k.a. "anchor") references.
-			if (absolute_refs[0] !== absolute_refs[1]) {
-			    bin.push("absolute-ref-mismatch");
-			}
-			// Dependencies that are neither vertical or horizontal (likely errors if an absolute-ref-mismatch).
-			for (let i = 0; i < dependence_vectors.length; i++) {
-			    if (dependence_vectors[i].length > 0) {
-				if (dependence_vectors[i][0][0] * dependence_vectors[i][0][1] !== 0) {
-				    bin.push("off-axis-reference");
-				    break;
-				}
-			    }
-			}
-			if (bin === []) {
-			    bin.push("unclassified");
-			}
-			example_fixes_r1c1.push({ "bin" : bin,
-						  "direction" : direction,
-						  "numbers" : numbers,
-						  "numeric_difference": totalNumericDiff,
-						  "magnitude_numeric_difference": (totalNumericDiff === 0) ? 0 : Math.log10(totalNumericDiff),
-						  "formulas": print_formulas,
-						  "r1c1formulas" : r1c1_print_formulas,
-						  "dependence_vectors" : dependence_vectors });
-			// example_fixes_r1c1.push([direction, formulas]);
-		    }
-		}
-	    }
+            let example_fixes_r1c1 = [];
+            {
+                let totalNumericDiff = 0.0;
+                if (adjusted_fixes.length > 0) {
+                    for (let ind = 0; ind < adjusted_fixes.length; ind++) {
+                        let direction = "";
+                        if (adjusted_fixes[ind][1][0][0] === adjusted_fixes[ind][2][0][0]) {
+                            direction = "vertical";
+                        } else {
+                            direction = "horizontal";
+                        }
+                        let formulas = [];              // actual formulas
+                        let print_formulas = [];        // formulas with a preface (the cell name containing each)
+                        let r1c1_formulas = [];         // formulas in R1C1 format
+                        let r1c1_print_formulas = [];   // as above, but for R1C1 formulas
+                        let all_numbers = [];           // all the numeric constants in each formula
+                        let numbers = [];               // the sum of all the numeric constants in each formula
+                        let dependence_count = [];      // the number of dependent cells
+                        let absolute_refs = [];         // the number of absolute references in each formula
+                        let dependence_vectors = [];
+                        for (let i = 0; i < 2; i++) {
+                            // the coordinates of the cell containing the first formula in the proposed fix range
+                            const formulaCoord = adjusted_fixes[ind][i + 1][0];
+                            const formulaX = formulaCoord[1] - 1;                   // row
+                            const formulaY = formulaCoord[0] - 1;                   // column
+                            const formula = sheet.formulas[formulaX][formulaY];   // the formula itself
+                            const numeric_constants = ExcelUtils.numeric_constants(formula); // all numeric constants in the formula
+                            all_numbers.push(numeric_constants);
+                            numbers.push(numbers.reduce((a, b) => a + b, 0));      // the sum of all numeric constants
+                            const dependences_wo_constants = ExcelUtils.all_cell_dependencies(formula, formulaY + 1, formulaX + 1, false);
+                            dependence_count.push(dependences_wo_constants.length);
+                            const r1c1 = ExcelUtils.formulaToR1C1(formula, formulaY + 1, formulaX + 1);
+                            const preface = ExcelUtils.column_index_to_name(formulaY + 1) + (formulaX + 1) + ":";
+                            const cellPlusFormula = preface + r1c1;
+                            // Add the formulas plus their prefaces (the latter for printing).
+                            r1c1_formulas.push(r1c1);
+                            r1c1_print_formulas.push(cellPlusFormula);
+                            formulas.push(formula);
+                            print_formulas.push(preface + formula);
+                            absolute_refs.push((formula.match(/\$/g) || []).length);
+                            // console.log(preface + JSON.stringify(dependences_wo_constants));
+                            dependence_vectors.push(dependences_wo_constants);
+                        }
+                        totalNumericDiff = Math.abs(numbers[0] - numbers[1]);
+                        // Binning.
+                        let bin = [];
+                        // Check for recurrent formulas.
+                        for (let i = 0; i < dependence_vectors.length; i++) {
+                            // If there are at least two dependencies and one of them is -1 in the column (row),
+                            // it is a recurrence (the common recurrence relation of starting at a value and
+                            // referencing, say, =B10+1).
+                            if (dependence_vectors[i].length > 0) {
+                                if ((direction === "vertical") && ((dependence_vectors[i][0][0] === 0) && (dependence_vectors[i][0][1] === -1))) {
+                                    bin.push("recurrent-formula");
+                                    break;
+                                }
+                                if ((direction === "horizontal") && ((dependence_vectors[i][0][0] === -1) && (dependence_vectors[i][0][1] === 0))) {
+                                    bin.push("recurrent-formula");
+                                    break;
+                                }
+                            }
+                        }
+                        // Different number of referents (dependencies).
+                        if (dependence_count[0] !== dependence_count[1]) {
+                            bin.push("different-referent-count");
+                        }
+                        // Different number of constants.
+                        if (all_numbers[0].length !== all_numbers[1].length) {
+                            if (Math.abs(all_numbers[0].length - all_numbers[1].length) === 1) {
+                                bin.push("one-extra-constant");
+                            } else {
+                                bin.push("number-of-constants-mismatch");
+                            }
+                        }
+                        // Both constants.
+                        if ((all_numbers[0].length > 0) && (all_numbers[1].length > 0)) {
+                            // Both have numbers.
+                            if (dependence_count[0] + dependence_count[1] === 0) {
+                                // Both have no dependents.
+                                bin.push("both-constants");
+                            } else {
+                                if (dependence_count[0] * dependence_count[1] === 0) {
+                                    // One is a constant.
+                                    bin.push("one-is-all-constants");
+                                }
+                            }
+                        }
+                        // Mismatched R1C1 representation.
+                        if (r1c1_formulas[0] !== r1c1_formulas[1]) {
+                            // The formulas don't match, but it could
+                            // be because of the presence of (possibly
+                            // different) constants instead of the
+                            // dependencies being different. Do a deep comparison
+                            // here.
+                            if (JSON.stringify(dependence_vectors[0].sort()) !== JSON.stringify(dependence_vectors[1].sort())) {
+                                bin.push("r1c1-mismatch");
+                            }
+                        }
+                        // Different number of absolute ($, a.k.a. "anchor") references.
+                        if (absolute_refs[0] !== absolute_refs[1]) {
+                            bin.push("absolute-ref-mismatch");
+                        }
+                        // Dependencies that are neither vertical or horizontal (likely errors if an absolute-ref-mismatch).
+                        for (let i = 0; i < dependence_vectors.length; i++) {
+                            if (dependence_vectors[i].length > 0) {
+                                if (dependence_vectors[i][0][0] * dependence_vectors[i][0][1] !== 0) {
+                                    bin.push("off-axis-reference");
+                                    break;
+                                }
+                            }
+                        }
+                        if (bin === []) {
+                            bin.push("unclassified");
+                        }
+                        example_fixes_r1c1.push({
+                            "bin": bin,
+                            "direction": direction,
+                            "numbers": numbers,
+                            "numeric_difference": totalNumericDiff,
+                            "magnitude_numeric_difference": (totalNumericDiff === 0) ? 0 : Math.log10(totalNumericDiff),
+                            "formulas": print_formulas,
+                            "r1c1formulas": r1c1_print_formulas,
+                            "dependence_vectors": dependence_vectors
+                        });
+                        // example_fixes_r1c1.push([direction, formulas]);
+                    }
+                }
+            }
 
             let elapsed = myTimer.elapsedTime();
             if (args.noElapsedTime) {
@@ -369,10 +371,10 @@ for (let parms of parameters) {
                 'suspiciousnessThreshold': reportingThreshold,
                 'formattingDiscount': formattingDiscount,
                 'proposedFixes': adjusted_fixes,
-		'exampleFixes' : example_fixes_r1c1,
-//		'exampleFixesR1C1' : example_fixes_r1c1,
+                'exampleFixes': example_fixes_r1c1,
+                //		'exampleFixesR1C1' : example_fixes_r1c1,
                 'suspiciousRanges': adjusted_fixes.length,
-		'weightedSuspiciousRanges' : 0, // actually calculated below.
+                'weightedSuspiciousRanges': 0, // actually calculated below.
                 'suspiciousCells': 0, // actually calculated below.
                 'elapsedTimeSeconds': elapsed / 1e6,
                 'columns': columns,
@@ -395,8 +397,8 @@ for (let parms of parameters) {
             const foundBugsArray: any = Array.from(new Set(foundBugs.flat(1).map(JSON.stringify)));
             foundBugs = foundBugsArray.map(JSON.parse);
             out['suspiciousCells'] = foundBugs.length;
-	    let weightedSuspiciousRanges = out['proposedFixes'].map(x => x[0]).reduce((x, y) => x + y, 0);
-	    out['weightedSuspiciousRanges'] = weightedSuspiciousRanges;
+            let weightedSuspiciousRanges = out['proposedFixes'].map(x => x[0]).reduce((x, y) => x + y, 0);
+            out['weightedSuspiciousRanges'] = weightedSuspiciousRanges;
             if (workbookBasename in bugs) {
                 if (sheet.sheetName in bugs[workbookBasename]) {
                     const trueBugs = bugs[workbookBasename][sheet.sheetName]['bugs'];

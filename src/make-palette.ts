@@ -11,7 +11,7 @@ for (let p of palette) {
     let str = `<rect x="${xPos}" y="0" width="${barWidth}" height="20" fill="${p}" />`;
     xPos += barWidth;
     console.log(str);
-//    console.log(p);
+    //    console.log(p);
 }
 let epilogue = '<text x="55" y="13">formulas (pastel colors)</text></svg>';
 console.log(epilogue);

@@ -1,0 +1,12 @@
+{
+  "name": "excelint-core",
+  "description": "",
+  "author": "Emery Berger",
+  "version": "1.0.0",
+  "scripts": {
+    "lint": "tslint --project tsconfig.json",
+    "build": "npm run clean && webpack --mode production --config config/webpack.prod.js --colors --progress --bail"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

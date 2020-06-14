@@ -175,7 +175,7 @@ for (let parms of parameters) {
 
     for (let fname of allFiles) {
         // Read from file.
-	console.warn('processing ' + fname);
+        console.warn('processing ' + fname);
         let content = fs.readFileSync(base + fname);
         inp = JSON.parse(content);
 
@@ -223,40 +223,40 @@ for (let parms of parameters) {
                 }
             }
 
-	    // console.log(sheet.formulas);
-	    // console.log(JSON.stringify(adjusted_fixes));
+            // console.log(sheet.formulas);
+            // console.log(JSON.stringify(adjusted_fixes));
 
-	    let example_fixes = [];
-	    
-	    if (adjusted_fixes.length > 0) {
-		for (let ind = 0; ind < adjusted_fixes.length; ind++) {
-		    let formulas = [];
-		    for (let i = 0; i < 2; i++) {
-			const formulaCoord = adjusted_fixes[ind][i+1][0];
-			const formulaX = formulaCoord[1]-1;
-			const formulaY = formulaCoord[0]-1;
-			const formula = sheet.formulas[formulaX][formulaY];
-			formulas.push(formula);
-		    }
-		    example_fixes.push(formulas);
-		}
-	    }
+            let example_fixes = [];
 
-	    let example_fixes_r1c1 = [];
-	    
-	    if (adjusted_fixes.length > 0) {
-		for (let ind = 0; ind < adjusted_fixes.length; ind++) {
-		    let formulas = [];
-		    for (let i = 0; i < 2; i++) {
-			const formulaCoord = adjusted_fixes[ind][i+1][0];
-			const formulaX = formulaCoord[1]-1;
-			const formulaY = formulaCoord[0]-1;
-			const formula = sheet.formulas[formulaX][formulaY];
-			formulas.push(ExcelUtils.formulaToR1C1(formula, formulaY, formulaX)); // formulaX, formulaY));
-		    }
-		    example_fixes_r1c1.push(formulas);
-		}
-	    }
+            if (adjusted_fixes.length > 0) {
+                for (let ind = 0; ind < adjusted_fixes.length; ind++) {
+                    let formulas = [];
+                    for (let i = 0; i < 2; i++) {
+                        const formulaCoord = adjusted_fixes[ind][i + 1][0];
+                        const formulaX = formulaCoord[1] - 1;
+                        const formulaY = formulaCoord[0] - 1;
+                        const formula = sheet.formulas[formulaX][formulaY];
+                        formulas.push(formula);
+                    }
+                    example_fixes.push(formulas);
+                }
+            }
+
+            let example_fixes_r1c1 = [];
+
+            if (adjusted_fixes.length > 0) {
+                for (let ind = 0; ind < adjusted_fixes.length; ind++) {
+                    let formulas = [];
+                    for (let i = 0; i < 2; i++) {
+                        const formulaCoord = adjusted_fixes[ind][i + 1][0];
+                        const formulaX = formulaCoord[1] - 1;
+                        const formulaY = formulaCoord[0] - 1;
+                        const formula = sheet.formulas[formulaX][formulaY];
+                        formulas.push(ExcelUtils.formulaToR1C1(formula, formulaY, formulaX)); // formulaX, formulaY));
+                    }
+                    example_fixes_r1c1.push(formulas);
+                }
+            }
 
             let elapsed = myTimer.elapsedTime();
             if (args.noElapsedTime) {
@@ -277,10 +277,10 @@ for (let parms of parameters) {
                 'suspiciousnessThreshold': reportingThreshold,
                 'formattingDiscount': formattingDiscount,
                 'proposedFixes': adjusted_fixes,
-		'exampleFixes' : example_fixes,
-		'exampleFixesR1C1' : example_fixes_r1c1,
+                'exampleFixes': example_fixes,
+                'exampleFixesR1C1': example_fixes_r1c1,
                 'suspiciousRanges': adjusted_fixes.length,
-		'weightedSuspiciousRanges' : 0, // actually calculated below.
+                'weightedSuspiciousRanges': 0, // actually calculated below.
                 'suspiciousCells': 0, // actually calculated below.
                 'elapsedTimeSeconds': elapsed / 1e6,
                 'columns': columns,
@@ -303,8 +303,8 @@ for (let parms of parameters) {
             const foundBugsArray: any = Array.from(new Set(foundBugs.flat(1).map(JSON.stringify)));
             foundBugs = foundBugsArray.map(JSON.parse);
             out['suspiciousCells'] = foundBugs.length;
-	    let weightedSuspiciousRanges = out['proposedFixes'].map(x => x[0]).reduce((x, y) => x + y, 0);
-	    out['weightedSuspiciousRanges'] = weightedSuspiciousRanges;
+            let weightedSuspiciousRanges = out['proposedFixes'].map(x => x[0]).reduce((x, y) => x + y, 0);
+            out['weightedSuspiciousRanges'] = weightedSuspiciousRanges;
             if (workbookBasename in bugs) {
                 if (sheet.sheetName in bugs[workbookBasename]) {
                     const trueBugs = bugs[workbookBasename][sheet.sheetName]['bugs'];

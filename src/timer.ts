@@ -10,7 +10,7 @@ export class Timer {
         this.perf = null;
         if (typeof window === 'undefined') {
             this.perf = {
-                now: function () {
+                now: function() {
                     let [secs, nanosecs] = process.hrtime()
                     return ((secs * 1e9) + nanosecs) / 1e3;
                 }
