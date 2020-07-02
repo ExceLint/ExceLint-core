@@ -353,7 +353,10 @@ export class Colorize {
         const origin = ExcelUtils.cell_dependency(startCell, 0, 0);
 
         let processed_formulas = [];
-        if (formulas.length > this.formulasThreshold) {
+        // Filter out non-empty items from whole matrix.
+            let totalFormulas = (formulas as any).flat().filter(Boolean).length;
+	    
+        if (totalFormulas > this.formulasThreshold) {
             console.warn('Too many formulas to perform formula analysis.');
         } else {
 
@@ -368,7 +371,9 @@ export class Colorize {
         const cols = values.length;
         const rows = values[0].length;
 
-        if (values.length > this.valuesThreshold) {
+        // Filter out non-empty items from whole matrix.
+            let totalValues = (values as any).flat().filter(Boolean).length;
+        if (totalValues > this.valuesThreshold) {
             console.warn('Too many values to perform reference analysis.');
         } else {
 
