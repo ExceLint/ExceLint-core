@@ -21,8 +21,6 @@ this requires a recent version of `node`.
     # below not needed for Mac
     sudo apt install node-typescript
     npm run build
-    # test
-    node dist/excelint-cli.js --input test/act3_lab23_posey.xlsx
 
 To install an up-to-date version of `node` on Linux:
 
@@ -33,6 +31,20 @@ To install an up-to-date version of `node` on Mac OS X with Homebrew:
     brew uninstall --force --ignore-dependencies node npm
     brew install node npm
 
+## Testing
+
+ExceLint comes with a range of test inputs. The simplest sanity check is to run on a single spreadsheet included in the distribution.
+
+    node dist/excelint-cli.js --input test/act3_lab23_posey.xlsx
+
+We manually audited a number of spreadsheets (from the "CUSTODES"
+suite); this annotations file is included in the `test`
+directory. When it is present in the current directory,
+`excelint-cli.js` will automatically use it.
+
+    cd test
+    node ../dist/excelint-cli.js --directory subjects_xlsx
+    
 ## Technical Details
 
 The following technical paper describes how ExceLint works and includes
