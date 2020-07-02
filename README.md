@@ -25,6 +25,10 @@ this requires a recent version of `node`.
     # test
     node dist/excelint-cli.js --input test/act3_lab23_posey.xlsx
 
+To install an up-to-date version of `node` on Mac OS X with Homebrew:
+
+    brew uninstall --force --ignore-dependencies node npm
+    brew install node npm
 
 ## Technical Details
 
