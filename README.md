@@ -18,12 +18,15 @@ this requires a recent version of `node`.
 
     npm install
     npm install typescript
+    # below not needed for Mac
     sudo apt install node-typescript
     npm run build
-    # needed a new version of node
-    npm install --update node
     # test
     node dist/excelint-cli.js --input test/act3_lab23_posey.xlsx
+
+To install an up-to-date version of `node` on Linux:
+
+    npm install --update node
 
 To install an up-to-date version of `node` on Mac OS X with Homebrew:
 
