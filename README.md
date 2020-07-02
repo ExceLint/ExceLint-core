@@ -11,6 +11,21 @@ Microsoft Research), and [Ben
 Zorn](https://www.microsoft.com/en-us/research/people/zorn/)
 (Microsoft Research).
 
+## Building
+
+The commands below will build ExceLint-core on Unix-like systems. Note that
+this requires a recent version of `node`.
+
+    npm install
+    npm install typescript
+    sudo apt install node-typescript
+    npm run build
+    # needed a new version of node
+    npm install --update node
+    # test
+    node dist/excelint-cli.js --input test/act3_lab23_posey.xlsx
+
+
 ## Technical Details
 
 The following technical paper describes how ExceLint works and includes
