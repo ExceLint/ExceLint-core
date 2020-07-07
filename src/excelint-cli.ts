@@ -42,7 +42,7 @@ const args = require('yargs')
     .command('directory', 'Read from a directory of files (all ending in .xls / .xlsx).')
     .alias('d', 'directory')
     .command('formattingDiscount', 'Set discount for formatting differences (default = ' + defaultFormattingDiscount + ').')
-    .command('reportingThreshold', 'Set the threshold % for reporting suspicious formulas (default = ' + defaultReportingThreshold + ').')
+    .command('reportingThreshold', 'Set the threshold % for reporting anomalous formulas (default = ' + defaultReportingThreshold + ').')
     .command('suppressOutput', 'Don\'t output the processed JSON to stdout.')
     .command('noElapsedTime', 'Suppress elapsed time output (for regression testing).')
     .command('sweep', 'Perform a parameter sweep and report the best settings overall.')
@@ -199,8 +199,8 @@ for (let parms of parameters) {
 
             const myTimer = new Timer('excelint');
 
-            // Get suspicious cells and proposed fixes, among others.
-            let [suspicious_cells, grouped_formulas, grouped_data, proposed_fixes]
+            // Get anomalous cells and proposed fixes, among others.
+            let [anomalous_cells, grouped_formulas, grouped_data, proposed_fixes]
                 = Colorize.process_suspicious(usedRangeAddress, sheet.formulas, sheet.values);
 
             // Adjust the fixes based on font stuff. We should allow parameterization here for weighting (as for thresholding).
@@ -368,14 +368,14 @@ for (let parms of parameters) {
             const totalCells = rows * columns;
 
             const out = {
-                'suspiciousnessThreshold': reportingThreshold,
+                'anomalousnessThreshold': reportingThreshold,
                 'formattingDiscount': formattingDiscount,
                 'proposedFixes': adjusted_fixes,
                 'exampleFixes': example_fixes_r1c1,
                 //		'exampleFixesR1C1' : example_fixes_r1c1,
-                'suspiciousRanges': adjusted_fixes.length,
-                'weightedSuspiciousRanges': 0, // actually calculated below.
-                'suspiciousCells': 0, // actually calculated below.
+                'anomalousRanges': adjusted_fixes.length,
+                'weightedAnomalousRanges': 0, // actually calculated below.
+                'anomalousCells': 0, // actually calculated below.
                 'elapsedTimeSeconds': elapsed / 1e6,
                 'columns': columns,
                 'rows': rows,
@@ -396,9 +396,9 @@ for (let parms of parameters) {
             });
             const foundBugsArray: any = Array.from(new Set(foundBugs.flat(1).map(JSON.stringify)));
             foundBugs = foundBugsArray.map(JSON.parse);
-            out['suspiciousCells'] = foundBugs.length;
-            let weightedSuspiciousRanges = out['proposedFixes'].map(x => x[0]).reduce((x, y) => x + y, 0);
-            out['weightedSuspiciousRanges'] = weightedSuspiciousRanges;
+            out['anomalousCells'] = foundBugs.length;
+            let weightedAnomalousRanges = out['proposedFixes'].map(x => x[0]).reduce((x, y) => x + y, 0);
+            out['weightedAnomalousRanges'] = weightedAnomalousRanges;
             if (workbookBasename in bugs) {
                 if (sheet.sheetName in bugs[workbookBasename]) {
                     const trueBugs = bugs[workbookBasename][sheet.sheetName]['bugs'];
