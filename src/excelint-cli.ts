@@ -54,6 +54,10 @@ const defaultMaxCategories = 2;
 let numWorkbooks = 0;
 let numWorkbooksWithFormulas = 0;
 let numWorkbooksWithErrors = 0;
+
+let sheetTruePositiveSet = new Set();
+let sheetFalsePositiveSet = new Set();
+
 let numSheets = 0;
 let numSheetsWithErrors = 0;
 let sheetTruePositives = 0;
@@ -513,9 +517,11 @@ for (let parms of parameters) {
 
 		    if (truePositives.length) {
 			sheetTruePositives += 1;
+			sheetTruePositiveSet.add(workbookBasename + ':' + sheet.sheetName);
 		    }
 		    if (falsePositives.length) {
 			sheetFalsePositives += 1;
+			sheetFalsePositiveSet.add(workbookBasename + ':' + sheet.sheetName);
 		    }
 		    
                     // We adopt the methodology used by the ExceLint paper (OOPSLA 18):
@@ -583,3 +589,5 @@ console.log("Num sheets = " + numSheets);
 console.log("Num sheets with errors = " + numSheetsWithErrors);
 console.log("Sheets with ExceLint true positives = " + sheetTruePositives);
 console.log("Sheets with ExceLint false positives = " + sheetFalsePositives);
+let intersection = new Set([...sheetTruePositiveSet].filter(i => sheetFalsePositiveSet.has(i)));
+console.log("Sheets with both = " + intersection.size);
