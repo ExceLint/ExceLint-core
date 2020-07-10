@@ -591,3 +591,6 @@ console.log("Sheets with ExceLint true positives = " + sheetTruePositives);
 console.log("Sheets with ExceLint false positives = " + sheetFalsePositives);
 let intersection = new Set([...sheetTruePositiveSet].filter(i => sheetFalsePositiveSet.has(i)));
 console.log("Sheets with both = " + intersection.size);
+console.log("True positive sheets = " + [...sheetTruePositiveSet]);
+console.log("Both true and false positive sheets = " + [...intersection]);
+console.log("False positive sheets = " + [...sheetFalsePositiveSet]);
