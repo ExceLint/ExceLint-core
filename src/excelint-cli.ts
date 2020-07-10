@@ -49,6 +49,7 @@ const useExample = false;
 const usageString = 'Usage: $0 <command> [options]';
 const defaultFormattingDiscount = Colorize.getFormattingDiscount();
 const defaultReportingThreshold = Colorize.getReportingThreshold();
+const defaultMaxCategories = 2;
 
 // Process command-line arguments.
 const args = require('yargs')
@@ -62,6 +63,8 @@ const args = require('yargs')
     .command('reportingThreshold', 'Set the threshold % for reporting anomalous formulas (default = ' + defaultReportingThreshold + ').')
     .command('suppressOutput', 'Don\'t output the processed JSON to stdout.')
     .command('noElapsedTime', 'Suppress elapsed time output (for regression testing).')
+    .command('maxCategories', 'Maximum number of categories for reported errors (default = ' + defaultMaxCategories + ').')
+    .command('suppressDifferentReferentCount', '')
     .command('suppressRecurrentFormula', '')
     .command('suppressOneExtraConstant', '')
     .command('suppressNumberOfConstantsMismatch', '')
@@ -95,6 +98,11 @@ if (args.input) {
     allFiles = [fname];
 }
 
+if (!args.directory && !args.input) {
+    console.warn('Must specify either --directory or --input.');
+    process.exit(-1);
+}
+
 // argument:
 // formattingDiscount = amount of impact of formatting on fix reporting (0-100%).
 let formattingDiscount = defaultFormattingDiscount;
@@ -124,6 +132,10 @@ if (reportingThreshold > 100) {
     reportingThreshold = 100;
 }
 Colorize.setReportingThreshold(reportingThreshold);
+
+if (!('maxCategories' in args)) {
+  args.maxCategories = defaultMaxCategories;
+}
 
 //
 // Ready to start processing.
@@ -251,7 +263,7 @@ for (let parms of parameters) {
             }
 
 	    // Process all the fixes, classifying and optionally pruning them.
-	    
+
             let example_fixes_r1c1 = [];
             for (let ind = 0; ind < initial_adjusted_fixes.length; ind++) {
 		// Determine the direction of the range (vertical or horizontal) by looking at the axes.
@@ -367,7 +379,8 @@ for (let parms of parameters) {
                 }
 		// IMPORTANT:
 		// Exclude reported bugs subject to certain conditions.
-		if ((bin.length > 2) // Too many categories
+		if ((bin.length > args.maxCategories) // Too many categories
+		    || ((bin.indexOf(BinCategories.DifferentReferentCount) != -1) && args.suppressDifferentReferentCount)
 		    || ((bin.indexOf(BinCategories.RecurrentFormula) != -1) && args.suppressRecurrentFormula)
 		    || ((bin.indexOf(BinCategories.OneExtraConstant) != -1) && args.suppressOneExtraConstant)
 		    || ((bin.indexOf(BinCategories.NumberOfConstantsMismatch) != -1) && args.suppressNumberOfConstantsMismatch)
