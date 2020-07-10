@@ -5,7 +5,7 @@ import re
 import subprocess
 
 maxCategories = "3"
-reportingThreshold = "2"
+reportingThreshold = "0"
 
 opts = [
 #    "suppressDifferentReferentCount",
@@ -43,6 +43,8 @@ for i in range(2**lenopts):
     # print(cmdline)
     # cmdline = "ls -l"
     r = subprocess.run(cmdline, shell=True, capture_output=True)
+    truePositives = 0
+    falsePositives = 0
     for line in r.stdout.decode().split('\n'):
         # Try to match out true positives and false positives
         if (line.find("ExceLint true positives") >= 0):
