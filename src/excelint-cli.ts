@@ -51,6 +51,14 @@ const defaultFormattingDiscount = Colorize.getFormattingDiscount();
 const defaultReportingThreshold = Colorize.getReportingThreshold();
 const defaultMaxCategories = 2;
 
+let numWorkbooks = 0;
+let numWorkbooksWithFormulas = 0;
+let numWorkbooksWithErrors = 0;
+let numSheets = 0;
+let numSheetsWithErrors = 0;
+let sheetTruePositives = 0;
+let sheetFalsePositives = 0;
+
 // Process command-line arguments.
 const args = require('yargs')
     .usage(usageString)
@@ -212,6 +220,7 @@ for (let parms of parameters) {
     let scores = [];
 
     for (let fname of allFiles) {
+	numWorkbooks += 1;
         // Read from file.
         console.warn('processing ' + fname);
         inp = ExcelJSON.processWorkbook(base, fname);
@@ -221,6 +230,31 @@ for (let parms of parameters) {
             'worksheets': {}
         };
 
+	{
+	    let hasError = false;
+	    let hasFormula = false;
+            for (let i = 0; i < inp.worksheets.length; i++) {
+		const sheet = inp.worksheets[i];
+		numSheets += 1;
+		const workbookBasename = path.basename(inp['workbookName']);
+		if (workbookBasename in bugs) {
+		    if (sheet.sheetName in bugs[workbookBasename]) {
+			hasError = true;
+			numSheetsWithErrors += 1;
+		    }
+		}
+		if (sheet.formulas.length > 2) { // ExceLint can't ever report an error if there are fewer than 3 formulas.
+		    hasFormula = true;
+		}
+	    }
+	    if (hasError) {
+		numWorkbooksWithErrors += 1;
+	    }
+	    if (hasFormula) {
+		numWorkbooksWithFormulas += 1;
+	    }
+	}
+	
         for (let i = 0; i < inp.worksheets.length; i++) {
             const sheet = inp.worksheets[i];
 	    
@@ -228,7 +262,7 @@ for (let parms of parameters) {
             if ((sheet.formulas.length === 0) && (sheet.values.length === 0)) {
                 continue;
             }
-	    console.log(output['workbookName'] + " - " + sheet.sheetName);
+	    console.warn(output['workbookName'] + " - " + sheet.sheetName);
 	    
             // Get rid of multiple exclamation points in the used range address,
             // as these interfere with later regexp parsing.
@@ -476,6 +510,13 @@ for (let parms of parameters) {
 		    out['sheetFalsePositives'] = (falsePositives.length > 0) ? 1 : 0;
 		    out['sheetFalseNegatives'] = (falseNegatives.length > 0) ? 1 : 0;
 		    out['sheetTruePositives'] = (truePositives.length > 0) ? 1 : 0;
+
+		    if (truePositives.length) {
+			sheetTruePositives += 1;
+		    }
+		    if (falsePositives.length) {
+			sheetFalsePositives += 1;
+		    }
 		    
                     // We adopt the methodology used by the ExceLint paper (OOPSLA 18):
                     //   "When a tool flags nothing, we define precision to
@@ -535,3 +576,10 @@ if (!args.suppressOutput) {
 }
 // console.log(JSON.stringify(f1scores));
 
+console.log("Num workbooks = " + numWorkbooks);
+console.log("Num workbooks with errors = " + numWorkbooksWithErrors);
+console.log("Num workbooks with formulas = " + numWorkbooksWithFormulas);
+console.log("Num sheets = " + numSheets);
+console.log("Num sheets with errors = " + numSheetsWithErrors);
+console.log("Sheets with ExceLint true positives = " + sheetTruePositives);
+console.log("Sheets with ExceLint false positives = " + sheetFalsePositives);
