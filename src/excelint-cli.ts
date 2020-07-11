@@ -12,6 +12,7 @@ import { Timer } from './timer';
 import { string } from 'prop-types';
 
 enum BinCategories {
+    FatFix = "fat-fix", // fix is not a single column or single row
     RecurrentFormula = "recurrent-formula", // formulas refer to each other
     OneExtraConstant = "one-extra-constant", // one has no constant and the other has one constant
     NumberOfConstantsMismatch = "number-of-constants-mismatch", // both have constants but not the same number of constants
@@ -76,6 +77,7 @@ const args = require('yargs')
     .command('suppressOutput', 'Don\'t output the processed JSON to stdout.')
     .command('noElapsedTime', 'Suppress elapsed time output (for regression testing).')
     .command('maxCategories', 'Maximum number of categories for reported errors (default = ' + defaultMaxCategories + ').')
+    .command('suppressFatFix', '')
     .command('suppressDifferentReferentCount', '')
     .command('suppressRecurrentFormula', '')
     .command('suppressOneExtraConstant', '')
@@ -347,6 +349,30 @@ for (let parms of parameters) {
                 let totalNumericDiff = Math.abs(numbers[0] - numbers[1]);
                 // Binning.
                 let bin = [];
+		
+		// Check for "fat" fixes (that result in more than a single row or single column).
+		//console.log(initial_adjusted_fixes[ind]);
+		// Check if all in the same row.
+		let sameRow = false;
+		let sameColumn = false;
+		{
+		    let fixColumn = initial_adjusted_fixes[ind][1][0][0];
+		    if ((initial_adjusted_fixes[ind][1][1][0] == fixColumn) &&
+			(initial_adjusted_fixes[ind][2][0][0] == fixColumn) &&
+			(initial_adjusted_fixes[ind][2][1][0] == fixColumn)) {
+			sameColumn = true;
+		    }
+		    let fixRow = initial_adjusted_fixes[ind][1][0][1];
+		    if ((initial_adjusted_fixes[ind][1][1][1] == fixRow) &&
+			(initial_adjusted_fixes[ind][2][0][1] == fixRow) &&
+			(initial_adjusted_fixes[ind][2][1][1] == fixRow)) {
+			sameRow = true;
+		    }
+		    if (!sameColumn && !sameRow) {
+			bin.push(BinCategories.FatFix);
+		    }
+		}
+		    
                 // Check for recurrent formulas.
                 for (let i = 0; i < dependence_vectors.length; i++) {
                     // If there are at least two dependencies and one of them is -1 in the column (row),
@@ -418,6 +444,7 @@ for (let parms of parameters) {
 		// IMPORTANT:
 		// Exclude reported bugs subject to certain conditions.
 		if ((bin.length > args.maxCategories) // Too many categories
+		    || ((bin.indexOf(BinCategories.FatFix) != -1) && args.suppressFatFix)
 		    || ((bin.indexOf(BinCategories.DifferentReferentCount) != -1) && args.suppressDifferentReferentCount)
 		    || ((bin.indexOf(BinCategories.RecurrentFormula) != -1) && args.suppressRecurrentFormula)
 		    || ((bin.indexOf(BinCategories.OneExtraConstant) != -1) && args.suppressOneExtraConstant)
