@@ -51,6 +51,7 @@ const usageString = 'Usage: $0 <command> [options]';
 const defaultFormattingDiscount = Colorize.getFormattingDiscount();
 const defaultReportingThreshold = Colorize.getReportingThreshold();
 const defaultMaxCategories = 2;
+const defaultMinFixSize = 3;
 
 let numWorkbooks = 0;
 let numWorkbooksWithFormulas = 0;
@@ -77,6 +78,7 @@ const args = require('yargs')
     .command('suppressOutput', 'Don\'t output the processed JSON to stdout.')
     .command('noElapsedTime', 'Suppress elapsed time output (for regression testing).')
     .command('maxCategories', 'Maximum number of categories for reported errors (default = ' + defaultMaxCategories + ').')
+    .command('minFixSize', 'Minimum size of a fix in number of cells (default = ' + defaultMinFixSize + ')')
     .command('suppressFatFix', '')
     .command('suppressDifferentReferentCount', '')
     .command('suppressRecurrentFormula', '')
@@ -149,6 +151,11 @@ Colorize.setReportingThreshold(reportingThreshold);
 
 if (!('maxCategories' in args)) {
   args.maxCategories = defaultMaxCategories;
+}
+
+let minFixSize = defaultMinFixSize;
+if ('minFixSize' in args) {
+    minFixSize = args.minFixSize;
 }
 
 //
@@ -347,6 +354,14 @@ for (let parms of parameters) {
                     dependence_vectors.push(dependences_wo_constants);
                 }
                 let totalNumericDiff = Math.abs(numbers[0] - numbers[1]);
+
+		// Omit fixes that are too small (too few cells).
+		let fixRange = expand(initial_adjusted_fixes[ind][1][0], initial_adjusted_fixes[ind][1][1]).concat(expand(initial_adjusted_fixes[ind][2][0], initial_adjusted_fixes[ind][2][1]));
+		if (fixRange.length < minFixSize) {
+		    console.warn("Omitted " + JSON.stringify(print_formulas) + "(too small)");
+		    continue;
+		}
+		
                 // Binning.
                 let bin = [];
 		
@@ -617,7 +632,9 @@ console.log("Num sheets with errors = " + numSheetsWithErrors);
 console.log("Sheets with ExceLint true positives = " + sheetTruePositives);
 console.log("Sheets with ExceLint false positives = " + sheetFalsePositives);
 let intersection = new Set([...sheetTruePositiveSet].filter(i => sheetFalsePositiveSet.has(i)));
+let subtraction = new Set([...sheetFalsePositiveSet].filter(i => !intersection.has(i)));
 console.log("Sheets with both = " + intersection.size);
 console.log("True positive sheets = " + [...sheetTruePositiveSet]);
 console.log("Both true and false positive sheets = " + [...intersection]);
 console.log("False positive sheets = " + [...sheetFalsePositiveSet]);
+console.log("Only false positive sheets = " + [...subtraction]);
