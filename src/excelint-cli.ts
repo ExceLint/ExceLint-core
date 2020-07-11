@@ -52,6 +52,7 @@ const defaultFormattingDiscount = Colorize.getFormattingDiscount();
 const defaultReportingThreshold = Colorize.getReportingThreshold();
 const defaultMaxCategories = 2;
 const defaultMinFixSize = 3;
+const defaultMaxEntropy = 1.0;
 
 let numWorkbooks = 0;
 let numWorkbooksWithFormulas = 0;
@@ -79,6 +80,7 @@ const args = require('yargs')
     .command('noElapsedTime', 'Suppress elapsed time output (for regression testing).')
     .command('maxCategories', 'Maximum number of categories for reported errors (default = ' + defaultMaxCategories + ').')
     .command('minFixSize', 'Minimum size of a fix in number of cells (default = ' + defaultMinFixSize + ')')
+    .command('maxEntropy', 'Maximum entropy of a proposed fix (default = ' + defaultMaxEntropy + ')')
     .command('suppressFatFix', '')
     .command('suppressDifferentReferentCount', '')
     .command('suppressRecurrentFormula', '')
@@ -156,6 +158,18 @@ if (!('maxCategories' in args)) {
 let minFixSize = defaultMinFixSize;
 if ('minFixSize' in args) {
     minFixSize = args.minFixSize;
+}
+
+let maxEntropy = defaultMaxEntropy;
+if ('maxEntropy' in args) {
+    maxEntropy = args.maxEntropy;
+    // Entropy must be between 0 and 1.
+    if (maxEntropy < 0.0) {
+	maxEntropy = 0.0;
+    }
+    if (maxEntropy > 1.0) {
+	maxEntropy = 1.0;
+    }
 }
 
 //
@@ -353,14 +367,26 @@ for (let parms of parameters) {
                     // console.log(preface + JSON.stringify(dependences_wo_constants));
                     dependence_vectors.push(dependences_wo_constants);
                 }
-                let totalNumericDiff = Math.abs(numbers[0] - numbers[1]);
+                const totalNumericDiff = Math.abs(numbers[0] - numbers[1]);
 
 		// Omit fixes that are too small (too few cells).
-		let fixRange = expand(initial_adjusted_fixes[ind][1][0], initial_adjusted_fixes[ind][1][1]).concat(expand(initial_adjusted_fixes[ind][2][0], initial_adjusted_fixes[ind][2][1]));
+		const fixRange = expand(initial_adjusted_fixes[ind][1][0], initial_adjusted_fixes[ind][1][1]).concat(expand(initial_adjusted_fixes[ind][2][0], initial_adjusted_fixes[ind][2][1]));
 		if (fixRange.length < minFixSize) {
 		    console.warn("Omitted " + JSON.stringify(print_formulas) + "(too small)");
 		    continue;
 		}
+
+		// Entropy cutoff.
+		const leftFixSize = expand(initial_adjusted_fixes[ind][1][0], initial_adjusted_fixes[ind][1][1]).length;
+		const rightFixSize = expand(initial_adjusted_fixes[ind][2][0], initial_adjusted_fixes[ind][2][1]).length;
+		const totalSize = leftFixSize + rightFixSize;
+		const fixEntropy = -(leftFixSize/totalSize * Math.log2(leftFixSize/totalSize) + rightFixSize/totalSize * Math.log2(rightFixSize/totalSize));
+		console.log("fix entropy = " + fixEntropy);
+		if (fixEntropy > maxEntropy) {
+		    console.warn("Omitted " + JSON.stringify(print_formulas) + "(too high entropy)");
+		    continue;
+		}
+
 		
                 // Binning.
                 let bin = [];
