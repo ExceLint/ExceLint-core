@@ -266,8 +266,10 @@ for (let parms of parameters) {
 		const workbookBasename = path.basename(inp['workbookName']);
 		if (workbookBasename in bugs) {
 		    if (sheet.sheetName in bugs[workbookBasename]) {
-			hasError = true;
-			numSheetsWithErrors += 1;
+			if (bugs[workbookBasename][sheet.sheetName]['bugs'].length > 0) {
+			    hasError = true;
+			    numSheetsWithErrors += 1;
+			}
 		    }
 		}
 		if (sheet.formulas.length > 2) { // ExceLint can't ever report an error if there are fewer than 3 formulas.
