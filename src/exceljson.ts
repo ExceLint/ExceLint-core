@@ -67,8 +67,7 @@ export class ExcelJSON {
         return rows;
     }
 
-    public static processWorkbook(base: string, filename: string) {
-        let f = xlsx.readFile(base + filename, { "cellStyles": true });
+    public static processWorkbookFromXLSX(f: any, filename: string) {
         //console.log(JSON.stringify(f, null, 4));
         let output = {};
         output["workbookName"] = filename;
@@ -110,6 +109,11 @@ export class ExcelJSON {
             });
         }
         return output;
+    }
+    
+    public static processWorkbook(base: string, filename: string) {
+        let f = xlsx.readFile(base + filename, { "cellStyles": true });
+	return this.processWorkbookFromXLSX(f, filename);
     }
 };
 
