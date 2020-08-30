@@ -1,3 +1,4 @@
+const path = require('path');
 
 // Polyfill for flat (IE & Edge)
 const flat = require('array.prototype.flat');
@@ -14,11 +15,30 @@ import { find_all_proposed_fixes } from './groupme';
 import { Stencil, InfoGain } from './infogain';
 
 export class Colorize {
-   
-    public static reportingThreshold = 35; //  percent of bar
+    
+    public static maxCategories = 2;         // Maximum number of categories for reported errors
+    public static minFixSize = 3;            // Minimum size of a fix in number of cells
+    public static maxEntropy = 1.0;          // Maximum entropy of a proposed fix
+
+    // Suppressing certain categories of errors.
+    
+    public static suppressFatFix = true;
+    public static suppressDifferentReferentCount = false;
+    public static suppressRecurrentFormula = true;
+    public static suppressOneExtraConstant = false;
+    public static suppressNumberOfConstantsMismatch = false;
+    public static suppressBothConstants = false;
+    public static suppressOneIsAllConstants = false;
+    public static suppressR1C1Mismatch = false;
+    public static suppressAbsoluteRefMismatch = false;
+    public static suppressOffAxisReference = true;
+    
+    public static noElapsedTime = false;                  // if true, don't report elapsed time
+    public static reportingThreshold = 35;                // Percent of anomalousness
     public static suspiciousCellsReportingThreshold = 85; //  percent of bar
     public static formattingDiscount = 50; // percent of discount: 100% means different formats = not suspicious at all
 
+    // Limits on how many formulas or values to attempt to process.
     private static formulasThreshold = 10000;
     private static valuesThreshold = 10000;
 
@@ -68,6 +88,385 @@ export class Colorize {
     public static get_color(hashval: number): string {
         const color = this.color_list[(hashval * 1) % this.color_list.length];
         return color;
+    }
+
+    public static process_workbook(inp: any): any { // bugs
+	
+	let output = {
+            'workbookName': path.basename(inp['workbookName']),
+            'worksheets': {}
+	};
+	let scores = [];
+	let sheetTruePositiveSet = new Set();
+	let sheetFalsePositiveSet = new Set();
+	let sheetTruePositives = 0;
+	let sheetFalsePositives = 0;
+	
+	for (let i = 0; i < inp.worksheets.length; i++) {
+            const sheet = inp.worksheets[i];
+	    
+            // Skip empty sheets.
+            if ((sheet.formulas.length === 0) && (sheet.values.length === 0)) {
+		continue;
+            }
+	    // console.warn(output['workbookName'] + " - " + sheet.sheetName);
+	    
+            // Get rid of multiple exclamation points in the used range address,
+            // as these interfere with later regexp parsing.
+            let usedRangeAddress = sheet.usedRangeAddress;
+            usedRangeAddress = usedRangeAddress.replace(/!(!+)/, '!');
+
+            const myTimer = new Timer('excelint');
+
+            // Get anomalous cells and proposed fixes, among others.
+            let [anomalous_cells, grouped_formulas, grouped_data, proposed_fixes]
+		= Colorize.process_suspicious(usedRangeAddress, sheet.formulas, sheet.values);
+
+            // Adjust the fixes based on font stuff. We should allow parameterization here for weighting (as for thresholding).
+            // NB: origin_col and origin_row currently hard-coded at 0,0.
+
+            proposed_fixes = Colorize.adjust_proposed_fixes(proposed_fixes, sheet.styles, 0, 0);
+
+            // Adjust the proposed fixes for real (just adjusting the scores downwards by the formatting discount).
+            let initial_adjusted_fixes = [];
+	    let final_adjusted_fixes = []; // We will eventually trim these.
+            // tslint:disable-next-line: forin
+            for (let ind = 0; ind < proposed_fixes.length; ind++) {
+		const f = proposed_fixes[ind];
+		const [score, first, second, sameFormat] = f;
+		let adjusted_score = -score;
+		if (!sameFormat) {
+                    adjusted_score *= (100 - Colorize.formattingDiscount) / 100;
+		}
+		if (adjusted_score * 100 >= Colorize.reportingThreshold) {
+                    initial_adjusted_fixes.push([adjusted_score, first, second]);
+		}
+            }
+
+	    // Process all the fixes, classifying and optionally pruning them.
+
+            let example_fixes_r1c1 = [];
+            for (let ind = 0; ind < initial_adjusted_fixes.length; ind++) {
+		// Determine the direction of the range (vertical or horizontal) by looking at the axes.
+		let direction = "";
+		if (initial_adjusted_fixes[ind][1][0][0] === initial_adjusted_fixes[ind][2][0][0]) {
+                    direction = "vertical";
+		} else {
+                    direction = "horizontal";
+		}
+		let formulas = [];              // actual formulas
+		let print_formulas = [];        // formulas with a preface (the cell name containing each)
+		let r1c1_formulas = [];         // formulas in R1C1 format
+		let r1c1_print_formulas = [];   // as above, but for R1C1 formulas
+		let all_numbers = [];           // all the numeric constants in each formula
+		let numbers = [];               // the sum of all the numeric constants in each formula
+		let dependence_count = [];      // the number of dependent cells
+		let absolute_refs = [];         // the number of absolute references in each formula
+		let dependence_vectors = [];
+		// Generate info about the formulas.
+		for (let i = 0; i < 2; i++) {
+                    // the coordinates of the cell containing the first formula in the proposed fix range
+                    const formulaCoord = initial_adjusted_fixes[ind][i + 1][0];
+                    const formulaX = formulaCoord[1] - 1;                   // row
+                    const formulaY = formulaCoord[0] - 1;                   // column
+                    const formula = sheet.formulas[formulaX][formulaY];   // the formula itself
+                    const numeric_constants = ExcelUtils.numeric_constants(formula); // all numeric constants in the formula
+                    all_numbers.push(numeric_constants);
+                    numbers.push(numbers.reduce((a, b) => a + b, 0));      // the sum of all numeric constants
+                    const dependences_wo_constants = ExcelUtils.all_cell_dependencies(formula, formulaY + 1, formulaX + 1, false);
+                    dependence_count.push(dependences_wo_constants.length);
+                    const r1c1 = ExcelUtils.formulaToR1C1(formula, formulaY + 1, formulaX + 1);
+                    const preface = ExcelUtils.column_index_to_name(formulaY + 1) + (formulaX + 1) + ":";
+                    const cellPlusFormula = preface + r1c1;
+                    // Add the formulas plus their prefaces (the latter for printing).
+                    r1c1_formulas.push(r1c1);
+                    r1c1_print_formulas.push(cellPlusFormula);
+                    formulas.push(formula);
+                    print_formulas.push(preface + formula);
+                    absolute_refs.push((formula.match(/\$/g) || []).length);
+                    // console.log(preface + JSON.stringify(dependences_wo_constants));
+                    dependence_vectors.push(dependences_wo_constants);
+		}
+		const totalNumericDiff = Math.abs(numbers[0] - numbers[1]);
+
+		// Omit fixes that are too small (too few cells).
+		const fixRange = Colorize.expand(initial_adjusted_fixes[ind][1][0], initial_adjusted_fixes[ind][1][1]).concat(Colorize.expand(initial_adjusted_fixes[ind][2][0], initial_adjusted_fixes[ind][2][1]));
+		if (fixRange.length < Colorize.minFixSize) {
+		    console.warn("Omitted " + JSON.stringify(print_formulas) + "(too small)");
+		    continue;
+		}
+
+		// Entropy cutoff.
+		const leftFixSize = Colorize.expand(initial_adjusted_fixes[ind][1][0], initial_adjusted_fixes[ind][1][1]).length;
+		const rightFixSize = Colorize.expand(initial_adjusted_fixes[ind][2][0], initial_adjusted_fixes[ind][2][1]).length;
+		const totalSize = leftFixSize + rightFixSize;
+		const fixEntropy = -(leftFixSize/totalSize * Math.log2(leftFixSize/totalSize) + rightFixSize/totalSize * Math.log2(rightFixSize/totalSize));
+		console.warn("fix entropy = " + fixEntropy);
+		if (fixEntropy > Colorize.maxEntropy) {
+		    console.warn("Omitted " + JSON.stringify(print_formulas) + "(too high entropy)");
+		    continue;
+		}
+
+		
+		// Binning.
+		let bin = [];
+		
+		// Check for "fat" fixes (that result in more than a single row or single column).
+		//console.log(initial_adjusted_fixes[ind]);
+		// Check if all in the same row.
+		let sameRow = false;
+		let sameColumn = false;
+		{
+		    let fixColumn = initial_adjusted_fixes[ind][1][0][0];
+		    if ((initial_adjusted_fixes[ind][1][1][0] == fixColumn) &&
+			(initial_adjusted_fixes[ind][2][0][0] == fixColumn) &&
+			(initial_adjusted_fixes[ind][2][1][0] == fixColumn)) {
+			sameColumn = true;
+		    }
+		    let fixRow = initial_adjusted_fixes[ind][1][0][1];
+		    if ((initial_adjusted_fixes[ind][1][1][1] == fixRow) &&
+			(initial_adjusted_fixes[ind][2][0][1] == fixRow) &&
+			(initial_adjusted_fixes[ind][2][1][1] == fixRow)) {
+			sameRow = true;
+		    }
+		    if (!sameColumn && !sameRow) {
+			bin.push(Colorize.BinCategories.FatFix);
+		    }
+		}
+		
+		// Check for recurrent formulas.
+		for (let i = 0; i < dependence_vectors.length; i++) {
+                    // If there are at least two dependencies and one of them is -1 in the column (row),
+                    // it is a recurrence (the common recurrence relation of starting at a value and
+                    // referencing, say, =B10+1).
+                    if (dependence_vectors[i].length > 0) {
+			if ((direction === "vertical") && ((dependence_vectors[i][0][0] === 0) && (dependence_vectors[i][0][1] === -1))) {
+                            bin.push(Colorize.BinCategories.RecurrentFormula);
+                            break;
+			}
+			if ((direction === "horizontal") && ((dependence_vectors[i][0][0] === -1) && (dependence_vectors[i][0][1] === 0))) {
+                            bin.push(Colorize.BinCategories.RecurrentFormula);
+                            break;
+			}
+                    }
+		}
+		// Different number of referents (dependencies).
+		if (dependence_count[0] !== dependence_count[1]) {
+                    bin.push(Colorize.BinCategories.DifferentReferentCount);
+		}
+		// Different number of constants.
+		if (all_numbers[0].length !== all_numbers[1].length) {
+                    if (Math.abs(all_numbers[0].length - all_numbers[1].length) === 1) {
+			bin.push(Colorize.BinCategories.OneExtraConstant);
+                    } else {
+			bin.push(Colorize.BinCategories.NumberOfConstantsMismatch);
+                    }
+		}
+		// Both constants.
+		if ((all_numbers[0].length > 0) && (all_numbers[1].length > 0)) {
+                    // Both have numbers.
+                    if (dependence_count[0] + dependence_count[1] === 0) {
+			// Both have no dependents.
+			bin.push(Colorize.BinCategories.BothConstants);
+                    } else {
+			if (dependence_count[0] * dependence_count[1] === 0) {
+                            // One is a constant.
+                            bin.push(Colorize.BinCategories.OneIsAllConstants);
+			}
+                    }
+		}
+		// Mismatched R1C1 representation.
+		if (r1c1_formulas[0] !== r1c1_formulas[1]) {
+                    // The formulas don't match, but it could
+                    // be because of the presence of (possibly
+                    // different) constants instead of the
+                    // dependencies being different. Do a deep comparison
+                    // here.
+                    if (JSON.stringify(dependence_vectors[0].sort()) !== JSON.stringify(dependence_vectors[1].sort())) {
+			bin.push(Colorize.BinCategories.R1C1Mismatch);
+                    }
+		}
+		// Different number of absolute ($, a.k.a. "anchor") references.
+		if (absolute_refs[0] !== absolute_refs[1]) {
+                    bin.push(Colorize.BinCategories.AbsoluteRefMismatch);
+		}
+		// Dependencies that are neither vertical or horizontal (likely errors if an absolute-ref-mismatch).
+		for (let i = 0; i < dependence_vectors.length; i++) {
+                    if (dependence_vectors[i].length > 0) {
+			if (dependence_vectors[i][0][0] * dependence_vectors[i][0][1] !== 0) {
+                            bin.push(Colorize.BinCategories.OffAxisReference);
+                            break;
+			}
+                    }
+		}
+		if (bin === []) {
+                    bin.push(Colorize.BinCategories.Unclassified);
+		}
+		// IMPORTANT:
+		// Exclude reported bugs subject to certain conditions.
+		if ((bin.length > Colorize.maxCategories) // Too many categories
+		    || ((bin.indexOf(Colorize.BinCategories.FatFix) != -1) && Colorize.suppressFatFix)
+		    || ((bin.indexOf(Colorize.BinCategories.DifferentReferentCount) != -1) && Colorize.suppressDifferentReferentCount)
+		    || ((bin.indexOf(Colorize.BinCategories.RecurrentFormula) != -1) && Colorize.suppressRecurrentFormula)
+		    || ((bin.indexOf(Colorize.BinCategories.OneExtraConstant) != -1) && Colorize.suppressOneExtraConstant)
+		    || ((bin.indexOf(Colorize.BinCategories.NumberOfConstantsMismatch) != -1) && Colorize.suppressNumberOfConstantsMismatch)
+		    || ((bin.indexOf(Colorize.BinCategories.BothConstants) != -1) && Colorize.suppressBothConstants)
+		    || ((bin.indexOf(Colorize.BinCategories.OneIsAllConstants) != -1) && Colorize.suppressOneIsAllConstants)
+		    || ((bin.indexOf(Colorize.BinCategories.R1C1Mismatch) != -1) && Colorize.suppressR1C1Mismatch)
+		    || ((bin.indexOf(Colorize.BinCategories.AbsoluteRefMismatch) != -1) && Colorize.suppressAbsoluteRefMismatch)
+		    || ((bin.indexOf(Colorize.BinCategories.OffAxisReference) != -1) && Colorize.suppressOffAxisReference))
+		{
+		    console.warn("Omitted " + JSON.stringify(print_formulas) + "(" + JSON.stringify(bin) + ")");
+		    continue;
+		} else {
+		    console.warn("NOT omitted " + JSON.stringify(print_formulas) + "(" + JSON.stringify(bin) + ")");
+		}
+		final_adjusted_fixes.push(initial_adjusted_fixes[ind]);
+		
+		example_fixes_r1c1.push({
+                    "bin": bin,
+                    "direction": direction,
+                    "numbers": numbers,
+                    "numeric_difference": totalNumericDiff,
+                    "magnitude_numeric_difference": (totalNumericDiff === 0) ? 0 : Math.log10(totalNumericDiff),
+                    "formulas": print_formulas,
+                    "r1c1formulas": r1c1_print_formulas,
+                    "dependence_vectors": dependence_vectors
+		});
+		// example_fixes_r1c1.push([direction, formulas]);
+            }
+
+            let elapsed = myTimer.elapsedTime();
+            if (Colorize.noElapsedTime) {
+		elapsed = 0; // Dummy value, used for regression testing.
+            }
+            // Compute number of cells containing formulas.
+            const numFormulaCells = (sheet.formulas.flat().filter(x => x.length > 0)).length;
+
+            // Count the number of non-empty cells.
+            const numValueCells = (sheet.values.flat().filter(x => x.length > 0)).length;
+
+            // Compute total number of cells in the sheet (rows * columns).
+            const columns = sheet.values[0].length;
+            const rows = sheet.values.length;
+            const totalCells = rows * columns;
+
+            const out = {
+		'anomalousnessThreshold': Colorize.reportingThreshold,
+		'formattingDiscount': Colorize.formattingDiscount,
+		// 'proposedFixes': final_adjusted_fixes,
+		'exampleFixes': example_fixes_r1c1,
+		//		'exampleFixesR1C1' : example_fixes_r1c1,
+		'anomalousRanges': final_adjusted_fixes.length,
+		'weightedAnomalousRanges': 0, // actually calculated below.
+		'anomalousCells': 0, // actually calculated below.
+		'elapsedTimeSeconds': elapsed / 1e6,
+		'columns': columns,
+		'rows': rows,
+		'totalCells': totalCells,
+		'numFormulaCells': numFormulaCells,
+		'numValueCells': numValueCells
+            };
+
+            // Compute precision and recall of proposed fixes, if we have annotated ground truth.
+            const workbookBasename = path.basename(inp['workbookName']);
+            // Build list of bugs.
+            let foundBugs: any = final_adjusted_fixes.map(x => {
+		if (x[0] >= (Colorize.reportingThreshold / 100)) {
+                    return Colorize.expand(x[1][0], x[1][1]).concat(Colorize.expand(x[2][0], x[2][1]));
+		} else {
+                    return [];
+		}
+            });
+            const foundBugsArray: any = Array.from(new Set(foundBugs.flat(1).map(JSON.stringify)));
+            foundBugs = foundBugsArray.map(JSON.parse);
+            out['anomalousCells'] = foundBugs.length;
+            let weightedAnomalousRanges = final_adjusted_fixes.map(x => x[0]).reduce((x, y) => x + y, 0);
+            out['weightedAnomalousRanges'] = weightedAnomalousRanges;
+
+	    /* disabled for now.
+
+            if (workbookBasename in bugs) {
+		if (sheet.sheetName in bugs[workbookBasename]) {
+                    const trueBugs = bugs[workbookBasename][sheet.sheetName]['bugs'];
+                    const totalTrueBugs = trueBugs.length;
+                    const trueBugsJSON = trueBugs.map(x => JSON.stringify(x));
+                    const foundBugsJSON = foundBugs.map(x => JSON.stringify(x));
+                    const truePositives = trueBugsJSON.filter(value => foundBugsJSON.includes(value)).map(x => JSON.parse(x));
+                    const falsePositives = foundBugsJSON.filter(value => !trueBugsJSON.includes(value)).map(x => JSON.parse(x));
+                    const falseNegatives = trueBugsJSON.filter(value => !foundBugsJSON.includes(value)).map(x => JSON.parse(x));
+                    let precision = 0;
+                    let recall = 0;
+                    out['falsePositives'] = falsePositives.length;
+                    out['falseNegatives'] = falseNegatives.length;
+                    out['truePositives'] = truePositives.length;
+		    // sheetFalsePositives just equals 1 if there are any false positives;
+		    // similarly for others.
+		    out['sheetFalsePositives'] = (falsePositives.length > 0) ? 1 : 0;
+		    out['sheetFalseNegatives'] = (falseNegatives.length > 0) ? 1 : 0;
+		    out['sheetTruePositives'] = (truePositives.length > 0) ? 1 : 0;
+
+		    if (truePositives.length) {
+			sheetTruePositives += 1;
+			sheetTruePositiveSet.add(workbookBasename + ':' + sheet.sheetName);
+		    }
+		    if (falsePositives.length) {
+			sheetFalsePositives += 1;
+			sheetFalsePositiveSet.add(workbookBasename + ':' + sheet.sheetName);
+		    }
+		    
+                    // We adopt the methodology used by the ExceLint paper (OOPSLA 18):
+                    //   "When a tool flags nothing, we define precision to
+                    //    be 1, since the tool makes no mistakes. When a benchmark contains no errors but the tool flags
+                    //    anything, we define precision to be 0 since nothing that it flags can be a real error."
+
+                    if (foundBugs.length === 0) {
+			out['precision'] = 1;
+                    }
+                    if ((truePositives.length === 0) && (foundBugs.length > 0)) {
+			out['precision'] = 0;
+                    }
+                    if ((truePositives.length > 0) && (foundBugs.length > 0)) {
+			precision = truePositives.length / (truePositives.length + falsePositives.length);
+			out['precision'] = precision;
+                    }
+                    if (falseNegatives.length + trueBugs.length > 0) {
+			recall = truePositives.length / (falseNegatives.length + truePositives.length);
+			out['recall'] = recall;
+                    } else {
+			// No bugs to find means perfect recall. NOTE: this is not described in the paper.
+			out['recall'] = 1;
+                    }
+                    scores.push(truePositives.length - falsePositives.length);
+                    if (false) {
+			if (precision + recall > 0) {
+                            // F1 score: https://en.wikipedia.org/wiki/F1_score
+                            const f1score = (2 * precision * recall) / (precision + recall);
+                            /// const f1score = precision; //// FIXME for testing (2 * precision * recall) / (precision + recall);
+                            scores.push(f1score);
+			}
+	   	    }
+		}
+	    }
+            */
+	    out['proposedFixes'] = final_adjusted_fixes;
+            output.worksheets[sheet.sheetName] = out;
+	}
+//	outputs.push(output);
+	return output; // , scores, sheetTruePositiveSet, sheetTruePositives, sheetFalsePositiveSet, sheetFalsePositives };
+    }
+
+    // Convert a rectangle into a list of indices.
+    public static expand(first: Colorize.excelintVector, second: Colorize.excelintVector): Array<Colorize.excelintVector> {
+	const [fcol, frow] = first;
+	const [scol, srow] = second;
+	let expanded: Array<Colorize.excelintVector> = [];
+	for (let i = fcol; i <= scol; i++) {
+            for (let j = frow; j <= srow; j++) {
+		expanded.push([i, j, 0]);
+            }
+	}
+	return expanded;
     }
 
     // Generate dependence vectors and their hash for all formulas.
@@ -155,8 +554,8 @@ export class Colorize {
     // Take in a list of [[row, col], color] pairs and group them,
     // sorting them (e.g., by columns).
     private static identify_ranges(list: Array<[Colorize.excelintVector, string]>,
-        sortfn?: (n1: Colorize.excelintVector, n2: Colorize.excelintVector) => number)
-        : { [val: string]: Array<Colorize.excelintVector> } {
+				   sortfn?: (n1: Colorize.excelintVector, n2: Colorize.excelintVector) => number)
+    : { [val: string]: Array<Colorize.excelintVector> } {
         // Separate into groups based on their string value.
         let groups = {};
         for (let r of list) {
@@ -172,8 +571,8 @@ export class Colorize {
 
     // Group all ranges by their value.
     private static group_ranges(groups: { [val: string]: Array<Colorize.excelintVector> },
-        columnFirst: boolean)
-        : { [val: string]: Array<[Colorize.excelintVector, Colorize.excelintVector]> } {
+				columnFirst: boolean)
+    : { [val: string]: Array<[Colorize.excelintVector, Colorize.excelintVector]> } {
         let output = {};
         let index0 = 0; // column
         let index1 = 1; // row
@@ -212,32 +611,32 @@ export class Colorize {
     }
 
     public static processed_to_matrix(cols: number, rows: number,
-        origin_col: number, origin_row: number,
-        processed: Array<[Colorize.excelintVector, string]>): Array<Array<number>> {
-        // Invert the hash table.
-        // First, initialize a zero-filled matrix.
-        let matrix = new Array(cols);
-        for (let i = 0; i < cols; i++) {
-            matrix[i] = new Array(rows).fill(0);
-        }
-        // Now iterate through the processed formulas and update the matrix.
-        for (let item of processed) {
-            const [[col, row, isConstant], val] = item;
-            // Yes, I know this is confusing. Will fix later.
-            //	    console.log('C) cols = ' + rows + ', rows = ' + cols + '; row = ' + row + ', col = ' + col);
-            const adjustedX = row - origin_row - 1;
-            const adjustedY = col - origin_col - 1;
-            let value = Number(Colorize.distinguishedZeroHash);
-            if (isConstant === 1) {
-                // That means it was a constant.
-                // Set to a fixed value (as above).
-            } else {
-                value = Number(val);
-            }
-            matrix[adjustedX][adjustedY] = value;
-        }
-        return matrix;
-    }
+				      origin_col: number, origin_row: number,
+				      processed: Array<[Colorize.excelintVector, string]>): Array<Array<number>> {
+					  // Invert the hash table.
+					  // First, initialize a zero-filled matrix.
+					  let matrix = new Array(cols);
+					  for (let i = 0; i < cols; i++) {
+					      matrix[i] = new Array(rows).fill(0);
+					  }
+					  // Now iterate through the processed formulas and update the matrix.
+					  for (let item of processed) {
+					      const [[col, row, isConstant], val] = item;
+					      // Yes, I know this is confusing. Will fix later.
+					      //	    console.log('C) cols = ' + rows + ', rows = ' + cols + '; row = ' + row + ', col = ' + col);
+					      const adjustedX = row - origin_row - 1;
+					      const adjustedY = col - origin_col - 1;
+					      let value = Number(Colorize.distinguishedZeroHash);
+					      if (isConstant === 1) {
+						  // That means it was a constant.
+						  // Set to a fixed value (as above).
+					      } else {
+						  value = Number(val);
+					      }
+					      matrix[adjustedX][adjustedY] = value;
+					  }
+					  return matrix;
+				      }
 
 
     public static stencilize(matrix: Array<Array<number>>): Array<Array<number>> {
@@ -246,180 +645,180 @@ export class Colorize {
     }
 
     public static compute_stencil_probabilities(cols: number, rows: number,
-        stencil: Array<Array<number>>): Array<Array<number>> {
-        //        console.log('compute_stencil_probabilities: stencil = ' + JSON.stringify(stencil));
-        let probs = new Array(cols);
-        for (let i = 0; i < cols; i++) {
-            probs[i] = new Array(rows).fill(0);
-        }
-        // Generate the counts.
-        let totalNonzeroes = 0;
-        let counts = {};
-        for (let i = 0; i < cols; i++) {
-            for (let j = 0; j < rows; j++) {
-                counts[stencil[i][j]] = (counts[stencil[i][j]] + 1) || 1;
-                if (stencil[i][j] !== 0) {
-                    totalNonzeroes += 1;
-                }
-            }
-        }
+						stencil: Array<Array<number>>): Array<Array<number>> {
+						    //        console.log('compute_stencil_probabilities: stencil = ' + JSON.stringify(stencil));
+						    let probs = new Array(cols);
+						    for (let i = 0; i < cols; i++) {
+							probs[i] = new Array(rows).fill(0);
+						    }
+						    // Generate the counts.
+						    let totalNonzeroes = 0;
+						    let counts = {};
+						    for (let i = 0; i < cols; i++) {
+							for (let j = 0; j < rows; j++) {
+							    counts[stencil[i][j]] = (counts[stencil[i][j]] + 1) || 1;
+							    if (stencil[i][j] !== 0) {
+								totalNonzeroes += 1;
+							    }
+							}
+						    }
 
-        // Now iterate over the counts to compute probabilities.
-        for (let i = 0; i < cols; i++) {
-            for (let j = 0; j < rows; j++) {
-                probs[i][j] = counts[stencil[i][j]] / totalNonzeroes;
-            }
-        }
+						    // Now iterate over the counts to compute probabilities.
+						    for (let i = 0; i < cols; i++) {
+							for (let j = 0; j < rows; j++) {
+							    probs[i][j] = counts[stencil[i][j]] / totalNonzeroes;
+							}
+						    }
 
-        //	    console.log('probs = ' + JSON.stringify(probs));
+						    //	    console.log('probs = ' + JSON.stringify(probs));
 
-        let totalEntropy = 0;
-        let total = 0;
-        for (let i = 0; i < cols; i++) {
-            for (let j = 0; j < rows; j++) {
-                if (stencil[i][j] > 0) {
-                    total += counts[stencil[i][j]];
-                }
-            }
-        }
+						    let totalEntropy = 0;
+						    let total = 0;
+						    for (let i = 0; i < cols; i++) {
+							for (let j = 0; j < rows; j++) {
+							    if (stencil[i][j] > 0) {
+								total += counts[stencil[i][j]];
+							    }
+							}
+						    }
 
-        for (let i = 0; i < cols; i++) {
-            for (let j = 0; j < rows; j++) {
-                if (counts[stencil[i][j]] > 0) {
-                    totalEntropy += this.entropy(counts[stencil[i][j]] / total);
-                }
-            }
-        }
+						    for (let i = 0; i < cols; i++) {
+							for (let j = 0; j < rows; j++) {
+							    if (counts[stencil[i][j]] > 0) {
+								totalEntropy += this.entropy(counts[stencil[i][j]] / total);
+							    }
+							}
+						    }
 
-        const normalizedEntropy = totalEntropy / Math.log2(totalNonzeroes);
+						    const normalizedEntropy = totalEntropy / Math.log2(totalNonzeroes);
 
-        // Now discount the probabilities by weighing them by the normalized total entropy.
-        if (false) {
-            for (let i = 0; i < cols; i++) {
-                for (let j = 0; j < rows; j++) {
-                    probs[i][j] *= normalizedEntropy;
-                    //			totalEntropy += this.entropy(probs[i][j]);
-                }
-            }
-        }
-        return probs;
-    }
+						    // Now discount the probabilities by weighing them by the normalized total entropy.
+						    if (false) {
+							for (let i = 0; i < cols; i++) {
+							    for (let j = 0; j < rows; j++) {
+								probs[i][j] *= normalizedEntropy;
+								//			totalEntropy += this.entropy(probs[i][j]);
+							    }
+							}
+						    }
+						    return probs;
+						}
 
 
     public static generate_suspicious_cells(cols: number, rows: number,
-        origin_col: number, origin_row: number,
-        matrix: Array<Array<number>>,
-        probs: Array<Array<number>>,
-        threshold = 0.01): Array<Colorize.excelintVector> {
-        let cells = [];
-        let sumValues = 0;
-        let countValues = 0;
-        for (let i = 0; i < cols; i++) {
-            for (let j = 0; j < rows; j++) {
-                const adjustedX = j + origin_col + 1;
-                const adjustedY = i + origin_row + 1;
-                //		    console.log('examining ' + i + ' ' + j + ' = ' + matrix[i][j] + ' (' + adjustedX + ', ' + adjustedY + ')');
-                if (probs[i][j] > 0) {
-                    sumValues += matrix[i][j];
-                    countValues += 1;
-                    if (probs[i][j] <= threshold) {
-                        // console.log('found one at ' + i + ' ' + j + ' = [' + matrix[i][j] + '] (' + adjustedX + ', ' + adjustedY + '): p = ' + probs[i][j]);
-                        if (matrix[i][j] !== 0) {
-                            // console.log('PUSHED!');
-                            // Never push an empty cell.
-                            cells.push([adjustedX, adjustedY, probs[i][j]]);
-                        }
-                    }
-                }
-            }
-        }
-        const avgValues = sumValues / countValues;
-        cells.sort((a, b) => { return Math.abs(b[2] - avgValues) - Math.abs(a[2] - avgValues); });
-        //        console.log('cells = ' + JSON.stringify(cells));
-        return cells;
-    }
+					    origin_col: number, origin_row: number,
+					    matrix: Array<Array<number>>,
+					    probs: Array<Array<number>>,
+					    threshold = 0.01): Array<Colorize.excelintVector> {
+						let cells = [];
+						let sumValues = 0;
+						let countValues = 0;
+						for (let i = 0; i < cols; i++) {
+						    for (let j = 0; j < rows; j++) {
+							const adjustedX = j + origin_col + 1;
+							const adjustedY = i + origin_row + 1;
+							//		    console.log('examining ' + i + ' ' + j + ' = ' + matrix[i][j] + ' (' + adjustedX + ', ' + adjustedY + ')');
+							if (probs[i][j] > 0) {
+							    sumValues += matrix[i][j];
+							    countValues += 1;
+							    if (probs[i][j] <= threshold) {
+								// console.log('found one at ' + i + ' ' + j + ' = [' + matrix[i][j] + '] (' + adjustedX + ', ' + adjustedY + '): p = ' + probs[i][j]);
+								if (matrix[i][j] !== 0) {
+								    // console.log('PUSHED!');
+								    // Never push an empty cell.
+								    cells.push([adjustedX, adjustedY, probs[i][j]]);
+								}
+							    }
+							}
+						    }
+						}
+						const avgValues = sumValues / countValues;
+						cells.sort((a, b) => { return Math.abs(b[2] - avgValues) - Math.abs(a[2] - avgValues); });
+						//        console.log('cells = ' + JSON.stringify(cells));
+						return cells;
+					    }
 
 
     public static process_suspicious(usedRangeAddress: string,
-        formulas: Array<Array<string>>,
-        values: Array<Array<string>>): [any, any, any, any] {
-        if (false) {
-            console.log('process_suspicious:');
-            console.log(JSON.stringify(usedRangeAddress));
-            console.log(JSON.stringify(formulas));
-            console.log(JSON.stringify(values));
-        }
+				     formulas: Array<Array<string>>,
+				     values: Array<Array<string>>): [any, any, any, any] {
+					 if (false) {
+					     console.log('process_suspicious:');
+					     console.log(JSON.stringify(usedRangeAddress));
+					     console.log(JSON.stringify(formulas));
+					     console.log(JSON.stringify(values));
+					 }
 
-        let t = new Timer('process_suspicious');
+					 let t = new Timer('process_suspicious');
 
-        const [sheetName, startCell] = ExcelUtils.extract_sheet_cell(usedRangeAddress);
-        const origin = ExcelUtils.cell_dependency(startCell, 0, 0);
+					 const [sheetName, startCell] = ExcelUtils.extract_sheet_cell(usedRangeAddress);
+					 const origin = ExcelUtils.cell_dependency(startCell, 0, 0);
 
-        let processed_formulas = [];
-        // Filter out non-empty items from whole matrix.
-            let totalFormulas = (formulas as any).flat().filter(Boolean).length;
-	    
-        if (totalFormulas > this.formulasThreshold) {
-            console.warn('Too many formulas to perform formula analysis.');
-        } else {
+					 let processed_formulas = [];
+					 // Filter out non-empty items from whole matrix.
+					 let totalFormulas = (formulas as any).flat().filter(Boolean).length;
+					 
+					 if (totalFormulas > this.formulasThreshold) {
+					     console.warn('Too many formulas to perform formula analysis.');
+					 } else {
 
-            //	    t.split('about to process formulas');
-            processed_formulas = Colorize.process_formulas(formulas, origin[0] - 1, origin[1] - 1);
-            //	    t.split('processed formulas');
-        }
-        const useTimeouts = false;
+					     //	    t.split('about to process formulas');
+					     processed_formulas = Colorize.process_formulas(formulas, origin[0] - 1, origin[1] - 1);
+					     //	    t.split('processed formulas');
+					 }
+					 const useTimeouts = false;
 
-        let referenced_data = [];
-        let data_values = [];
-        const cols = values.length;
-        const rows = values[0].length;
+					 let referenced_data = [];
+					 let data_values = [];
+					 const cols = values.length;
+					 const rows = values[0].length;
 
-        // Filter out non-empty items from whole matrix.
-            let totalValues = (values as any).flat().filter(Boolean).length;
-        if (totalValues > this.valuesThreshold) {
-            console.warn('Too many values to perform reference analysis.');
-        } else {
+					 // Filter out non-empty items from whole matrix.
+					 let totalValues = (values as any).flat().filter(Boolean).length;
+					 if (totalValues > this.valuesThreshold) {
+					     console.warn('Too many values to perform reference analysis.');
+					 } else {
 
-            // Compute references (to color referenced data).
-            const refs = ExcelUtils.generate_all_references(formulas, origin[0] - 1, origin[1] - 1);
-            //	    t.split('generated all references');
+					     // Compute references (to color referenced data).
+					     const refs = ExcelUtils.generate_all_references(formulas, origin[0] - 1, origin[1] - 1);
+					     //	    t.split('generated all references');
 
-            referenced_data = Colorize.color_all_data(refs);
-            // console.log('referenced_data = ' + JSON.stringify(referenced_data));
-            data_values = Colorize.process_values(values, formulas, origin[0] - 1, origin[1] - 1);
+					     referenced_data = Colorize.color_all_data(refs);
+					     // console.log('referenced_data = ' + JSON.stringify(referenced_data));
+					     data_values = Colorize.process_values(values, formulas, origin[0] - 1, origin[1] - 1);
 
-            // t.split('processed data');
-        }
+					     // t.split('processed data');
+					 }
 
-        const grouped_data = Colorize.identify_groups(referenced_data);
+					 const grouped_data = Colorize.identify_groups(referenced_data);
 
-        //	t.split('identified groups');
+					 //	t.split('identified groups');
 
-        const grouped_formulas = Colorize.identify_groups(processed_formulas);
-        //	t.split('grouped formulas');
+					 const grouped_formulas = Colorize.identify_groups(processed_formulas);
+					 //	t.split('grouped formulas');
 
-        // Identify suspicious cells.
-        let suspicious_cells = [];
+					 // Identify suspicious cells.
+					 let suspicious_cells = [];
 
-        if (values.length < 10000) {
-            // Disabled for now. FIXME
-            //            suspicious_cells = Colorize.find_suspicious_cells(cols, rows, origin, formulas, processed_formulas, data_values, 1 - Colorize.getReportingThreshold() / 100); // Must be more rare than this fraction.
-            suspicious_cells = Colorize.find_suspicious_cells(cols, rows, origin, formulas, processed_formulas, data_values, 1); // Must be more rare than this fraction.
+					 if (values.length < 10000) {
+					     // Disabled for now. FIXME
+					     //            suspicious_cells = Colorize.find_suspicious_cells(cols, rows, origin, formulas, processed_formulas, data_values, 1 - Colorize.getReportingThreshold() / 100); // Must be more rare than this fraction.
+					     suspicious_cells = Colorize.find_suspicious_cells(cols, rows, origin, formulas, processed_formulas, data_values, 1); // Must be more rare than this fraction.
 
-        }
+					 }
 
-        const proposed_fixes = Colorize.generate_proposed_fixes(grouped_formulas);
+					 const proposed_fixes = Colorize.generate_proposed_fixes(grouped_formulas);
 
-        if (false) {
-            console.log('results:');
-            console.log(JSON.stringify(suspicious_cells));
-            console.log(JSON.stringify(grouped_formulas));
-            console.log(JSON.stringify(grouped_data));
-            console.log(JSON.stringify(proposed_fixes));
-        }
+					 if (false) {
+					     console.log('results:');
+					     console.log(JSON.stringify(suspicious_cells));
+					     console.log(JSON.stringify(grouped_formulas));
+					     console.log(JSON.stringify(grouped_data));
+					     console.log(JSON.stringify(proposed_fixes));
+					 }
 
-        return [suspicious_cells, grouped_formulas, grouped_data, proposed_fixes];
-    }
+					 return [suspicious_cells, grouped_formulas, grouped_data, proposed_fixes];
+				     }
 
 
     // Shannon entropy.
@@ -437,28 +836,28 @@ export class Colorize {
 
     // Compute the normalized distance from merging two ranges.
     public static fix_metric(target_norm: number,
-        target: [Colorize.excelintVector, Colorize.excelintVector],
-        merge_with_norm: number,
-        merge_with: [Colorize.excelintVector, Colorize.excelintVector]): number {
-        //	console.log('fix_metric: ' + target_norm + ', ' + JSON.stringify(target) + ', ' + merge_with_norm + ', ' + JSON.stringify(merge_with));
-        const [t1, t2] = target;
-        const [m1, m2] = merge_with;
-        const n_target = RectangleUtils.area([[t1[0], t1[1], 0], [t2[0], t2[1], 0]]);
-        const n_merge_with = RectangleUtils.area([[m1[0], m1[1], 0], [m2[0], m2[1], 0]]);
-        const n_min = Math.min(n_target, n_merge_with);
-        const n_max = Math.max(n_target, n_merge_with);
-        const norm_min = Math.min(merge_with_norm, target_norm);
-        const norm_max = Math.max(merge_with_norm, target_norm);
-        let fix_distance = Math.abs(norm_max - norm_min) / this.Multiplier;
-        // Ensure that the minimum fix is at least one (we need this if we don't use the L1 norm).
-        if (fix_distance < 1.0) {
-            fix_distance = 1.0;
-        }
-        const entropy_drop = this.entropydiff(n_min, n_max); // negative
-        let ranking = (1.0 + entropy_drop) / (fix_distance * n_min); // ENTROPY WEIGHTED BY FIX DISTANCE
-        ranking = -ranking; // negating to sort in reverse order.
-        return ranking;
-    }
+			     target: [Colorize.excelintVector, Colorize.excelintVector],
+			     merge_with_norm: number,
+			     merge_with: [Colorize.excelintVector, Colorize.excelintVector]): number {
+				 //	console.log('fix_metric: ' + target_norm + ', ' + JSON.stringify(target) + ', ' + merge_with_norm + ', ' + JSON.stringify(merge_with));
+				 const [t1, t2] = target;
+				 const [m1, m2] = merge_with;
+				 const n_target = RectangleUtils.area([[t1[0], t1[1], 0], [t2[0], t2[1], 0]]);
+				 const n_merge_with = RectangleUtils.area([[m1[0], m1[1], 0], [m2[0], m2[1], 0]]);
+				 const n_min = Math.min(n_target, n_merge_with);
+				 const n_max = Math.max(n_target, n_merge_with);
+				 const norm_min = Math.min(merge_with_norm, target_norm);
+				 const norm_max = Math.max(merge_with_norm, target_norm);
+				 let fix_distance = Math.abs(norm_max - norm_min) / this.Multiplier;
+				 // Ensure that the minimum fix is at least one (we need this if we don't use the L1 norm).
+				 if (fix_distance < 1.0) {
+				     fix_distance = 1.0;
+				 }
+				 const entropy_drop = this.entropydiff(n_min, n_max); // negative
+				 let ranking = (1.0 + entropy_drop) / (fix_distance * n_min); // ENTROPY WEIGHTED BY FIX DISTANCE
+				 ranking = -ranking; // negating to sort in reverse order.
+				 return ranking;
+			     }
 
     // Iterate through the size of proposed fixes.
     public static count_proposed_fixes(fixes: Array<[number, [Colorize.excelintVector, Colorize.excelintVector], [Colorize.excelintVector, Colorize.excelintVector]]>): number {
@@ -475,7 +874,7 @@ export class Colorize {
 
     // Try to merge fixes into larger groups.
     public static fix_proposed_fixes(fixes: Array<[number, [Colorize.excelintVector, Colorize.excelintVector], [Colorize.excelintVector, Colorize.excelintVector]]>):
-        Array<[number, [Colorize.excelintVector, Colorize.excelintVector], [Colorize.excelintVector, Colorize.excelintVector]]> {
+    Array<[number, [Colorize.excelintVector, Colorize.excelintVector], [Colorize.excelintVector, Colorize.excelintVector]]> {
         // example: [[-0.8729568798082977,[[4,23],[13,23]],[[3,23,0],[3,23,0]]],[-0.6890824929174288,[[4,6],[7,6]],[[3,6,0],[3,6,0]]],[-0.5943609377704335,[[4,10],[6,10]],[[3,10,0],[3,10,0]]],[-0.42061983571430495,[[3,27],[4,27]],[[5,27,0],[5,27,0]]],[-0.42061983571430495,[[4,14],[5,14]],[[3,14,0],[3,14,0]]],[-0.42061983571430495,[[6,27],[7,27]],[[5,27,0],[5,27,0]]]]
         let count = 0;
         // Search for fixes where the same coordinate pair appears in the front and in the back.
@@ -540,7 +939,7 @@ export class Colorize {
     }
 
     public static generate_proposed_fixes(groups: { [val: string]: Array<[Colorize.excelintVector, Colorize.excelintVector]> }):
-        Array<[number, [Colorize.excelintVector, Colorize.excelintVector], [Colorize.excelintVector, Colorize.excelintVector]]> {
+    Array<[number, [Colorize.excelintVector, Colorize.excelintVector], [Colorize.excelintVector, Colorize.excelintVector]]> {
         //	let t = new Timer('generate_proposed_fixes');
         //	t.split('about to find.');
         let proposed_fixes_new = find_all_proposed_fixes(groups);
@@ -552,7 +951,7 @@ export class Colorize {
     }
 
     public static merge_groups(groups: { [val: string]: Array<[Colorize.excelintVector, Colorize.excelintVector]> })
-        : { [val: string]: Array<[Colorize.excelintVector, Colorize.excelintVector]> } {
+    : { [val: string]: Array<[Colorize.excelintVector, Colorize.excelintVector]> } {
         for (let k of Object.keys(groups)) {
             const g = groups[k].slice();
             groups[k] = this.merge_individual_groups(g);
@@ -561,7 +960,7 @@ export class Colorize {
     }
 
     public static merge_individual_groups(group: Array<[Colorize.excelintVector, Colorize.excelintVector]>)
-        : Array<[Colorize.excelintVector, Colorize.excelintVector]> {
+    : Array<[Colorize.excelintVector, Colorize.excelintVector]> {
         let t = new Timer('merge_individual_groups');
         let numIterations = 0;
         group = group.sort();
@@ -682,18 +1081,18 @@ export class Colorize {
     }
 
     public static find_suspicious_cells(cols: number, rows: number,
-        origin: [number, number, number],
-        formulas: any[][], processed_formulas: any[], data_values: any, threshold: number) {
+					origin: [number, number, number],
+					formulas: any[][], processed_formulas: any[], data_values: any, threshold: number) {
         return []; // FIXME disabled for now
         let suspiciousCells: any[];
         {
             data_values = data_values;
             const formula_matrix = Colorize.processed_to_matrix(cols,
-                rows,
-                origin[0] - 1,
-                origin[1] - 1,
-                //								processed_formulas);
-                processed_formulas.concat(data_values));
+								rows,
+								origin[0] - 1,
+								origin[1] - 1,
+								//								processed_formulas);
+								processed_formulas.concat(data_values));
             //									processed_formulas);
 
             const stencil = Colorize.stencilize(formula_matrix);
@@ -738,23 +1137,23 @@ export class Colorize {
 
 export namespace Colorize {
 
-   export type excelintVector = [number, number, number];
+    export type excelintVector = [number, number, number];
 
-   export enum BinCategories {
-       FatFix = "fat-fix", // fix is not a single column or single row
-       RecurrentFormula = "recurrent-formula", // formulas refer to each other
-       OneExtraConstant = "one-extra-constant", // one has no constant and the other has one constant
-       NumberOfConstantsMismatch = "number-of-constants-mismatch", // both have constants but not the same number of constants
-       BothConstants = "both-constants", // both have only constants but differ in numeric value
-       OneIsAllConstants = "one-is-all-constants", // one is entirely constants and other is formula
-       AbsoluteRefMismatch = "absolute-ref-mismatch", // relative vs. absolute mismatch
-       OffAxisReference = "off-axis-reference", // references refer to different columns or rows
-       R1C1Mismatch = "r1c1-mismatch", // different R1C1 representations
-       DifferentReferentCount = "different-referent-count", // ranges have different number of referents
-       // Not yet implemented.
-       RefersToEmptyCells = "refers-to-empty-cells",
-       UsesDifferentOperations = "uses-different-operations", // e.g. SUM vs. AVERAGE
-       // Fall-through category
-       Unclassified = "unclassified",
-   }
+    export enum BinCategories {
+	FatFix = "fat-fix", // fix is not a single column or single row
+	RecurrentFormula = "recurrent-formula", // formulas refer to each other
+	OneExtraConstant = "one-extra-constant", // one has no constant and the other has one constant
+	NumberOfConstantsMismatch = "number-of-constants-mismatch", // both have constants but not the same number of constants
+	BothConstants = "both-constants", // both have only constants but differ in numeric value
+	OneIsAllConstants = "one-is-all-constants", // one is entirely constants and other is formula
+	AbsoluteRefMismatch = "absolute-ref-mismatch", // relative vs. absolute mismatch
+	OffAxisReference = "off-axis-reference", // references refer to different columns or rows
+	R1C1Mismatch = "r1c1-mismatch", // different R1C1 representations
+	DifferentReferentCount = "different-referent-count", // ranges have different number of referents
+	// Not yet implemented.
+	RefersToEmptyCells = "refers-to-empty-cells",
+	UsesDifferentOperations = "uses-different-operations", // e.g. SUM vs. AVERAGE
+	// Fall-through category
+	Unclassified = "unclassified",
+    }
 }
