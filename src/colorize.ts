@@ -1,3 +1,8 @@
+
+// Polyfill for flat (IE & Edge)
+const flat = require('array.prototype.flat');
+flat.shim();
+
 //import { rgb2hex, GroupedList } from 'office-ui-fabric-react';
 //import { ColorUtils } from './colorutils';
 import { ExcelUtils } from './excelutils';
