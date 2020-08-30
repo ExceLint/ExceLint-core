@@ -11,31 +11,11 @@ import { Colorize } from './colorize';
 import { Timer } from './timer';
 import { string } from 'prop-types';
 
-enum BinCategories {
-    FatFix = "fat-fix", // fix is not a single column or single row
-    RecurrentFormula = "recurrent-formula", // formulas refer to each other
-    OneExtraConstant = "one-extra-constant", // one has no constant and the other has one constant
-    NumberOfConstantsMismatch = "number-of-constants-mismatch", // both have constants but not the same number of constants
-    BothConstants = "both-constants", // both have only constants but differ in numeric value
-    OneIsAllConstants = "one-is-all-constants", // one is entirely constants and other is formula
-    AbsoluteRefMismatch = "absolute-ref-mismatch", // relative vs. absolute mismatch
-    OffAxisReference = "off-axis-reference", // references refer to different columns or rows
-    R1C1Mismatch = "r1c1-mismatch", // different R1C1 representations
-    DifferentReferentCount = "different-referent-count", // ranges have different number of referents
-    // Not yet implemented.
-    RefersToEmptyCells = "refers-to-empty-cells",
-    UsesDifferentOperations = "uses-different-operations", // e.g. SUM vs. AVERAGE
-    // Fall-through category
-    Unclassified = "unclassified",
-}
-
-type excelintVector = [number, number, number];
-
 // Convert a rectangle into a list of indices.
-function expand(first: excelintVector, second: excelintVector): Array<excelintVector> {
+function expand(first: Colorize.excelintVector, second: Colorize.excelintVector): Array<Colorize.excelintVector> {
     const [fcol, frow] = first;
     const [scol, srow] = second;
-    let expanded: Array<excelintVector> = [];
+    let expanded: Array<Colorize.excelintVector> = [];
     for (let i = fcol; i <= scol; i++) {
         for (let j = frow; j <= srow; j++) {
             expanded.push([i, j, 0]);
@@ -412,7 +392,7 @@ for (let parms of parameters) {
 			sameRow = true;
 		    }
 		    if (!sameColumn && !sameRow) {
-			bin.push(BinCategories.FatFix);
+			bin.push(Colorize.BinCategories.FatFix);
 		    }
 		}
 		    
@@ -423,25 +403,25 @@ for (let parms of parameters) {
                     // referencing, say, =B10+1).
                     if (dependence_vectors[i].length > 0) {
                         if ((direction === "vertical") && ((dependence_vectors[i][0][0] === 0) && (dependence_vectors[i][0][1] === -1))) {
-                            bin.push(BinCategories.RecurrentFormula);
+                            bin.push(Colorize.BinCategories.RecurrentFormula);
                             break;
                         }
                         if ((direction === "horizontal") && ((dependence_vectors[i][0][0] === -1) && (dependence_vectors[i][0][1] === 0))) {
-                            bin.push(BinCategories.RecurrentFormula);
+                            bin.push(Colorize.BinCategories.RecurrentFormula);
                             break;
                         }
                     }
                 }
                 // Different number of referents (dependencies).
                 if (dependence_count[0] !== dependence_count[1]) {
-                    bin.push(BinCategories.DifferentReferentCount);
+                    bin.push(Colorize.BinCategories.DifferentReferentCount);
                 }
                 // Different number of constants.
                 if (all_numbers[0].length !== all_numbers[1].length) {
                     if (Math.abs(all_numbers[0].length - all_numbers[1].length) === 1) {
-                        bin.push(BinCategories.OneExtraConstant);
+                        bin.push(Colorize.BinCategories.OneExtraConstant);
                     } else {
-                        bin.push(BinCategories.NumberOfConstantsMismatch);
+                        bin.push(Colorize.BinCategories.NumberOfConstantsMismatch);
                     }
                 }
                 // Both constants.
@@ -449,11 +429,11 @@ for (let parms of parameters) {
                     // Both have numbers.
                     if (dependence_count[0] + dependence_count[1] === 0) {
                         // Both have no dependents.
-                        bin.push(BinCategories.BothConstants);
+                        bin.push(Colorize.BinCategories.BothConstants);
                     } else {
                         if (dependence_count[0] * dependence_count[1] === 0) {
                             // One is a constant.
-                            bin.push(BinCategories.OneIsAllConstants);
+                            bin.push(Colorize.BinCategories.OneIsAllConstants);
                         }
                     }
                 }
@@ -465,38 +445,38 @@ for (let parms of parameters) {
                     // dependencies being different. Do a deep comparison
                     // here.
                     if (JSON.stringify(dependence_vectors[0].sort()) !== JSON.stringify(dependence_vectors[1].sort())) {
-                        bin.push(BinCategories.R1C1Mismatch);
+                        bin.push(Colorize.BinCategories.R1C1Mismatch);
                     }
                 }
                 // Different number of absolute ($, a.k.a. "anchor") references.
                 if (absolute_refs[0] !== absolute_refs[1]) {
-                    bin.push(BinCategories.AbsoluteRefMismatch);
+                    bin.push(Colorize.BinCategories.AbsoluteRefMismatch);
                 }
                 // Dependencies that are neither vertical or horizontal (likely errors if an absolute-ref-mismatch).
                 for (let i = 0; i < dependence_vectors.length; i++) {
                     if (dependence_vectors[i].length > 0) {
                         if (dependence_vectors[i][0][0] * dependence_vectors[i][0][1] !== 0) {
-                            bin.push(BinCategories.OffAxisReference);
+                            bin.push(Colorize.BinCategories.OffAxisReference);
                             break;
                         }
                     }
                 }
                 if (bin === []) {
-                    bin.push(BinCategories.Unclassified);
+                    bin.push(Colorize.BinCategories.Unclassified);
                 }
 		// IMPORTANT:
 		// Exclude reported bugs subject to certain conditions.
 		if ((bin.length > args.maxCategories) // Too many categories
-		    || ((bin.indexOf(BinCategories.FatFix) != -1) && args.suppressFatFix)
-		    || ((bin.indexOf(BinCategories.DifferentReferentCount) != -1) && args.suppressDifferentReferentCount)
-		    || ((bin.indexOf(BinCategories.RecurrentFormula) != -1) && args.suppressRecurrentFormula)
-		    || ((bin.indexOf(BinCategories.OneExtraConstant) != -1) && args.suppressOneExtraConstant)
-		    || ((bin.indexOf(BinCategories.NumberOfConstantsMismatch) != -1) && args.suppressNumberOfConstantsMismatch)
-		    || ((bin.indexOf(BinCategories.BothConstants) != -1) && args.suppressBothConstants)
-		    || ((bin.indexOf(BinCategories.OneIsAllConstants) != -1) && args.suppressOneIsAllConstants)
-		    || ((bin.indexOf(BinCategories.R1C1Mismatch) != -1) && args.suppressR1C1Mismatch)
-		    || ((bin.indexOf(BinCategories.AbsoluteRefMismatch) != -1) && args.suppressAbsoluteRefMismatch)
-		    || ((bin.indexOf(BinCategories.OffAxisReference) != -1) && args.suppressOffAxisReference))
+		    || ((bin.indexOf(Colorize.BinCategories.FatFix) != -1) && args.suppressFatFix)
+		    || ((bin.indexOf(Colorize.BinCategories.DifferentReferentCount) != -1) && args.suppressDifferentReferentCount)
+		    || ((bin.indexOf(Colorize.BinCategories.RecurrentFormula) != -1) && args.suppressRecurrentFormula)
+		    || ((bin.indexOf(Colorize.BinCategories.OneExtraConstant) != -1) && args.suppressOneExtraConstant)
+		    || ((bin.indexOf(Colorize.BinCategories.NumberOfConstantsMismatch) != -1) && args.suppressNumberOfConstantsMismatch)
+		    || ((bin.indexOf(Colorize.BinCategories.BothConstants) != -1) && args.suppressBothConstants)
+		    || ((bin.indexOf(Colorize.BinCategories.OneIsAllConstants) != -1) && args.suppressOneIsAllConstants)
+		    || ((bin.indexOf(Colorize.BinCategories.R1C1Mismatch) != -1) && args.suppressR1C1Mismatch)
+		    || ((bin.indexOf(Colorize.BinCategories.AbsoluteRefMismatch) != -1) && args.suppressAbsoluteRefMismatch)
+		    || ((bin.indexOf(Colorize.BinCategories.OffAxisReference) != -1) && args.suppressOffAxisReference))
 		{
 		    console.warn("Omitted " + JSON.stringify(print_formulas) + "(" + JSON.stringify(bin) + ")");
 		    continue;
