@@ -24,13 +24,13 @@ export class Colorize {
   public static suppressFatFix = true;
   public static suppressDifferentReferentCount = false;
   public static suppressRecurrentFormula = true;
-  public static suppressOneExtraConstant = true;
-  public static suppressNumberOfConstantsMismatch = true;
-  public static suppressBothConstants = true;
-  public static suppressOneIsAllConstants = true;
+    public static suppressOneExtraConstant = false; // true;
+    public static suppressNumberOfConstantsMismatch = false; // = true;
+    public static suppressBothConstants = false; // true;
+    public static suppressOneIsAllConstants = false; // true;
   public static suppressR1C1Mismatch = false;
   public static suppressAbsoluteRefMismatch = false;
-  public static suppressOffAxisReference = true;
+    public static suppressOffAxisReference = false; // true;
 
   public static noElapsedTime = false; // if true, don't report elapsed time
   public static reportingThreshold = 35; // Percent of anomalousness
@@ -104,9 +104,7 @@ export class Colorize {
     return color;
   }
 
-  public static process_workbook(inp: any): any {
-    // bugs
-
+  public static process_workbook(inp: any, sheetName: string): any {
     const output = {
       workbookName: path.basename(inp['workbookName']),
       worksheets: {},
@@ -121,7 +119,10 @@ export class Colorize {
 
     for (let i = 0; i < inp.worksheets.length; i++) {
       const sheet = inp.worksheets[i];
-
+      // If sheet name argument is not "" and doesn't match, skip it.
+	if ((sheetName !== "") && (sheet.sheetName !== sheetName)) {
+	    continue;
+	}
       // Skip empty sheets.
       if (sheet.formulas.length === 0 && sheet.values.length === 0) {
         continue;
@@ -1436,19 +1437,19 @@ export namespace Colorize {
   export type excelintVector = [number, number, number];
 
   export enum BinCategories {
-    FatFix = 'fat-fix', // fix is not a single column or single row
-    RecurrentFormula = 'recurrent-formula', // formulas refer to each other
-    OneExtraConstant = 'one-extra-constant', // one has no constant and the other has one constant
-    NumberOfConstantsMismatch = 'number-of-constants-mismatch', // both have constants but not the same number of constants
-    BothConstants = 'both-constants', // both have only constants but differ in numeric value
-    OneIsAllConstants = 'one-is-all-constants', // one is entirely constants and other is formula
-    AbsoluteRefMismatch = 'absolute-ref-mismatch', // relative vs. absolute mismatch
-    OffAxisReference = 'off-axis-reference', // references refer to different columns or rows
-    R1C1Mismatch = 'r1c1-mismatch', // different R1C1 representations
-    DifferentReferentCount = 'different-referent-count', // ranges have different number of referents
+    FatFix = 'Inconsistent multiple columns/rows', // fix is not a single column or single row
+    RecurrentFormula = 'Formulas refer to each other', // formulas refer to each other
+    OneExtraConstant = 'Formulas with an extra constant', // one has no constant and the other has one constant
+    NumberOfConstantsMismatch = 'Formulas have different number of constants', // both have constants but not the same number of constants
+    BothConstants = 'All constants, but different values', // both have only constants but differ in numeric value
+    OneIsAllConstants = 'Mix of constants and formulas', // one is entirely constants and other is formula
+    AbsoluteRefMismatch = 'Mix of absolute ($) and regular references', // relative vs. absolute mismatch
+    OffAxisReference = 'References refer to different rows/columns', // references refer to different columns or rows
+    R1C1Mismatch = 'Refers to different ranges', // different R1C1 representations
+    DifferentReferentCount = 'Formula ranges are of different sizes', // ranges have different number of referents
     // Not yet implemented.
-    RefersToEmptyCells = 'refers-to-empty-cells',
-    UsesDifferentOperations = 'uses-different-operations', // e.g. SUM vs. AVERAGE
+    RefersToEmptyCells = 'Formulas refer to empty cells',
+    UsesDifferentOperations = 'Formulas use different functions', // e.g. SUM vs. AVERAGE
     // Fall-through category
     Unclassified = 'unclassified',
   }

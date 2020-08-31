@@ -316,7 +316,7 @@ for (const parms of parameters) {
       }
     }
 
-    const output = Colorize.process_workbook(inp); // no bug processing for now
+    const output = Colorize.process_workbook(inp, ""); // no bug processing for now; get all sheets
     outputs.push(output);
   }
   let averageScores = 0;
