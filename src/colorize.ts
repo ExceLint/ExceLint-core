@@ -23,7 +23,7 @@ export class Colorize {
 
   public static suppressFatFix = true;
   public static suppressDifferentReferentCount = false;
-  public static suppressRecurrentFormula = true;
+    public static suppressRecurrentFormula = false; // true;
     public static suppressOneExtraConstant = false; // true;
     public static suppressNumberOfConstantsMismatch = false; // = true;
     public static suppressBothConstants = false; // true;
@@ -275,7 +275,7 @@ export class Colorize {
         }
 
         // Binning.
-        const bin = [];
+        let bin = [];
 
         // Check for "fat" fixes (that result in more than a single row or single column).
         //console.log(initial_adjusted_fixes[ind]);
@@ -386,6 +386,10 @@ export class Colorize {
         if (bin === []) {
           bin.push(Colorize.BinCategories.Unclassified);
         }
+	  // In case there's more than one classification, prune some by priority (best explanation).
+	  if (bin.includes(Colorize.BinCategories.OneIsAllConstants)) {
+	      bin = [Colorize.BinCategories.OneIsAllConstants];
+	  }
         // IMPORTANT:
         // Exclude reported bugs subject to certain conditions.
         if (
@@ -1438,8 +1442,8 @@ export namespace Colorize {
 
   export enum BinCategories {
     FatFix = 'Inconsistent multiple columns/rows', // fix is not a single column or single row
-    RecurrentFormula = 'Formulas refer to each other', // formulas refer to each other
-    OneExtraConstant = 'Formulas with an extra constant', // one has no constant and the other has one constant
+    RecurrentFormula = 'Formula(s) refer to each other', // formulas refer to each other
+    OneExtraConstant = 'Formula(s) with an extra constant', // one has no constant and the other has one constant
     NumberOfConstantsMismatch = 'Formulas have different number of constants', // both have constants but not the same number of constants
     BothConstants = 'All constants, but different values', // both have only constants but differ in numeric value
     OneIsAllConstants = 'Mix of constants and formulas', // one is entirely constants and other is formula
