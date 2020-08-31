@@ -84,7 +84,7 @@ export class ExcelJSON {
         // Weird edge case here.
         continue;
       }
-      console.warn('  processing ' + filename + '!' + sheetName);
+	// console.warn('  processing ' + filename + '!' + sheetName);
       // Try to parse the ref to see if it's a pair (e.g., A1:B10) or a singleton (e.g., C9).
       // If the latter, make it into a pair (e.g., C9:C9).
       let ref;

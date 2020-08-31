@@ -33,7 +33,7 @@ export class Colorize {
     public static suppressOffAxisReference = false; // true;
 
   public static noElapsedTime = false; // if true, don't report elapsed time
-  public static reportingThreshold = 35; // Percent of anomalousness
+    public static reportingThreshold = 0; // 35; // Percent of anomalousness
   public static suspiciousCellsReportingThreshold = 85; //  percent of bar
   public static formattingDiscount = 50; // percent of discount: 100% means different formats = not suspicious at all
 
@@ -266,7 +266,7 @@ export class Colorize {
           (leftFixSize / totalSize) * Math.log2(leftFixSize / totalSize) +
           (rightFixSize / totalSize) * Math.log2(rightFixSize / totalSize)
         );
-        console.warn('fix entropy = ' + fixEntropy);
+          // console.warn('fix entropy = ' + fixEntropy);
         if (fixEntropy > Colorize.maxEntropy) {
           console.warn(
             'Omitted ' + JSON.stringify(print_formulas) + '(too high entropy)'
@@ -278,7 +278,6 @@ export class Colorize {
         let bin = [];
 
         // Check for "fat" fixes (that result in more than a single row or single column).
-        //console.log(initial_adjusted_fixes[ind]);
         // Check if all in the same row.
         let sameRow = false;
         let sameColumn = false;
@@ -304,7 +303,7 @@ export class Colorize {
           }
         }
 
-        // Check for recurrent formulas.
+        // Check for recurrent formulas. NOTE: not sure if this is working currently
         for (let i = 0; i < dependence_vectors.length; i++) {
           // If there are at least two dependencies and one of them is -1 in the column (row),
           // it is a recurrence (the common recurrence relation of starting at a value and
@@ -1377,9 +1376,9 @@ export class Colorize {
       //									processed_formulas);
 
       const stencil = Colorize.stencilize(formula_matrix);
-      console.log('after stencilize: stencil = ' + JSON.stringify(stencil));
+     // console.log('after stencilize: stencil = ' + JSON.stringify(stencil));
       const probs = Colorize.compute_stencil_probabilities(cols, rows, stencil);
-      console.log('probs = ' + JSON.stringify(probs));
+      // console.log('probs = ' + JSON.stringify(probs));
 
       const candidateSuspiciousCells = Colorize.generate_suspicious_cells(
         cols,
@@ -1407,8 +1406,8 @@ export class Colorize {
             return false;
           }
         });
-        console.log('total formula weight = ' + totalFormulaWeight);
-        console.log('total weight = ' + totalWeight);
+        // console.log('total formula weight = ' + totalFormulaWeight);
+        // console.log('total weight = ' + totalWeight);
         // Now we need to correct all the non-formulas to give them weight proportional to the case when the formulas are removed.
         const multiplier = totalFormulaWeight / totalWeight;
         console.log(
