@@ -25,10 +25,10 @@ export class Colorize {
     public static suppressFatFix = true;
     public static suppressDifferentReferentCount = false;
     public static suppressRecurrentFormula = true;
-    public static suppressOneExtraConstant = false;
-    public static suppressNumberOfConstantsMismatch = false;
-    public static suppressBothConstants = false;
-    public static suppressOneIsAllConstants = false;
+    public static suppressOneExtraConstant = true;
+    public static suppressNumberOfConstantsMismatch = true;
+    public static suppressBothConstants = true;
+    public static suppressOneIsAllConstants = true;
     public static suppressR1C1Mismatch = false;
     public static suppressAbsoluteRefMismatch = false;
     public static suppressOffAxisReference = true;
