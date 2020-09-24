@@ -3,9 +3,10 @@
   "description": "",
   "author": "Emery Berger",
   "version": "1.0.0",
+    "preinstall": "npm install npx tsc",
   "scripts": {
     "lint": "tslint --project tsconfig.json",
-    "build": "tsc --project tsconfig.json"
+    "build": "npx tsc --project tsconfig.json"
   },
   "dependencies": {
     "@types/node": "^14.0.13",
