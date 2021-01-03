@@ -11,9 +11,6 @@ import {Colorize} from './colorize';
 import {Timer} from './timer';
 import {string} from 'prop-types';
 
-// Set to true to use the hard-coded example below.
-const useExample = false;
-
 const usageString = 'Usage: $0 <command> [options]';
 const defaultFormattingDiscount = Colorize.getFormattingDiscount();
 const defaultReportingThreshold = Colorize.getReportingThreshold();
@@ -202,44 +199,6 @@ if ('maxEntropy' in args) {
 
 let inp = null;
 
-if (useExample) {
-  // A simple example.
-  inp = {
-    workbookName: 'example',
-    worksheets: [
-      {
-        sheetname: 'Sheet1',
-        usedRangeAddress: 'Sheet1!E12:E21',
-        formulas: [
-          ['=D12'],
-          ['=D13'],
-          ['=D14'],
-          ['=D15'],
-          ['=D16'],
-          ['=D17'],
-          ['=D18'],
-          ['=D19'],
-          ['=D20'],
-          ['=C21'],
-        ],
-        values: [
-          ['0'],
-          ['0'],
-          ['0'],
-          ['0'],
-          ['0'],
-          ['0'],
-          ['0'],
-          ['0'],
-          ['0'],
-          ['0'],
-        ],
-        styles: [[''], [''], [''], [''], [''], [''], [''], [''], [''], ['']],
-      },
-    ],
-  };
-}
-
 let annotated_bugs = '{}';
 try {
   annotated_bugs = fs.readFileSync('annotations-processed.json');
@@ -280,13 +239,6 @@ for (const parms of parameters) {
     // Read from file.
     console.warn('processing ' + fname);
     inp = ExcelJSON.processWorkbook(base, fname);
-
-    /*
-        let output = {
-            'workbookName': path.basename(inp['workbookName']),
-            'worksheets': {}
-        };
-*/
 
     {
       let hasError = false;
@@ -336,48 +288,7 @@ f1scores.sort((a, b) => {
   }
   return 0;
 });
-/*
-// Now find the lowest threshold with the highest F1 score.
-const maxScore = f1scores.reduce((a, b) => {
-  if (a[2] > b[2]) {
-    return a[2];
-  } else {
-    return b[2];
-  }
-});
-//console.log('maxScore = ' + maxScore);
-*/
-// Find the first one with the max.
-/*
-const firstMax = f1scores.find(item => {
-  return item[2] === maxScore;
-});
-//console.log('first max = ' + firstMax);
-*/
 
 if (!args.suppressOutput) {
   console.log(JSON.stringify(outputs, null, '\t'));
 }
-// console.log(JSON.stringify(f1scores));
-
-/*
-
-console.log("Num workbooks = " + numWorkbooks);
-console.log("Num workbooks with errors = " + numWorkbooksWithErrors);
-console.log("Num workbooks with formulas = " + numWorkbooksWithFormulas);
-console.log("Num sheets = " + numSheets);
-console.log("Num sheets with errors = " + numSheetsWithErrors);
-
-*/
-
-/* disabled for now:
-console.log("Sheets with ExceLint true positives = " + sheetTruePositives);
-console.log("Sheets with ExceLint false positives = " + sheetFalsePositives);
-let intersection = new Set([...sheetTruePositiveSet].filter(i => sheetFalsePositiveSet.has(i)));
-let subtraction = new Set([...sheetFalsePositiveSet].filter(i => !intersection.has(i)));
-console.log("Sheets with both = " + intersection.size);
-console.log("True positive sheets = " + [...sheetTruePositiveSet]);
-console.log("Both true and false positive sheets = " + [...intersection]);
-console.log("False positive sheets = " + [...sheetFalsePositiveSet]);
-console.log("Only false positive sheets = " + [...subtraction]);
-*/
