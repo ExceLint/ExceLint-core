@@ -11,7 +11,6 @@
     "clean": "gts clean",
     "compile": "tsc",
     "fix": "gts fix",
-    "prepare": "npm run compile",
     "pretest": "npm run compile",
     "posttest": "npm run check"
   },
@@ -27,7 +26,6 @@
   },
   "devDependencies": {
     "@types/node": "^14.11.2",
-    "gts": "^2.0.2",
-    "typescript": "^3.8.3"
+    "gts": "^2.0.2"
   }
 }
