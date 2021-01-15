@@ -1,18 +1,18 @@
-const path = require('path');
+const path = require("path");
 
 // Polyfill for flat (IE & Edge)
-const flat = require('array.prototype.flat');
+const flat = require("array.prototype.flat");
 flat.shim();
 
 //import { rgb2hex, GroupedList } from 'office-ui-fabric-react';
 //import { ColorUtils } from './colorutils';
-import {ExcelUtils} from './excelutils';
-import {RectangleUtils} from './rectangleutils';
+import { ExcelUtils } from "./excelutils";
+import { RectangleUtils } from "./rectangleutils";
 //import { ExcelUtilities } from '@microsoft/office-js-helpers';
-import {Timer} from './timer';
-import {JSONclone} from './jsonclone';
-import {find_all_proposed_fixes} from './groupme';
-import {Stencil, InfoGain} from './infogain';
+import { Timer } from "./timer";
+import { JSONclone } from "./jsonclone";
+import { find_all_proposed_fixes } from "./groupme";
+import { Stencil, InfoGain } from "./infogain";
 
 export class Colorize {
   public static maxCategories = 2; // Maximum number of categories for reported errors
@@ -20,20 +20,19 @@ export class Colorize {
   public static maxEntropy = 1.0; // Maximum entropy of a proposed fix
 
   // Suppressing certain categories of errors.
-
   public static suppressFatFix = true;
   public static suppressDifferentReferentCount = false;
-    public static suppressRecurrentFormula = false; // true;
-    public static suppressOneExtraConstant = false; // true;
-    public static suppressNumberOfConstantsMismatch = false; // = true;
-    public static suppressBothConstants = false; // true;
-    public static suppressOneIsAllConstants = false; // true;
+  public static suppressRecurrentFormula = false; // true;
+  public static suppressOneExtraConstant = false; // true;
+  public static suppressNumberOfConstantsMismatch = false; // = true;
+  public static suppressBothConstants = false; // true;
+  public static suppressOneIsAllConstants = false; // true;
   public static suppressR1C1Mismatch = false;
   public static suppressAbsoluteRefMismatch = false;
-    public static suppressOffAxisReference = false; // true;
+  public static suppressOffAxisReference = false; // true;
 
   public static noElapsedTime = false; // if true, don't report elapsed time
-    public static reportingThreshold = 0; // 35; // Percent of anomalousness
+  public static reportingThreshold = 0; // 35; // Percent of anomalousness
   public static suspiciousCellsReportingThreshold = 85; //  percent of bar
   public static formattingDiscount = 50; // percent of discount: 100% means different formats = not suspicious at all
 
@@ -59,20 +58,20 @@ export class Colorize {
 
   // Color-blind friendly color palette.
   public static palette = [
-    '#ecaaae',
-    '#74aff3',
-    '#d8e9b2',
-    '#deb1e0',
-    '#9ec991',
-    '#adbce9',
-    '#e9c59a',
-    '#71cdeb',
-    '#bfbb8a',
-    '#94d9df',
-    '#91c7a8',
-    '#b4efd3',
-    '#80b6aa',
-    '#9bd1c6',
+    "#ecaaae",
+    "#74aff3",
+    "#d8e9b2",
+    "#deb1e0",
+    "#9ec991",
+    "#adbce9",
+    "#e9c59a",
+    "#71cdeb",
+    "#bfbb8a",
+    "#94d9df",
+    "#91c7a8",
+    "#b4efd3",
+    "#80b6aa",
+    "#9bd1c6",
   ]; // removed '#73dad1'
 
   // True iff this class been initialized.
@@ -85,7 +84,7 @@ export class Colorize {
   private static Multiplier = 1; // 103037;
 
   // A hash string indicating no dependencies.
-  private static distinguishedZeroHash = '12345';
+  private static distinguishedZeroHash = "12345";
 
   public static initialize() {
     if (!this.initialized) {
@@ -106,7 +105,7 @@ export class Colorize {
 
   public static process_workbook(inp: any, sheetName: string): any {
     const output = {
-      workbookName: path.basename(inp['workbookName']),
+      workbookName: path.basename(inp["workbookName"]),
       worksheets: {},
     };
     /* disabled for now:
@@ -120,9 +119,9 @@ export class Colorize {
     for (let i = 0; i < inp.worksheets.length; i++) {
       const sheet = inp.worksheets[i];
       // If sheet name argument is not "" and doesn't match, skip it.
-	if ((sheetName !== "") && (sheet.sheetName !== sheetName)) {
-	    continue;
-	}
+      if (sheetName !== "" && sheet.sheetName !== sheetName) {
+        continue;
+      }
       // Skip empty sheets.
       if (sheet.formulas.length === 0 && sheet.values.length === 0) {
         continue;
@@ -132,9 +131,9 @@ export class Colorize {
       // Get rid of multiple exclamation points in the used range address,
       // as these interfere with later regexp parsing.
       let usedRangeAddress = sheet.usedRangeAddress;
-      usedRangeAddress = usedRangeAddress.replace(/!(!+)/, '!');
+      usedRangeAddress = usedRangeAddress.replace(/!(!+)/, "!");
 
-      const myTimer = new Timer('excelint');
+      const myTimer = new Timer("excelint");
 
       // Get anomalous cells and proposed fixes, among others.
       let [
@@ -179,14 +178,14 @@ export class Colorize {
       const example_fixes_r1c1 = [];
       for (let ind = 0; ind < initial_adjusted_fixes.length; ind++) {
         // Determine the direction of the range (vertical or horizontal) by looking at the axes.
-        let direction = '';
+        let direction = "";
         if (
           initial_adjusted_fixes[ind][1][0][0] ===
           initial_adjusted_fixes[ind][2][0][0]
         ) {
-          direction = 'vertical';
+          direction = "vertical";
         } else {
-          direction = 'horizontal';
+          direction = "horizontal";
         }
         const formulas = []; // actual formulas
         const print_formulas = []; // formulas with a preface (the cell name containing each)
@@ -222,7 +221,7 @@ export class Colorize {
           const preface =
             ExcelUtils.column_index_to_name(formulaY + 1) +
             (formulaX + 1) +
-            ':';
+            ":";
           const cellPlusFormula = preface + r1c1;
           // Add the formulas plus their prefaces (the latter for printing).
           r1c1_formulas.push(r1c1);
@@ -247,7 +246,7 @@ export class Colorize {
         );
         if (fixRange.length < Colorize.minFixSize) {
           console.warn(
-            'Omitted ' + JSON.stringify(print_formulas) + '(too small)'
+            "Omitted " + JSON.stringify(print_formulas) + "(too small)"
           );
           continue;
         }
@@ -266,10 +265,10 @@ export class Colorize {
           (leftFixSize / totalSize) * Math.log2(leftFixSize / totalSize) +
           (rightFixSize / totalSize) * Math.log2(rightFixSize / totalSize)
         );
-          // console.warn('fix entropy = ' + fixEntropy);
+        // console.warn('fix entropy = ' + fixEntropy);
         if (fixEntropy > Colorize.maxEntropy) {
           console.warn(
-            'Omitted ' + JSON.stringify(print_formulas) + '(too high entropy)'
+            "Omitted " + JSON.stringify(print_formulas) + "(too high entropy)"
           );
           continue;
         }
@@ -310,7 +309,7 @@ export class Colorize {
           // referencing, say, =B10+1).
           if (dependence_vectors[i].length > 0) {
             if (
-              direction === 'vertical' &&
+              direction === "vertical" &&
               dependence_vectors[i][0][0] === 0 &&
               dependence_vectors[i][0][1] === -1
             ) {
@@ -318,7 +317,7 @@ export class Colorize {
               break;
             }
             if (
-              direction === 'horizontal' &&
+              direction === "horizontal" &&
               dependence_vectors[i][0][0] === -1 &&
               dependence_vectors[i][0][1] === 0
             ) {
@@ -385,10 +384,10 @@ export class Colorize {
         if (bin === []) {
           bin.push(Colorize.BinCategories.Unclassified);
         }
-	  // In case there's more than one classification, prune some by priority (best explanation).
-	  if (bin.includes(Colorize.BinCategories.OneIsAllConstants)) {
-	      bin = [Colorize.BinCategories.OneIsAllConstants];
-	  }
+        // In case there's more than one classification, prune some by priority (best explanation).
+        if (bin.includes(Colorize.BinCategories.OneIsAllConstants)) {
+          bin = [Colorize.BinCategories.OneIsAllConstants];
+        }
         // IMPORTANT:
         // Exclude reported bugs subject to certain conditions.
         if (
@@ -416,20 +415,20 @@ export class Colorize {
             Colorize.suppressOffAxisReference)
         ) {
           console.warn(
-            'Omitted ' +
+            "Omitted " +
               JSON.stringify(print_formulas) +
-              '(' +
+              "(" +
               JSON.stringify(bin) +
-              ')'
+              ")"
           );
           continue;
         } else {
           console.warn(
-            'NOT omitted ' +
+            "NOT omitted " +
               JSON.stringify(print_formulas) +
-              '(' +
+              "(" +
               JSON.stringify(bin) +
-              ')'
+              ")"
           );
         }
         final_adjusted_fixes.push(initial_adjusted_fixes[ind]);
@@ -453,11 +452,11 @@ export class Colorize {
         elapsed = 0; // Dummy value, used for regression testing.
       }
       // Compute number of cells containing formulas.
-      const numFormulaCells = sheet.formulas.flat().filter(x => x.length > 0)
+      const numFormulaCells = sheet.formulas.flat().filter((x) => x.length > 0)
         .length;
 
       // Count the number of non-empty cells.
-      const numValueCells = sheet.values.flat().filter(x => x.length > 0)
+      const numValueCells = sheet.values.flat().filter((x) => x.length > 0)
         .length;
 
       // Compute total number of cells in the sheet (rows * columns).
@@ -483,9 +482,9 @@ export class Colorize {
       };
 
       // Compute precision and recall of proposed fixes, if we have annotated ground truth.
-      const workbookBasename = path.basename(inp['workbookName']);
+      const workbookBasename = path.basename(inp["workbookName"]);
       // Build list of bugs.
-      let foundBugs: any = final_adjusted_fixes.map(x => {
+      let foundBugs: any = final_adjusted_fixes.map((x) => {
         if (x[0] >= Colorize.reportingThreshold / 100) {
           return Colorize.expand(x[1][0], x[1][1]).concat(
             Colorize.expand(x[2][0], x[2][1])
@@ -498,11 +497,11 @@ export class Colorize {
         new Set(foundBugs.flat(1).map(JSON.stringify))
       );
       foundBugs = foundBugsArray.map(JSON.parse);
-      out['anomalousCells'] = foundBugs.length;
+      out["anomalousCells"] = foundBugs.length;
       const weightedAnomalousRanges = final_adjusted_fixes
-        .map(x => x[0])
+        .map((x) => x[0])
         .reduce((x, y) => x + y, 0);
-      out['weightedAnomalousRanges'] = weightedAnomalousRanges;
+      out["weightedAnomalousRanges"] = weightedAnomalousRanges;
 
       /* disabled for now.
 
@@ -569,7 +568,7 @@ export class Colorize {
 		}
 	    }
             */
-      out['proposedFixes'] = final_adjusted_fixes;
+      out["proposedFixes"] = final_adjusted_fixes;
       output.worksheets[sheet.sheetName] = out;
     }
     //	outputs.push(output);
@@ -627,7 +626,7 @@ export class Colorize {
           const adjustedX = j + origin_col + 1;
           const adjustedY = i + origin_row + 1;
           if (vec_array.length === 0) {
-            if (cell[0] === '=') {
+            if (cell[0] === "=") {
               // It's a formula but it has no dependencies (i.e., it just has constants). Use a distinguished value.
               output.push([
                 [adjustedX, adjustedY, 0],
@@ -660,7 +659,7 @@ export class Colorize {
     //	let t = new Timer('color_all_data');
     const referenced_data = [];
     for (const refvec of Object.keys(refs)) {
-      const rv = refvec.split(',');
+      const rv = refvec.split(",");
       const row = Number(rv[0]);
       const col = Number(rv[1]);
       referenced_data.push([[row, col, 0], Colorize.distinguishedZeroHash]); // See comment at top of function declaration.
@@ -684,7 +683,7 @@ export class Colorize {
       for (let j = 0; j < row.length; j++) {
         const cell = row[j].toString();
         // If the value is not from a formula, include it.
-        if (cell.length > 0 && formulas[i][j][0] !== '=') {
+        if (cell.length > 0 && formulas[i][j][0] !== "=") {
           const cellAsNumber = Number(cell).toString();
           if (cellAsNumber === cell) {
             // It's a number. Add it.
@@ -710,7 +709,7 @@ export class Colorize {
       n1: Colorize.excelintVector,
       n2: Colorize.excelintVector
     ) => number
-  ): {[val: string]: Array<Colorize.excelintVector>} {
+  ): { [val: string]: Array<Colorize.excelintVector> } {
     // Separate into groups based on their string value.
     const groups = {};
     for (const r of list) {
@@ -726,7 +725,7 @@ export class Colorize {
 
   // Group all ranges by their value.
   private static group_ranges(
-    groups: {[val: string]: Array<Colorize.excelintVector>},
+    groups: { [val: string]: Array<Colorize.excelintVector> },
     columnFirst: boolean
   ): {
     [val: string]: Array<[Colorize.excelintVector, Colorize.excelintVector]>;
@@ -931,13 +930,13 @@ export class Colorize {
     values: Array<Array<string>>
   ): [any, any, any, any] {
     if (false) {
-      console.log('process_suspicious:');
+      console.log("process_suspicious:");
       console.log(JSON.stringify(usedRangeAddress));
       console.log(JSON.stringify(formulas));
       console.log(JSON.stringify(values));
     }
 
-    const t = new Timer('process_suspicious');
+    const t = new Timer("process_suspicious");
 
     const [sheetName, startCell] = ExcelUtils.extract_sheet_cell(
       usedRangeAddress
@@ -949,7 +948,7 @@ export class Colorize {
     const totalFormulas = (formulas as any).flat().filter(Boolean).length;
 
     if (totalFormulas > this.formulasThreshold) {
-      console.warn('Too many formulas to perform formula analysis.');
+      console.warn("Too many formulas to perform formula analysis.");
     } else {
       //	    t.split('about to process formulas');
       processed_formulas = Colorize.process_formulas(
@@ -969,7 +968,7 @@ export class Colorize {
     // Filter out non-empty items from whole matrix.
     const totalValues = (values as any).flat().filter(Boolean).length;
     if (totalValues > this.valuesThreshold) {
-      console.warn('Too many values to perform reference analysis.');
+      console.warn("Too many values to perform reference analysis.");
     } else {
       // Compute references (to color referenced data).
       const refs = ExcelUtils.generate_all_references(
@@ -1018,7 +1017,7 @@ export class Colorize {
     const proposed_fixes = Colorize.generate_proposed_fixes(grouped_formulas);
 
     if (false) {
-      console.log('results:');
+      console.log("results:");
       console.log(JSON.stringify(suspicious_cells));
       console.log(JSON.stringify(grouped_formulas));
       console.log(JSON.stringify(grouped_data));
@@ -1218,7 +1217,7 @@ export class Colorize {
   public static merge_individual_groups(
     group: Array<[Colorize.excelintVector, Colorize.excelintVector]>
   ): Array<[Colorize.excelintVector, Colorize.excelintVector]> {
-    const t = new Timer('merge_individual_groups');
+    const t = new Timer("merge_individual_groups");
     let numIterations = 0;
     group = group.sort();
     while (true) {
@@ -1261,8 +1260,8 @@ export class Colorize {
       numIterations++;
       if (numIterations > 2000) {
         // This is a hack to guarantee convergence.
-        console.log('Too many iterations; abandoning this group.');
-        t.split('done, ' + numIterations + ' iterations.');
+        console.log("Too many iterations; abandoning this group.");
+        t.split("done, " + numIterations + " iterations.");
         return [
           [
             [-1, -1, 0],
@@ -1321,8 +1320,12 @@ export class Colorize {
       // This is a pain because if we don't pad appropriately, [1,9] is 'less than' [1,10]. (Seriously.)
       // So we make sure that numbers are always left padded with zeroes to make the number 10 digits long
       // (which is 1 more than Excel needs right now).
-      const firstPadded = fixes[k][1].map(a => a.toString().padStart(10, '0'));
-      const secondPadded = fixes[k][2].map(a => a.toString().padStart(10, '0'));
+      const firstPadded = fixes[k][1].map((a) =>
+        a.toString().padStart(10, "0")
+      );
+      const secondPadded = fixes[k][2].map((a) =>
+        a.toString().padStart(10, "0")
+      );
 
       const first = firstPadded < secondPadded ? fixes[k][1] : fixes[k][2];
       const second = firstPadded < secondPadded ? fixes[k][2] : fixes[k][1];
@@ -1363,7 +1366,7 @@ export class Colorize {
   ) {
     return []; // FIXME disabled for now
     let suspiciousCells: any[];
-      {
+    {
       // data_values = data_values;
       const formula_matrix = Colorize.processed_to_matrix(
         cols,
@@ -1376,7 +1379,7 @@ export class Colorize {
       //									processed_formulas);
 
       const stencil = Colorize.stencilize(formula_matrix);
-     // console.log('after stencilize: stencil = ' + JSON.stringify(stencil));
+      // console.log('after stencilize: stencil = ' + JSON.stringify(stencil));
       const probs = Colorize.compute_stencil_probabilities(cols, rows, stencil);
       // console.log('probs = ' + JSON.stringify(probs));
 
@@ -1391,12 +1394,12 @@ export class Colorize {
       );
       // Prune any cell that is in fact a formula.
 
-      if (typeof formulas !== 'undefined') {
+      if (typeof formulas !== "undefined") {
         let totalFormulaWeight = 0;
         let totalWeight = 0;
-        suspiciousCells = candidateSuspiciousCells.filter(c => {
+        suspiciousCells = candidateSuspiciousCells.filter((c) => {
           const theFormula = formulas[c[1] - origin[1]][c[0] - origin[0]];
-          if (theFormula.length < 1 || theFormula[0] !== '=') {
+          if (theFormula.length < 1 || theFormula[0] !== "=") {
             totalWeight += c[2];
             return true;
           } else {
@@ -1411,21 +1414,21 @@ export class Colorize {
         // Now we need to correct all the non-formulas to give them weight proportional to the case when the formulas are removed.
         const multiplier = totalFormulaWeight / totalWeight;
         console.log(
-          'after processing 1, suspiciousCells = ' +
+          "after processing 1, suspiciousCells = " +
             JSON.stringify(suspiciousCells)
         );
-        suspiciousCells = suspiciousCells.map(c => [
+        suspiciousCells = suspiciousCells.map((c) => [
           c[0],
           c[1],
           c[2] * multiplier,
         ]);
         console.log(
-          'after processing 2, suspiciousCells = ' +
+          "after processing 2, suspiciousCells = " +
             JSON.stringify(suspiciousCells)
         );
-        suspiciousCells = suspiciousCells.filter(c => c[2] <= threshold);
+        suspiciousCells = suspiciousCells.filter((c) => c[2] <= threshold);
         console.log(
-          'after processing 3, suspiciousCells = ' +
+          "after processing 3, suspiciousCells = " +
             JSON.stringify(suspiciousCells)
         );
       } else {
@@ -1440,20 +1443,20 @@ export namespace Colorize {
   export type excelintVector = [number, number, number];
 
   export enum BinCategories {
-    FatFix = 'Inconsistent multiple columns/rows', // fix is not a single column or single row
-    RecurrentFormula = 'Formula(s) refer to each other', // formulas refer to each other
-    OneExtraConstant = 'Formula(s) with an extra constant', // one has no constant and the other has one constant
-    NumberOfConstantsMismatch = 'Formulas have different number of constants', // both have constants but not the same number of constants
-    BothConstants = 'All constants, but different values', // both have only constants but differ in numeric value
-    OneIsAllConstants = 'Mix of constants and formulas', // one is entirely constants and other is formula
-    AbsoluteRefMismatch = 'Mix of absolute ($) and regular references', // relative vs. absolute mismatch
-    OffAxisReference = 'References refer to different rows/columns', // references refer to different columns or rows
-    R1C1Mismatch = 'Refers to different ranges', // different R1C1 representations
-    DifferentReferentCount = 'Formula ranges are of different sizes', // ranges have different number of referents
+    FatFix = "Inconsistent multiple columns/rows", // fix is not a single column or single row
+    RecurrentFormula = "Formula(s) refer to each other", // formulas refer to each other
+    OneExtraConstant = "Formula(s) with an extra constant", // one has no constant and the other has one constant
+    NumberOfConstantsMismatch = "Formulas have different number of constants", // both have constants but not the same number of constants
+    BothConstants = "All constants, but different values", // both have only constants but differ in numeric value
+    OneIsAllConstants = "Mix of constants and formulas", // one is entirely constants and other is formula
+    AbsoluteRefMismatch = "Mix of absolute ($) and regular references", // relative vs. absolute mismatch
+    OffAxisReference = "References refer to different rows/columns", // references refer to different columns or rows
+    R1C1Mismatch = "Refers to different ranges", // different R1C1 representations
+    DifferentReferentCount = "Formula ranges are of different sizes", // ranges have different number of referents
     // Not yet implemented.
-    RefersToEmptyCells = 'Formulas refer to empty cells',
-    UsesDifferentOperations = 'Formulas use different functions', // e.g. SUM vs. AVERAGE
+    RefersToEmptyCells = "Formulas refer to empty cells",
+    UsesDifferentOperations = "Formulas use different functions", // e.g. SUM vs. AVERAGE
     // Fall-through category
-    Unclassified = 'unclassified',
+    Unclassified = "unclassified",
   }
 }
