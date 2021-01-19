@@ -100,10 +100,10 @@ export class ExcelUtils {
         proposed_fixes[current_fix][2]
       );
       // convert to sheet notation
-      const col0 = ExcelUtils.column_index_to_name(r[0][0]);
-      const row0 = r[0][1].toString();
-      const col1 = ExcelUtils.column_index_to_name(r[1][0]);
-      const row1 = r[1][1].toString();
+      const col0 = ExcelUtils.column_index_to_name(r[0].x);
+      const row0 = r[0].y.toString();
+      const col1 = ExcelUtils.column_index_to_name(r[1].x);
+      const row1 = r[1].y.toString();
       return [col0, row0, col1, row1];
     } else {
       return null;
@@ -260,32 +260,32 @@ export class ExcelUtils {
     // depending whether it's a relative or absolute reference.
     let resultStr = "";
     if (ExcelUtils.cell_both_absolute.exec(destCell)) {
-      resultStr = R + vec2[1] + C + vec2[0];
+      resultStr = R + vec2.y + C + vec2.x;
     } else if (ExcelUtils.cell_col_absolute.exec(destCell)) {
-      if (resultVec[1] === 0) {
+      if (resultVec.y === 0) {
         resultStr += R;
       } else {
         resultStr += R + "[" + resultVec[1] + "]";
       }
-      resultStr += C + vec2[0];
+      resultStr += C + vec2.x;
     } else if (ExcelUtils.cell_row_absolute.exec(destCell)) {
-      if (resultVec[0] === 0) {
+      if (resultVec.x === 0) {
         resultStr += C;
       } else {
-        resultStr += C + "[" + resultVec[0] + "]";
+        resultStr += C + "[" + resultVec.x + "]";
       }
-      resultStr = R + vec2[1] + resultStr;
+      resultStr = R + vec2.y + resultStr;
     } else {
       // Common case, both relative.
-      if (resultVec[1] === 0) {
+      if (resultVec.y === 0) {
         resultStr += R;
       } else {
         resultStr += R + "[" + resultVec[1] + "]";
       }
-      if (resultVec[0] === 0) {
+      if (resultVec.x === 0) {
         resultStr += C;
       } else {
-        resultStr += C + "[" + resultVec[0] + "]";
+        resultStr += C + "[" + resultVec.x + "]";
       }
     }
     return resultStr;
@@ -299,7 +299,7 @@ export class ExcelUtils {
     let range = formula.slice();
     const origin = ExcelUtils.column_index_to_name(origin_col) + origin_row;
     // First, get all the range pairs out.
-    let found_pair;
+    let found_pair: RegExpExecArray;
     while ((found_pair = ExcelUtils.range_pair.exec(range))) {
       if (found_pair) {
         const first_cell = found_pair[1];
@@ -314,7 +314,7 @@ export class ExcelUtils {
     }
 
     // Now look for singletons.
-    let singleton = null;
+    let singleton: RegExpExecArray;
     while ((singleton = ExcelUtils.single_dep.exec(range))) {
       if (singleton) {
         const first_cell = singleton[1];
@@ -353,16 +353,14 @@ export class ExcelUtils {
     return ExcelUtils.extract_sheet_cell(str);
   }
 
-  public static make_range_string(
-    theRange: Array<[number, number, number]>
-  ): string {
+  public static make_range_string(theRange: Array<ExcelintVector>): string {
     const r = theRange;
-    const col0 = r[0][0];
-    const row0 = r[0][1];
-    const col1 = r[1][0];
-    const row1 = r[1][1];
+    const col0 = r[0].x;
+    const row0 = r[0].y;
+    const col1 = r[1].x;
+    const row1 = r[1].y;
 
-    if (col0 === 0 && row0 === 0 && r[0][2] !== 0) {
+    if (!r[0].isReference()) {
       // Not a real dependency. Skip.
       console.log("NOT A REAL DEPENDENCY: " + col1 + "," + row1);
       return "";
@@ -389,7 +387,7 @@ export class ExcelUtils {
 
     const originalRange = range;
 
-    let found_pair = null;
+    let found_pair: RegExpExecArray;
     const all_vectors: Array<ExcelintVector> = [];
 
     if (typeof range !== "string") {
@@ -427,8 +425,8 @@ export class ExcelUtils {
         // Last_vec is the lower-right hand side of a rectangle.
 
         // Generate all vectors.
-        const length = last_vec[0] - first_vec[0] + 1;
-        const width = last_vec[1] - first_vec[1] + 1;
+        const length = last_vec.x - first_vec.x + 1;
+        const width = last_vec.y - first_vec.y + 1;
         for (let x = 0; x < length; x++) {
           for (let y = 0; y < width; y++) {
             all_vectors.push(
@@ -460,7 +458,7 @@ export class ExcelUtils {
 
     if (include_numbers) {
       // Optionally roll numbers in formulas into the dependency vectors. Each number counts as "1".
-      let number = null;
+      let number: RegExpExecArray;
       while ((number = ExcelUtils.number_dep.exec(range))) {
         if (number) {
           all_vectors.push(new ExcelintVector(0, 0, 1)); // just add 1 for every number
@@ -490,7 +488,7 @@ export class ExcelUtils {
     range = range.replace(this.formulas_with_structured_references, "_");
 
     // First, get all the range pairs out.
-    let found_pair = null;
+    let found_pair: RegExpExecArray;
     while ((found_pair = ExcelUtils.range_pair.exec(range))) {
       if (found_pair) {
         // Wipe out the matched contents of range.
@@ -499,7 +497,7 @@ export class ExcelUtils {
     }
 
     // Now look for singletons.
-    let singleton = null;
+    let singleton: RegExpExecArray;
     while ((singleton = ExcelUtils.single_dep.exec(range))) {
       if (singleton) {
         // Wipe out the matched contents of range.
@@ -508,11 +506,11 @@ export class ExcelUtils {
     }
 
     // Now aggregate total numeric constants (sum them).
-    let number = null;
+    let number: RegExpExecArray;
     //	let total = 0.0;
     while ((number = ExcelUtils.number_dep.exec(range))) {
       if (number) {
-        numbers.push(parseFloat(number));
+        numbers.push(parseFloat(number[0]));
         //		total += parseFloat(number);
         // Wipe out the matched contents of range.
         range = range.replace(number[0], "_");
@@ -573,13 +571,13 @@ export class ExcelUtils {
           // It's a formula.
           const direct_refs = ExcelUtils.all_cell_dependencies(cell, 0, 0); // origin_col, origin_row); // was just 0,0....  origin_col, origin_row);
           for (const dep of direct_refs) {
-            if (dep[0] === 0 && dep[1] === 0 && dep[2] !== 0) {
+            if (!dep.isReference()) {
               // Not a real reference. Skip.
             } else {
               // Check to see if this is data or a formula.
               // If it's not a formula, add it.
-              const rowIndex = dep[0] - origin_col - 1;
-              const colIndex = dep[1] - origin_row - 1;
+              const rowIndex = dep.x - origin_col - 1;
+              const colIndex = dep.y - origin_row - 1;
               const outsideFormulaRange =
                 colIndex >= formulas.length ||
                 rowIndex >= formulas[0].length ||

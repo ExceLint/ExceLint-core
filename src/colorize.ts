@@ -139,7 +139,10 @@ export class Colorize {
         continue;
       }
 
-      const usedRangeAddress = Colorize.normalizeAddress(sheet.usedRangeAddres);
+      // get the used range
+      const usedRangeAddress = Colorize.normalizeAddress(
+        sheet.usedRangeAddress
+      );
 
       // start timer
       const myTimer = new Timer("excelint");

@@ -28,4 +28,9 @@ export class ExcelintVector {
       this.x.toString() + "," + this.y.toString() + "," + this.c.toString()
     );
   }
+
+  // Return true if this vector encodes a reference
+  public isReference(): boolean {
+    return !(this.x === 0 && this.y === 0 && this.c !== 0);
+  }
 }
