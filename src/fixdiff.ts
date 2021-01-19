@@ -1,8 +1,8 @@
-const fs = require('fs');
-const textdiff = require('text-diff');
+const fs = require("fs");
+const textdiff = require("text-diff");
 const diff = new textdiff();
 
-import {ExcelUtils} from './excelutils';
+import { ExcelUtils } from "./excelutils";
 
 class CellEncoder {
   private static maxRows = 64; // -32..32
@@ -99,8 +99,8 @@ class CellEncoder {
         const decodedCol = CellEncoder.decodeColumn(encoded);
         const decodedRow = CellEncoder.decodeRow(encoded);
         //	console.log(decodedCol + " " + decodedRow);
-        console.assert(col === decodedCol, 'NOPE COL');
-        console.assert(row === decodedRow, 'NOPE ROW');
+        console.assert(col === decodedCol, "NOPE COL");
+        console.assert(row === decodedRow, "NOPE ROW");
       }
     }
   }
@@ -108,7 +108,7 @@ class CellEncoder {
 
 export class FixDiff {
   // Load the JSON file containing all the Excel functions.
-  private fns = JSON.parse(fs.readFileSync('functions.json', 'utf-8'));
+  private fns = JSON.parse(fs.readFileSync("functions.json", "utf-8"));
   // console.log(JSON.stringify(fns));
 
   // Build a map of Excel functions to crazy Unicode characters and back
@@ -158,31 +158,28 @@ export class FixDiff {
     // Dependencies are column, then row.
     const vec1 = ExcelUtils.cell_dependency(srcCell, 0, 0);
     const vec2 = ExcelUtils.cell_dependency(destCell, 0, 0);
-    console.log('start ' + JSON.stringify(vec1));
-    console.log('dest  ' + JSON.stringify(vec2));
+    console.log("start " + JSON.stringify(vec1));
+    console.log("dest  " + JSON.stringify(vec2));
     // Compute the difference.
-    const resultVec = [];
-    vec2.forEach((item, index, _) => {
-      resultVec.push(item - vec1[index]);
-    });
-    console.log('vec2  ' + JSON.stringify(resultVec));
+    const resultVec = vec2.subtract(vec1);
+    console.log("vec2  " + JSON.stringify(resultVec));
     // Now generate the pseudo R1C1 version, which varies
     // depending whether it's a relative or absolute reference.
-    let resultStr = '';
+    let resultStr = "";
     if (ExcelUtils.cell_both_absolute.exec(destCell)) {
-      console.log('both absolute');
+      console.log("both absolute");
       resultStr = CellEncoder.encodeToChar(vec2[0], vec2[1], true, true);
     } else if (ExcelUtils.cell_col_absolute.exec(destCell)) {
-      console.log('column absolute, row relative');
+      console.log("column absolute, row relative");
       console.log(vec2[0]);
       console.log(resultVec[1]);
       resultStr = CellEncoder.encodeToChar(vec2[0], resultVec[1], true, false);
     } else if (ExcelUtils.cell_row_absolute.exec(destCell)) {
-      console.log('row absolute, column relative');
+      console.log("row absolute, column relative");
       resultStr = CellEncoder.encodeToChar(resultVec[0], vec2[1], false, true);
     } else {
       // Common case, both relative.
-      console.log('both relative');
+      console.log("both relative");
       resultStr = CellEncoder.encodeToChar(
         resultVec[0],
         resultVec[1],
@@ -190,7 +187,7 @@ export class FixDiff {
         false
       );
     }
-    console.log('to pseudo r1c1: ' + resultStr);
+    console.log("to pseudo r1c1: " + resultStr);
     return resultStr;
   }
 
@@ -210,7 +207,7 @@ export class FixDiff {
         range = range.replace(
           found_pair[0],
           FixDiff.toPseudoR1C1(origin, found_pair[1]) +
-            ':' +
+            ":" +
             FixDiff.toPseudoR1C1(origin, found_pair[2])
         );
       }
@@ -312,28 +309,28 @@ export class FixDiff {
       if (absCo && !absRo) {
         // Row relative, column absolute (R[..]C...)
         // console.log("column absolute");
-        result = '$' + ExcelUtils.column_index_to_name(co) + (origin_row + ro);
+        result = "$" + ExcelUtils.column_index_to_name(co) + (origin_row + ro);
       }
       if (!absCo && absRo) {
         // Row absolute, column relative (R...C[..])
         // console.log("row absolute");
-        result = ExcelUtils.column_index_to_name(origin_col + co) + '$' + ro;
+        result = ExcelUtils.column_index_to_name(origin_col + co) + "$" + ro;
       }
       if (absCo && absRo) {
         // Both absolute (R...C...)
         // console.log("both absolute");
-        result = '$' + ExcelUtils.column_index_to_name(co) + '$' + ro;
+        result = "$" + ExcelUtils.column_index_to_name(co) + "$" + ro;
       }
       return result;
     });
     return r1c1;
   }
 
-  private static redtext = '\u001b[31m';
-  private static yellowtext = '\u001b[33m';
-  private static greentext = '\u001b[32m';
-  private static whitetext = '\u001b[37m';
-  private static resettext = '\u001b[0m';
+  private static redtext = "\u001b[31m";
+  private static yellowtext = "\u001b[33m";
+  private static greentext = "\u001b[32m";
+  private static whitetext = "\u001b[37m";
+  private static resettext = "\u001b[0m";
   private static textcolor = [
     FixDiff.redtext,
     FixDiff.yellowtext,
@@ -345,7 +342,7 @@ export class FixDiff {
     // Iterate for -1 and 1.
     for (const i of [-1, 1]) {
       // console.log(i);
-      let str = '';
+      let str = "";
       for (const d of diffs) {
         // console.log("diff = " + JSON.stringify(d));
         if (d[0] === i) {
@@ -387,10 +384,10 @@ function showDiffs(str1, row1, col1, str2, row2, col2) {
   console.log(second);
 }
 
-showDiffs('=ROUND(C9:E$10)', 1, 3, '=ROUND(B9:E10)', 1, 2);
-showDiffs('=ROUND(B9:E10)', 1, 2, '=ROUND(C9:E$10)', 1, 3);
-showDiffs('=ROUND(B9:E10)', 1, 2, '=ROUND(C9:E10)', 1, 3);
-showDiffs('=ROUND($B$9:E10)', 1, 2, '=ROUND(C9:E10)', 1, 3);
+showDiffs("=ROUND(C9:E$10)", 1, 3, "=ROUND(B9:E10)", 1, 2);
+showDiffs("=ROUND(B9:E10)", 1, 2, "=ROUND(C9:E$10)", 1, 3);
+showDiffs("=ROUND(B9:E10)", 1, 2, "=ROUND(C9:E10)", 1, 3);
+showDiffs("=ROUND($B$9:E10)", 1, 2, "=ROUND(C9:E10)", 1, 3);
 
 // Now try a diff.
 const [row1, col1] = [1, 3];
@@ -399,5 +396,5 @@ const [row2, col2] = [1, 2];
 //let [row2, col2] = [11, 3];
 //let str1 = '=ROUND(B7:B9)'; // 'ROUND(A1)+12';
 //let str2 = '=ROUND(C7:C10)'; // 'ROUNDUP(B2)+12';
-const str1 = '=ROUND(E$10:C9)'; // 'ROUNDUP(B2)+12';
-const str2 = '=ROUND(E10:B9)'; // 'ROUND(A1)+12';
+const str1 = "=ROUND(E$10:C9)"; // 'ROUNDUP(B2)+12';
+const str2 = "=ROUND(E10:B9)"; // 'ROUND(A1)+12';

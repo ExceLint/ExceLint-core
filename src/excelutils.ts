@@ -2,76 +2,77 @@
 // Emery Berger, Microsoft Research / UMass Amherst
 // https://emeryberger.com
 
-import * as sjcl from 'sjcl';
-import {RectangleUtils} from './rectangleutils';
+import * as sjcl from "sjcl";
+import { RectangleUtils } from "./rectangleutils";
+import { ExcelintVector } from "./ExcelintVector";
 
 export class ExcelUtils {
   // Matchers for all kinds of Excel expressions.
-  private static general_re = '\\$?[A-Z][A-Z]?\\$?[\\d\\u2000-\\u6000]+'; // column and row number, optionally with $
-  private static sheet_re = '[^\\!]+';
+  private static general_re = "\\$?[A-Z][A-Z]?\\$?[\\d\\u2000-\\u6000]+"; // column and row number, optionally with $
+  private static sheet_re = "[^\\!]+";
   private static sheet_plus_cell = new RegExp(
-    '(' + ExcelUtils.sheet_re + ')\\!(' + ExcelUtils.general_re + ')'
+    "(" + ExcelUtils.sheet_re + ")\\!(" + ExcelUtils.general_re + ")"
   );
   private static sheet_plus_range = new RegExp(
-    '(' +
+    "(" +
       ExcelUtils.sheet_re +
-      ')\\!(' +
+      ")\\!(" +
       ExcelUtils.general_re +
-      '):(' +
+      "):(" +
       ExcelUtils.general_re +
-      ')'
+      ")"
   );
-  public static single_dep = new RegExp('(' + ExcelUtils.general_re + ')');
+  public static single_dep = new RegExp("(" + ExcelUtils.general_re + ")");
   public static range_pair = new RegExp(
-    '(' + ExcelUtils.general_re + '):(' + ExcelUtils.general_re + ')',
-    'g'
+    "(" + ExcelUtils.general_re + "):(" + ExcelUtils.general_re + ")",
+    "g"
   );
-  private static number_dep = new RegExp('([0-9]+\\.?[0-9]*)');
+  private static number_dep = new RegExp("([0-9]+\\.?[0-9]*)");
   public static cell_both_relative = new RegExp(
-    '[^\\$A-Z]?([A-Z][A-Z]?)([\\d\\u2000-\\u6000]+)'
+    "[^\\$A-Z]?([A-Z][A-Z]?)([\\d\\u2000-\\u6000]+)"
   );
   public static cell_col_absolute = new RegExp(
-    '\\$([A-Z][A-Z]?)([\\d\\u2000-\\u6000]+)'
+    "\\$([A-Z][A-Z]?)([\\d\\u2000-\\u6000]+)"
   );
   public static cell_row_absolute = new RegExp(
-    '[^\\$A-Z]?([A-Z][A-Z]?)\\$([\\d\\u2000-\\u6000]+)'
+    "[^\\$A-Z]?([A-Z][A-Z]?)\\$([\\d\\u2000-\\u6000]+)"
   );
   public static cell_both_absolute = new RegExp(
-    '\\$([A-Z][A-Z]?)\\$([\\d\\u2000-\\u6000]+)'
+    "\\$([A-Z][A-Z]?)\\$([\\d\\u2000-\\u6000]+)"
   );
 
   // We need to filter out all formulas with these characteristics so they don't mess with our dependency regexps.
 
   private static formulas_with_numbers = new RegExp(
-    '/ATAN2|BIN2DEC|BIN2HEX|BIN2OCT|DAYS360|DEC2BIN|DEC2HEX|DEC2OCT|HEX2BIN|HEX2DEC|HEX2OCT|IMLOG2|IMLOG10|LOG10|OCT2BIN|OCT2DEC|OCT2HEX|SUNX2MY2|SUMX2PY2|SUMXMY2|T.DIST.2T|T.INV.2T/',
-    'g'
+    "/ATAN2|BIN2DEC|BIN2HEX|BIN2OCT|DAYS360|DEC2BIN|DEC2HEX|DEC2OCT|HEX2BIN|HEX2DEC|HEX2OCT|IMLOG2|IMLOG10|LOG10|OCT2BIN|OCT2DEC|OCT2HEX|SUNX2MY2|SUMX2PY2|SUMXMY2|T.DIST.2T|T.INV.2T/",
+    "g"
   );
   // Same with sheet name references.
   private static formulas_with_quoted_sheetnames_1 = new RegExp(
-    "'[^']*'!" + '\\$?[A-Z][A-Z]?\\$?\\d+',
-    'g'
+    "'[^']*'!" + "\\$?[A-Z][A-Z]?\\$?\\d+",
+    "g"
   );
   private static formulas_with_quoted_sheetnames_2 = new RegExp(
-    "'[^']*'!" + '\\$?[A-Z][A-Z]?\\$?\\d+' + ':' + '\\$?[A-Z][A-Z]?\\$?\\d+',
-    'g'
+    "'[^']*'!" + "\\$?[A-Z][A-Z]?\\$?\\d+" + ":" + "\\$?[A-Z][A-Z]?\\$?\\d+",
+    "g"
   );
   private static formulas_with_unquoted_sheetnames_1 = new RegExp(
-    '[A-Za-z0-9]+!' + '\\$?[A-Z][A-Z]?\\$?\\d+',
-    'g'
+    "[A-Za-z0-9]+!" + "\\$?[A-Z][A-Z]?\\$?\\d+",
+    "g"
   );
   private static formulas_with_unquoted_sheetnames_2 = new RegExp(
-    '[A-Za-z0-9]+!' +
-      '\\$?[A-Z][A-Z]?\\$?\\d+' +
-      ':' +
-      '\\$?[A-Z][A-Z]?\\$?\\d+',
-    'g'
+    "[A-Za-z0-9]+!" +
+      "\\$?[A-Z][A-Z]?\\$?\\d+" +
+      ":" +
+      "\\$?[A-Z][A-Z]?\\$?\\d+",
+    "g"
   );
   private static formulas_with_structured_references = new RegExp(
-    '\\[([^\\]])*\\]',
-    'g'
+    "\\[([^\\]])*\\]",
+    "g"
   );
 
-  private static originalSheetSuffix = '_EL';
+  private static originalSheetSuffix = "_EL";
 
   // Get the saved formats for this sheet (by its unique identifier).
   public static saved_original_sheetname(id: string): string {
@@ -134,25 +135,25 @@ export class ExcelUtils {
   public static column_name_to_index(name: string): number {
     if (name.length === 1) {
       // optimizing for the overwhelmingly common case
-      return name[0].charCodeAt(0) - 'A'.charCodeAt(0) + 1;
+      return name[0].charCodeAt(0) - "A".charCodeAt(0) + 1;
     }
     let value = 0;
-    const split_name = name.split('');
+    const split_name = name.split("");
     for (const i of split_name) {
       value *= 26;
-      value += i.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
+      value += i.charCodeAt(0) - "A".charCodeAt(0) + 1;
     }
     return value;
   }
 
   // Convert a column number to a name (as in, 3 => 'C').
   public static column_index_to_name(index: number): string {
-    let str = '';
+    let str = "";
     while (index > 0) {
       str += String.fromCharCode(((index - 1) % 26) + 65); // 65 = 'A'
       index = Math.floor((index - 1) / 26);
     }
-    return str.split('').reverse().join('');
+    return str.split("").reverse().join("");
   }
 
   // Returns a vector (x, y) corresponding to the column and row of the computed dependency.
@@ -160,20 +161,20 @@ export class ExcelUtils {
     cell: string,
     origin_col: number,
     origin_row: number
-  ): [number, number, number] {
+  ): ExcelintVector {
     const alwaysReturnAdjustedColRow = false;
     {
       const r = ExcelUtils.cell_both_absolute.exec(cell);
       if (r) {
         const col = ExcelUtils.column_name_to_index(r[1]);
         let row = Number(r[2]);
-        if (r[2][0] >= '\u2000') {
+        if (r[2][0] >= "\u2000") {
           row = Number(r[2].charCodeAt(0) - 16384);
         }
         if (alwaysReturnAdjustedColRow) {
-          return [col - origin_col, row - origin_row, 0];
+          return new ExcelintVector(col - origin_col, row - origin_row, 0);
         } else {
-          return [col, row, 0];
+          return new ExcelintVector(col, row, 0);
         }
       }
     }
@@ -183,13 +184,13 @@ export class ExcelUtils {
       if (r) {
         const col = ExcelUtils.column_name_to_index(r[1]);
         let row = Number(r[2]);
-        if (r[2][0] >= '\u2000') {
+        if (r[2][0] >= "\u2000") {
           row = Number(r[2].charCodeAt(0) - 16384);
         }
         if (alwaysReturnAdjustedColRow) {
-          return [col, row, 0];
+          return new ExcelintVector(col, row, 0);
         } else {
-          return [col, row - origin_row, 0];
+          return new ExcelintVector(col, row - origin_row, 0);
         }
       }
     }
@@ -199,13 +200,13 @@ export class ExcelUtils {
       if (r) {
         const col = ExcelUtils.column_name_to_index(r[1]);
         let row = Number(r[2]);
-        if (r[2][0] >= '\u2000') {
+        if (r[2][0] >= "\u2000") {
           row = Number(r[2].charCodeAt(0) - 16384);
         }
         if (alwaysReturnAdjustedColRow) {
-          return [col, row, 0];
+          return new ExcelintVector(col, row, 0);
         } else {
-          return [col - origin_col, row, 0];
+          return new ExcelintVector(col - origin_col, row, 0);
         }
       }
     }
@@ -215,27 +216,27 @@ export class ExcelUtils {
       if (r) {
         const col = ExcelUtils.column_name_to_index(r[1]);
         let row = Number(r[2]);
-        if (r[2][0] >= '\u2000') {
+        if (r[2][0] >= "\u2000") {
           row = Number(r[2].charCodeAt(0) - 16384);
         }
         if (alwaysReturnAdjustedColRow) {
-          return [col, row, 0];
+          return new ExcelintVector(col, row, 0);
         } else {
-          return [col - origin_col, row - origin_row, 0];
+          return new ExcelintVector(col - origin_col, row - origin_row, 0);
         }
       }
     }
 
     console.log(
-      'cell is ' +
+      "cell is " +
         cell +
-        ', origin_col = ' +
+        ", origin_col = " +
         origin_col +
-        ', origin_row = ' +
+        ", origin_row = " +
         origin_row
     );
-    throw new Error('We should never get here.');
-    return [0, 0, 0];
+    throw new Error("We should never get here.");
+    return ExcelintVector.Zero();
   }
 
   public static toR1C1(
@@ -246,35 +247,32 @@ export class ExcelUtils {
     // Dependencies are column, then row.
     const vec1 = ExcelUtils.cell_dependency(srcCell, 0, 0);
     const vec2 = ExcelUtils.cell_dependency(destCell, 0, 0);
-    let R = 'R';
-    let C = 'C';
+    let R = "R";
+    let C = "C";
     if (greek) {
       // We use this encoding to avoid confusion with, say, "C1", downstream.
-      R = 'ρ';
-      C = 'γ';
+      R = "ρ";
+      C = "γ";
     }
     // Compute the difference.
-    const resultVec = [];
-    vec2.forEach((item, index, _) => {
-      resultVec.push(item - vec1[index]);
-    });
+    const resultVec = vec2.subtract(vec1);
     // Now generate the R1C1 notation version, which varies
     // depending whether it's a relative or absolute reference.
-    let resultStr = '';
+    let resultStr = "";
     if (ExcelUtils.cell_both_absolute.exec(destCell)) {
       resultStr = R + vec2[1] + C + vec2[0];
     } else if (ExcelUtils.cell_col_absolute.exec(destCell)) {
       if (resultVec[1] === 0) {
         resultStr += R;
       } else {
-        resultStr += R + '[' + resultVec[1] + ']';
+        resultStr += R + "[" + resultVec[1] + "]";
       }
       resultStr += C + vec2[0];
     } else if (ExcelUtils.cell_row_absolute.exec(destCell)) {
       if (resultVec[0] === 0) {
         resultStr += C;
       } else {
-        resultStr += C + '[' + resultVec[0] + ']';
+        resultStr += C + "[" + resultVec[0] + "]";
       }
       resultStr = R + vec2[1] + resultStr;
     } else {
@@ -282,12 +280,12 @@ export class ExcelUtils {
       if (resultVec[1] === 0) {
         resultStr += R;
       } else {
-        resultStr += R + '[' + resultVec[1] + ']';
+        resultStr += R + "[" + resultVec[1] + "]";
       }
       if (resultVec[0] === 0) {
         resultStr += C;
       } else {
-        resultStr += C + '[' + resultVec[0] + ']';
+        resultStr += C + "[" + resultVec[0] + "]";
       }
     }
     return resultStr;
@@ -309,7 +307,7 @@ export class ExcelUtils {
         range = range.replace(
           found_pair[0],
           ExcelUtils.toR1C1(origin, found_pair[1], true) +
-            ':' +
+            ":" +
             ExcelUtils.toR1C1(origin, found_pair[2], true)
         );
       }
@@ -327,8 +325,8 @@ export class ExcelUtils {
       }
     }
     // Now, we de-greek.
-    range = range.replace(/ρ/g, 'R');
-    range = range.replace(/γ/g, 'C');
+    range = range.replace(/ρ/g, "R");
+    range = range.replace(/γ/g, "C");
 
     return range;
   }
@@ -342,7 +340,7 @@ export class ExcelUtils {
       return [matched[1], matched[2], matched[2]];
     }
     //	console.log("extract_sheet_cell failed for "+str);
-    return ['', '', ''];
+    return ["", "", ""];
   }
 
   public static extract_sheet_range(str: string): Array<string> {
@@ -366,17 +364,17 @@ export class ExcelUtils {
 
     if (col0 === 0 && row0 === 0 && r[0][2] !== 0) {
       // Not a real dependency. Skip.
-      console.log('NOT A REAL DEPENDENCY: ' + col1 + ',' + row1);
-      return '';
+      console.log("NOT A REAL DEPENDENCY: " + col1 + "," + row1);
+      return "";
     } else if (col0 < 0 || row0 < 0 || col1 < 0 || row1 < 0) {
       // Defensive programming.
-      console.log('WARNING: FOUND NEGATIVE VALUES.');
-      return '';
+      console.log("WARNING: FOUND NEGATIVE VALUES.");
+      return "";
     } else {
       const colname0 = ExcelUtils.column_index_to_name(col0);
       const colname1 = ExcelUtils.column_index_to_name(col1);
       //		    console.log("process: about to get range " + colname0 + row0 + ":" + colname1 + row1);
-      const rangeStr = colname0 + row0 + ':' + colname1 + row1;
+      const rangeStr = colname0 + row0 + ":" + colname1 + row1;
       return rangeStr;
     }
   }
@@ -386,26 +384,26 @@ export class ExcelUtils {
     origin_col: number,
     origin_row: number,
     include_numbers = true
-  ): Array<[number, number, number]> {
+  ): Array<ExcelintVector> {
     //	console.log("looking for dependencies in " + range);
 
     const originalRange = range;
 
     let found_pair = null;
-    const all_vectors: Array<[number, number, number]> = [];
+    const all_vectors: Array<ExcelintVector> = [];
 
-    if (typeof range !== 'string') {
+    if (typeof range !== "string") {
       return null;
     }
 
     // Zap all the formulas with the below characteristics.
-    range = range.replace(this.formulas_with_numbers, '_'); // Don't track these.
-    range = range.replace(this.formulas_with_quoted_sheetnames_2, '_');
-    range = range.replace(this.formulas_with_quoted_sheetnames_1, '_');
-    range = range.replace(this.formulas_with_unquoted_sheetnames_2, '_');
-    range = range.replace(this.formulas_with_unquoted_sheetnames_1, '_');
-    range = range.replace(this.formulas_with_unquoted_sheetnames_1, '_');
-    range = range.replace(this.formulas_with_structured_references, '_');
+    range = range.replace(this.formulas_with_numbers, "_"); // Don't track these.
+    range = range.replace(this.formulas_with_quoted_sheetnames_2, "_");
+    range = range.replace(this.formulas_with_quoted_sheetnames_1, "_");
+    range = range.replace(this.formulas_with_unquoted_sheetnames_2, "_");
+    range = range.replace(this.formulas_with_unquoted_sheetnames_1, "_");
+    range = range.replace(this.formulas_with_unquoted_sheetnames_1, "_");
+    range = range.replace(this.formulas_with_structured_references, "_");
 
     /// FIX ME - should we count the same range multiple times? Or just once?
 
@@ -433,12 +431,14 @@ export class ExcelUtils {
         const width = last_vec[1] - first_vec[1] + 1;
         for (let x = 0; x < length; x++) {
           for (let y = 0; y < width; y++) {
-            all_vectors.push([x + first_vec[0], y + first_vec[1], 0]);
+            all_vectors.push(
+              new ExcelintVector(x + first_vec.x, y + first_vec.y, 0)
+            );
           }
         }
 
         // Wipe out the matched contents of range.
-        range = range.replace(found_pair[0], '_');
+        range = range.replace(found_pair[0], "_");
       }
     }
 
@@ -454,7 +454,7 @@ export class ExcelUtils {
         );
         all_vectors.push(vec);
         // Wipe out the matched contents of range.
-        range = range.replace(singleton[0], '_');
+        range = range.replace(singleton[0], "_");
       }
     }
 
@@ -463,9 +463,9 @@ export class ExcelUtils {
       let number = null;
       while ((number = ExcelUtils.number_dep.exec(range))) {
         if (number) {
-          all_vectors.push([0, 0, 1]); // just add 1 for every number
+          all_vectors.push(new ExcelintVector(0, 0, 1)); // just add 1 for every number
           // Wipe out the matched contents of range.
-          range = range.replace(number[0], '_');
+          range = range.replace(number[0], "_");
         }
       }
     }
@@ -476,25 +476,25 @@ export class ExcelUtils {
   public static numeric_constants(range: string): Array<number> {
     const numbers = [];
     range = range.slice();
-    if (typeof range !== 'string') {
+    if (typeof range !== "string") {
       return numbers;
     }
 
     // Zap all the formulas with the below characteristics.
-    range = range.replace(this.formulas_with_numbers, '_'); // Don't track these.
-    range = range.replace(this.formulas_with_quoted_sheetnames_2, '_');
-    range = range.replace(this.formulas_with_quoted_sheetnames_1, '_');
-    range = range.replace(this.formulas_with_unquoted_sheetnames_2, '_');
-    range = range.replace(this.formulas_with_unquoted_sheetnames_1, '_');
-    range = range.replace(this.formulas_with_unquoted_sheetnames_1, '_');
-    range = range.replace(this.formulas_with_structured_references, '_');
+    range = range.replace(this.formulas_with_numbers, "_"); // Don't track these.
+    range = range.replace(this.formulas_with_quoted_sheetnames_2, "_");
+    range = range.replace(this.formulas_with_quoted_sheetnames_1, "_");
+    range = range.replace(this.formulas_with_unquoted_sheetnames_2, "_");
+    range = range.replace(this.formulas_with_unquoted_sheetnames_1, "_");
+    range = range.replace(this.formulas_with_unquoted_sheetnames_1, "_");
+    range = range.replace(this.formulas_with_structured_references, "_");
 
     // First, get all the range pairs out.
     let found_pair = null;
     while ((found_pair = ExcelUtils.range_pair.exec(range))) {
       if (found_pair) {
         // Wipe out the matched contents of range.
-        range = range.replace(found_pair[0], '_');
+        range = range.replace(found_pair[0], "_");
       }
     }
 
@@ -503,7 +503,7 @@ export class ExcelUtils {
     while ((singleton = ExcelUtils.single_dep.exec(range))) {
       if (singleton) {
         // Wipe out the matched contents of range.
-        range = range.replace(singleton[0], '_');
+        range = range.replace(singleton[0], "_");
       }
     }
 
@@ -515,7 +515,7 @@ export class ExcelUtils {
         numbers.push(parseFloat(number));
         //		total += parseFloat(number);
         // Wipe out the matched contents of range.
-        range = range.replace(number[0], '_');
+        range = range.replace(number[0], "_");
       }
     }
     return numbers; // total;
@@ -546,7 +546,7 @@ export class ExcelUtils {
 
     // Check if this cell is a formula.
     const cell = formulas[row][col];
-    if (cell.length > 1 && cell[0] === '=') {
+    if (cell.length > 1 && cell[0] === "=") {
       // It is. Compute the dependencies.
       deps = ExcelUtils.all_cell_dependencies(cell, origin_col, origin_row);
     }
@@ -557,7 +557,7 @@ export class ExcelUtils {
     formulas: Array<Array<string>>,
     origin_col: number,
     origin_row: number
-  ): {[dep: string]: Array<[number, number, number]>} {
+  ): { [dep: string]: Array<ExcelintVector> } {
     const refs = {};
     let counter = 0;
     for (let i = 0; i < formulas.length; i++) {
@@ -569,7 +569,7 @@ export class ExcelUtils {
           //		    console.log(counter + " references down");
         }
 
-        if (cell[0] === '=') {
+        if (cell[0] === "=") {
           // It's a formula.
           const direct_refs = ExcelUtils.all_cell_dependencies(cell, 0, 0); // origin_col, origin_row); // was just 0,0....  origin_col, origin_row);
           for (const dep of direct_refs) {
@@ -592,13 +592,12 @@ export class ExcelUtils {
                 } else {
                   // Only include non-formulas (if they are in the range).
                   const referentCell = formulas[colIndex][rowIndex];
-                  if (referentCell !== undefined && referentCell[0] !== '=') {
+                  if (referentCell !== undefined && referentCell[0] !== "=") {
                     addReference = true;
                   }
                 }
                 if (addReference) {
-                  const key = dep.join(',');
-                  refs[key] = true;
+                  refs[dep.asKey()] = true;
                 }
               }
             }

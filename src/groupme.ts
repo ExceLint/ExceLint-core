@@ -1,27 +1,7 @@
-import {binsearch, strict_binsearch} from './binsearch';
-import {Colorize} from './colorize';
-import {Timer} from './timer';
-
-type excelintVector = [number, number, number];
-
-/*
-// Enable reasonable comparisons of numbers by converting them to zero-padded strings
-// so that 9 < 56 (because "0009" < "0056").
-function fix(n) {
-    return n.toString().padStart(10, '0');
-}
-
-// Apply fixes to an array.
-function fix_array(arr) {
-    return arr.map((x, _1, _2) => { return fix(x); });
-}
-
-// Apply fixes to a pair.
-function fix_pair(p) {
-    const [p1, p2] = p;
-    return [fix_array(p1), fix_array(p2)];
-}
-*/
+import { binsearch, strict_binsearch } from "./binsearch";
+import { Colorize } from "./colorize";
+import { Timer } from "./timer";
+import { ExcelintVector } from "./ExcelintVector";
 
 // A comparison function to sort by x-coordinate.
 function sort_x_coord(a, b) {
@@ -47,7 +27,7 @@ function sort_y_coord(a, b) {
 
 function generate_bounding_box(
   g
-): {[val: string]: [excelintVector, excelintVector]} {
+): { [val: string]: [ExcelintVector, ExcelintVector] } {
   const bb = {};
   for (const i of Object.keys(g)) {
     //	console.log("length of formulas for " + i + " = " + g[i].length);
@@ -109,7 +89,7 @@ function shuffle(a) {
 
 let comparisons = 0;
 
-function numComparator(a_val: excelintVector, b_val: excelintVector) {
+function numComparator(a_val: ExcelintVector, b_val: ExcelintVector) {
   for (let i = 0; i < 3; i++) {
     // note: length of excelint vector
     if (a_val[i] < b_val[i]) {
@@ -123,11 +103,11 @@ function numComparator(a_val: excelintVector, b_val: excelintVector) {
 }
 
 function matching_rectangles(
-  rect_ul: excelintVector,
-  rect_lr: excelintVector,
-  rect_uls: Array<excelintVector>,
-  rect_lrs: Array<excelintVector>
-): Array<[excelintVector, excelintVector]> {
+  rect_ul: ExcelintVector,
+  rect_lr: ExcelintVector,
+  rect_uls: Array<ExcelintVector>,
+  rect_lrs: Array<ExcelintVector>
+): Array<[ExcelintVector, ExcelintVector]> {
   // Assumes uls and lrs are already sorted and the same length.
   const x1 = rect_ul[0];
   const y1 = rect_ul[1];
@@ -144,13 +124,13 @@ function matching_rectangles(
   //                                   [ ] --> [ (x1, y2+1) ... (x2, ?) ]
 
   // left (lr) = ul_x, lr_y
-  const left = [x1 - 1, y2, 0];
+  const left = new ExcelintVector(x1 - 1, y2, 0);
   // up (lr) = lr_x, ul_y
-  const up = [x2, y1 - 1, 0];
+  const up = new ExcelintVector(x2, y1 - 1, 0);
   // right (ul) = lr_x, ul_y
-  const right = [x2 + 1, y1, 0];
+  const right = new ExcelintVector(x2 + 1, y1, 0);
   // down (ul) = ul_x, lr_y
-  const down = [x1, y2 + 1, 0];
+  const down = new ExcelintVector(x1, y2 + 1, 0);
   const matches = [];
   let ind = -1;
   ind = strict_binsearch(rect_lrs, left, numComparator);
@@ -192,16 +172,16 @@ let rectangles_count = 0;
 
 function find_all_matching_rectangles(
   thisKey: string,
-  rect: [excelintVector, excelintVector],
-  grouped_formulas: {[val: string]: Array<[excelintVector, excelintVector]>},
+  rect: [ExcelintVector, ExcelintVector],
+  grouped_formulas: { [val: string]: Array<[ExcelintVector, ExcelintVector]> },
   keylistX: Array<string>,
   keylistY: Array<string>,
-  x_ul: {[val: string]: Array<excelintVector>},
-  x_lr: {[val: string]: Array<excelintVector>},
-  bb: {[val: string]: [excelintVector, excelintVector]},
-  bbsX: Array<[excelintVector, excelintVector]>,
-  bbsY: Array<[excelintVector, excelintVector]>
-): Array<[number, [excelintVector, excelintVector]]> {
+  x_ul: { [val: string]: Array<ExcelintVector> },
+  x_lr: { [val: string]: Array<ExcelintVector> },
+  bb: { [val: string]: [ExcelintVector, ExcelintVector] },
+  bbsX: Array<[ExcelintVector, ExcelintVector]>,
+  bbsY: Array<[ExcelintVector, ExcelintVector]>
+): Array<[number, [ExcelintVector, ExcelintVector]]> {
   const [base_ul, base_lr] = rect;
   //    console.log("Looking for matches of " + JSON.stringify(base_ul) + ", " + JSON.stringify(base_lr));
   let match_list = [];
@@ -330,13 +310,13 @@ function find_all_matching_rectangles(
 // Returns an array with all duplicated entries removed.
 function dedup(arr) {
   const t = {};
-  return arr.filter(e => !(t[e] = e in t));
+  return arr.filter((e) => !(t[e] = e in t));
 }
 
 export function find_all_proposed_fixes(grouped_formulas: {
-  [val: string]: Array<[excelintVector, excelintVector]>;
+  [val: string]: Array<[ExcelintVector, ExcelintVector]>;
 }): Array<
-  [number, [excelintVector, excelintVector], [excelintVector, excelintVector]]
+  [number, [ExcelintVector, ExcelintVector], [ExcelintVector, ExcelintVector]]
 > {
   //    let t = new Timer("find_all_proposed_fixes");
   let all_matches = [];
@@ -427,13 +407,13 @@ export function find_all_proposed_fixes(grouped_formulas: {
 export function test_find_all_proposed_fixes(grouped_formulas) {
   comparisons = 0;
   const all_fixes = find_all_proposed_fixes(grouped_formulas);
-  console.log('all matches = ' + JSON.stringify(all_fixes));
+  console.log("all matches = " + JSON.stringify(all_fixes));
   //    console.log("comparisons = " + comparisons);
   let theLength = 0;
   for (const k of Object.keys(grouped_formulas)) {
     theLength += grouped_formulas[k].length;
   }
-  console.log('total length of grouped_formulas = ' + theLength);
+  console.log("total length of grouped_formulas = " + theLength);
 }
 
 //let r = require('./grouped_formulas.js');

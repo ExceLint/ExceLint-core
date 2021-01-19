@@ -4,15 +4,13 @@ const path = require("path");
 const flat = require("array.prototype.flat");
 flat.shim();
 
-//import { rgb2hex, GroupedList } from 'office-ui-fabric-react';
-//import { ColorUtils } from './colorutils';
 import { ExcelUtils } from "./excelutils";
 import { RectangleUtils } from "./rectangleutils";
-//import { ExcelUtilities } from '@microsoft/office-js-helpers';
 import { Timer } from "./timer";
 import { JSONclone } from "./jsonclone";
 import { find_all_proposed_fixes } from "./groupme";
 import { Stencil, InfoGain } from "./infogain";
+import { ExcelintVector } from "./ExcelintVector";
 
 export class Colorize {
   public static maxCategories = 2; // Maximum number of categories for reported errors
@@ -30,7 +28,6 @@ export class Colorize {
   public static suppressR1C1Mismatch = false;
   public static suppressAbsoluteRefMismatch = false;
   public static suppressOffAxisReference = false; // true;
-
   public static noElapsedTime = false; // if true, don't report elapsed time
   public static reportingThreshold = 0; // 35; // Percent of anomalousness
   public static suspiciousCellsReportingThreshold = 85; //  percent of bar
@@ -103,36 +100,48 @@ export class Colorize {
     return color;
   }
 
+  // return true if this sheet is not the same as the other sheet
+  public static isNotSameSheet(
+    thisSheetName: string,
+    otherSheetName: string
+  ): boolean {
+    return thisSheetName !== "" && otherSheetName !== thisSheetName;
+  }
+
+  // returns true if this is an empty sheet
+  public static isEmptySheet(sheet: any): boolean {
+    return sheet.formulas.length === 0 && sheet.values.length === 0;
+  }
+
+  // Get rid of multiple exclamation points in the used range address,
+  // as these interfere with later regexp parsing.
+  public static normalizeAddress(addr: string): string {
+    return addr.replace(/!(!+)/, "!");
+  }
+
   public static process_workbook(inp: any, sheetName: string): any {
+    console.log("THIS HAPPENS");
+
     const output = {
       workbookName: path.basename(inp["workbookName"]),
       worksheets: {},
     };
-    /* disabled for now:
-    const scores = [];
-    const sheetTruePositiveSet = new Set();
-    const sheetFalsePositiveSet = new Set();
-    const sheetTruePositives = 0;
-    const sheetFalsePositives = 0;
-    */
 
+    // look for the requested sheet
     for (let i = 0; i < inp.worksheets.length; i++) {
       const sheet = inp.worksheets[i];
-      // If sheet name argument is not "" and doesn't match, skip it.
-      if (sheetName !== "" && sheet.sheetName !== sheetName) {
+
+      // skip sheets that don't match sheetName or are empty
+      if (
+        Colorize.isNotSameSheet(sheetName, sheet.sheetName) ||
+        Colorize.isEmptySheet(sheet)
+      ) {
         continue;
       }
-      // Skip empty sheets.
-      if (sheet.formulas.length === 0 && sheet.values.length === 0) {
-        continue;
-      }
-      // console.warn(output['workbookName'] + " - " + sheet.sheetName);
 
-      // Get rid of multiple exclamation points in the used range address,
-      // as these interfere with later regexp parsing.
-      let usedRangeAddress = sheet.usedRangeAddress;
-      usedRangeAddress = usedRangeAddress.replace(/!(!+)/, "!");
+      const usedRangeAddress = Colorize.normalizeAddress(sheet.usedRangeAddres);
 
+      // start timer
       const myTimer = new Timer("excelint");
 
       // Get anomalous cells and proposed fixes, among others.
@@ -149,7 +158,6 @@ export class Colorize {
 
       // Adjust the fixes based on font stuff. We should allow parameterization here for weighting (as for thresholding).
       // NB: origin_col and origin_row currently hard-coded at 0,0.
-
       proposed_fixes = Colorize.adjust_proposed_fixes(
         proposed_fixes,
         sheet.styles,
@@ -502,90 +510,21 @@ export class Colorize {
         .map((x) => x[0])
         .reduce((x, y) => x + y, 0);
       out["weightedAnomalousRanges"] = weightedAnomalousRanges;
-
-      /* disabled for now.
-
-            if (workbookBasename in bugs) {
-		if (sheet.sheetName in bugs[workbookBasename]) {
-                    const trueBugs = bugs[workbookBasename][sheet.sheetName]['bugs'];
-                    const totalTrueBugs = trueBugs.length;
-                    const trueBugsJSON = trueBugs.map(x => JSON.stringify(x));
-                    const foundBugsJSON = foundBugs.map(x => JSON.stringify(x));
-                    const truePositives = trueBugsJSON.filter(value => foundBugsJSON.includes(value)).map(x => JSON.parse(x));
-                    const falsePositives = foundBugsJSON.filter(value => !trueBugsJSON.includes(value)).map(x => JSON.parse(x));
-                    const falseNegatives = trueBugsJSON.filter(value => !foundBugsJSON.includes(value)).map(x => JSON.parse(x));
-                    let precision = 0;
-                    let recall = 0;
-                    out['falsePositives'] = falsePositives.length;
-                    out['falseNegatives'] = falseNegatives.length;
-                    out['truePositives'] = truePositives.length;
-		    // sheetFalsePositives just equals 1 if there are any false positives;
-		    // similarly for others.
-		    out['sheetFalsePositives'] = (falsePositives.length > 0) ? 1 : 0;
-		    out['sheetFalseNegatives'] = (falseNegatives.length > 0) ? 1 : 0;
-		    out['sheetTruePositives'] = (truePositives.length > 0) ? 1 : 0;
-
-		    if (truePositives.length) {
-			sheetTruePositives += 1;
-			sheetTruePositiveSet.add(workbookBasename + ':' + sheet.sheetName);
-		    }
-		    if (falsePositives.length) {
-			sheetFalsePositives += 1;
-			sheetFalsePositiveSet.add(workbookBasename + ':' + sheet.sheetName);
-		    }
-
-                    // We adopt the methodology used by the ExceLint paper (OOPSLA 18):
-                    //   "When a tool flags nothing, we define precision to
-                    //    be 1, since the tool makes no mistakes. When a benchmark contains no errors but the tool flags
-                    //    anything, we define precision to be 0 since nothing that it flags can be a real error."
-
-                    if (foundBugs.length === 0) {
-			out['precision'] = 1;
-                    }
-                    if ((truePositives.length === 0) && (foundBugs.length > 0)) {
-			out['precision'] = 0;
-                    }
-                    if ((truePositives.length > 0) && (foundBugs.length > 0)) {
-			precision = truePositives.length / (truePositives.length + falsePositives.length);
-			out['precision'] = precision;
-                    }
-                    if (falseNegatives.length + trueBugs.length > 0) {
-			recall = truePositives.length / (falseNegatives.length + truePositives.length);
-			out['recall'] = recall;
-                    } else {
-			// No bugs to find means perfect recall. NOTE: this is not described in the paper.
-			out['recall'] = 1;
-                    }
-                    scores.push(truePositives.length - falsePositives.length);
-                    if (false) {
-			if (precision + recall > 0) {
-                            // F1 score: https://en.wikipedia.org/wiki/F1_score
-                            const f1score = (2 * precision * recall) / (precision + recall);
-                            /// const f1score = precision; //// FIXME for testing (2 * precision * recall) / (precision + recall);
-                            scores.push(f1score);
-			}
-	   	    }
-		}
-	    }
-            */
       out["proposedFixes"] = final_adjusted_fixes;
       output.worksheets[sheet.sheetName] = out;
     }
-    //	outputs.push(output);
     return output; // , scores, sheetTruePositiveSet, sheetTruePositives, sheetFalsePositiveSet, sheetFalsePositives };
   }
 
   // Convert a rectangle into a list of indices.
   public static expand(
-    first: Colorize.excelintVector,
-    second: Colorize.excelintVector
-  ): Array<Colorize.excelintVector> {
-    const [fcol, frow] = first;
-    const [scol, srow] = second;
-    const expanded: Array<Colorize.excelintVector> = [];
-    for (let i = fcol; i <= scol; i++) {
-      for (let j = frow; j <= srow; j++) {
-        expanded.push([i, j, 0]);
+    first: ExcelintVector,
+    second: ExcelintVector
+  ): Array<ExcelintVector> {
+    const expanded: Array<ExcelintVector> = [];
+    for (let i = first.x; i <= second.x; i++) {
+      for (let j = first.y; j <= second.y; j++) {
+        expanded.push(new ExcelintVector(i, j, 0));
       }
     }
     return expanded;
@@ -596,7 +535,7 @@ export class Colorize {
     formulas: Array<Array<string>>,
     origin_col: number,
     origin_row: number
-  ): Array<[Colorize.excelintVector, string]> {
+  ): Array<[ExcelintVector, string]> {
     const base_vector = JSON.stringify(ExcelUtils.baseVector());
     const reducer = (
       acc: [number, number, number],
@@ -606,7 +545,7 @@ export class Colorize {
       acc[1] + curr[1],
       acc[2] + curr[2],
     ];
-    const output: Array<[[number, number, number], string]> = [];
+    const output: Array<[ExcelintVector, string]> = [];
 
     // Compute the vectors for all of the formulas.
     for (let i = 0; i < formulas.length; i++) {
@@ -629,7 +568,7 @@ export class Colorize {
             if (cell[0] === "=") {
               // It's a formula but it has no dependencies (i.e., it just has constants). Use a distinguished value.
               output.push([
-                [adjustedX, adjustedY, 0],
+                new ExcelintVector(adjustedX, adjustedY, 0),
                 Colorize.distinguishedZeroHash,
               ]);
             }
@@ -638,12 +577,15 @@ export class Colorize {
             if (JSON.stringify(vec) === base_vector) {
               // No dependencies! Use a distinguished value.
               // FIXME RESTORE THIS output.push([[adjustedX, adjustedY, 0], Colorize.distinguishedZeroHash]);
-              output.push([[adjustedX, adjustedY, 0], vec.toString()]);
+              output.push([
+                new ExcelintVector(adjustedX, adjustedY, 0),
+                vec.toString(),
+              ]);
             } else {
               const hash = this.hash_vector(vec);
               const str = hash.toString();
               //			    console.log('hash for ' + adjustedX + ', ' + adjustedY + ' = ' + str);
-              output.push([[adjustedX, adjustedY, 0], str]);
+              output.push([new ExcelintVector(adjustedX, adjustedY, 0), str]);
             }
           }
         }
@@ -654,8 +596,8 @@ export class Colorize {
 
   // Returns all referenced data so it can be colored later.
   public static color_all_data(refs: {
-    [dep: string]: Array<Colorize.excelintVector>;
-  }): Array<[Colorize.excelintVector, string]> {
+    [dep: string]: Array<ExcelintVector>;
+  }): Array<[ExcelintVector, string]> {
     //	let t = new Timer('color_all_data');
     const referenced_data = [];
     for (const refvec of Object.keys(refs)) {
@@ -675,7 +617,7 @@ export class Colorize {
     formulas: Array<Array<string>>,
     origin_col: number,
     origin_row: number
-  ): Array<[Colorize.excelintVector, string]> {
+  ): Array<[ExcelintVector, string]> {
     const value_array = [];
     //	let t = new Timer('process_values');
     for (let i = 0; i < values.length; i++) {
@@ -704,12 +646,9 @@ export class Colorize {
   // Take in a list of [[row, col], color] pairs and group them,
   // sorting them (e.g., by columns).
   private static identify_ranges(
-    list: Array<[Colorize.excelintVector, string]>,
-    sortfn?: (
-      n1: Colorize.excelintVector,
-      n2: Colorize.excelintVector
-    ) => number
-  ): { [val: string]: Array<Colorize.excelintVector> } {
+    list: Array<[ExcelintVector, string]>,
+    sortfn?: (n1: ExcelintVector, n2: ExcelintVector) => number
+  ): { [val: string]: Array<ExcelintVector> } {
     // Separate into groups based on their string value.
     const groups = {};
     for (const r of list) {
@@ -725,10 +664,10 @@ export class Colorize {
 
   // Group all ranges by their value.
   private static group_ranges(
-    groups: { [val: string]: Array<Colorize.excelintVector> },
+    groups: { [val: string]: Array<ExcelintVector> },
     columnFirst: boolean
   ): {
-    [val: string]: Array<[Colorize.excelintVector, Colorize.excelintVector]>;
+    [val: string]: Array<[ExcelintVector, ExcelintVector]>;
   } {
     const output = {};
     let index0 = 0; // column
@@ -757,14 +696,11 @@ export class Colorize {
   }
 
   public static identify_groups(
-    theList: Array<[Colorize.excelintVector, string]>
+    theList: Array<[ExcelintVector, string]>
   ): {
-    [val: string]: Array<[Colorize.excelintVector, Colorize.excelintVector]>;
+    [val: string]: Array<[ExcelintVector, ExcelintVector]>;
   } {
-    const columnsort = (
-      a: Colorize.excelintVector,
-      b: Colorize.excelintVector
-    ) => {
+    const columnsort = (a: ExcelintVector, b: ExcelintVector) => {
       if (a[0] === b[0]) {
         return a[1] - b[1];
       } else {
@@ -784,23 +720,23 @@ export class Colorize {
     rows: number,
     origin_col: number,
     origin_row: number,
-    processed: Array<[Colorize.excelintVector, string]>
+    processed: Array<[ExcelintVector, string]>
   ): Array<Array<number>> {
     // Invert the hash table.
     // First, initialize a zero-filled matrix.
-    const matrix = new Array(cols);
+    const matrix: Array<Array<number>> = new Array(cols);
     for (let i = 0; i < cols; i++) {
       matrix[i] = new Array(rows).fill(0);
     }
     // Now iterate through the processed formulas and update the matrix.
     for (const item of processed) {
-      const [[col, row, isConstant], val] = item;
+      const [vect, val] = item;
       // Yes, I know this is confusing. Will fix later.
       //	    console.log('C) cols = ' + rows + ', rows = ' + cols + '; row = ' + row + ', col = ' + col);
-      const adjustedX = row - origin_row - 1;
-      const adjustedY = col - origin_col - 1;
+      const adjustedX = vect.y - origin_row - 1;
+      const adjustedY = vect.x - origin_col - 1;
       let value = Number(Colorize.distinguishedZeroHash);
-      if (isConstant === 1) {
+      if (vect.isConstant()) {
         // That means it was a constant.
         // Set to a fixed value (as above).
       } else {
@@ -893,7 +829,7 @@ export class Colorize {
     matrix: Array<Array<number>>,
     probs: Array<Array<number>>,
     threshold = 0.01
-  ): Array<Colorize.excelintVector> {
+  ): Array<ExcelintVector> {
     const cells = [];
     let sumValues = 0;
     let countValues = 0;
@@ -943,7 +879,7 @@ export class Colorize {
     );
     const origin = ExcelUtils.cell_dependency(startCell, 0, 0);
 
-    let processed_formulas = [];
+    let processed_formulas: [ExcelintVector, string][] = [];
     // Filter out non-empty items from whole matrix.
     const totalFormulas = (formulas as any).flat().filter(Boolean).length;
 
@@ -953,8 +889,8 @@ export class Colorize {
       //	    t.split('about to process formulas');
       processed_formulas = Colorize.process_formulas(
         formulas,
-        origin[0] - 1,
-        origin[1] - 1
+        origin.x - 1,
+        origin.y - 1
       );
       //	    t.split('processed formulas');
     }
@@ -973,8 +909,8 @@ export class Colorize {
       // Compute references (to color referenced data).
       const refs = ExcelUtils.generate_all_references(
         formulas,
-        origin[0] - 1,
-        origin[1] - 1
+        origin.x - 1,
+        origin.y - 1
       );
       //	    t.split('generated all references');
 
@@ -983,8 +919,8 @@ export class Colorize {
       data_values = Colorize.process_values(
         values,
         formulas,
-        origin[0] - 1,
-        origin[1] - 1
+        origin.x - 1,
+        origin.y - 1
       );
 
       // t.split('processed data');
@@ -998,7 +934,7 @@ export class Colorize {
     //	t.split('grouped formulas');
 
     // Identify suspicious cells.
-    let suspicious_cells = [];
+    let suspicious_cells: ExcelintVector[] = [];
 
     if (values.length < 10000) {
       // Disabled for now. FIXME
@@ -1014,7 +950,11 @@ export class Colorize {
       ); // Must be more rare than this fraction.
     }
 
-    const proposed_fixes = Colorize.generate_proposed_fixes(grouped_formulas);
+    const proposed_fixes: [
+      number,
+      [ExcelintVector, ExcelintVector],
+      [ExcelintVector, ExcelintVector]
+    ][] = Colorize.generate_proposed_fixes(grouped_formulas);
 
     if (false) {
       console.log("results:");
@@ -1044,20 +984,20 @@ export class Colorize {
   // Compute the normalized distance from merging two ranges.
   public static fix_metric(
     target_norm: number,
-    target: [Colorize.excelintVector, Colorize.excelintVector],
+    target: [ExcelintVector, ExcelintVector],
     merge_with_norm: number,
-    merge_with: [Colorize.excelintVector, Colorize.excelintVector]
+    merge_with: [ExcelintVector, ExcelintVector]
   ): number {
     //	console.log('fix_metric: ' + target_norm + ', ' + JSON.stringify(target) + ', ' + merge_with_norm + ', ' + JSON.stringify(merge_with));
     const [t1, t2] = target;
     const [m1, m2] = merge_with;
     const n_target = RectangleUtils.area([
-      [t1[0], t1[1], 0],
-      [t2[0], t2[1], 0],
+      new ExcelintVector(t1.x, t1.y, 0),
+      new ExcelintVector(t2.x, t2.y, 0),
     ]);
     const n_merge_with = RectangleUtils.area([
-      [m1[0], m1[1], 0],
-      [m2[0], m2[1], 0],
+      new ExcelintVector(m1.x, m1.y, 0),
+      new ExcelintVector(m2.x, m2.y, 0),
     ]);
     const n_min = Math.min(n_target, n_merge_with);
     const n_max = Math.max(n_target, n_merge_with);
@@ -1079,8 +1019,8 @@ export class Colorize {
     fixes: Array<
       [
         number,
-        [Colorize.excelintVector, Colorize.excelintVector],
-        [Colorize.excelintVector, Colorize.excelintVector]
+        [ExcelintVector, ExcelintVector],
+        [ExcelintVector, ExcelintVector]
       ]
     >
   ): number {
@@ -1090,12 +1030,12 @@ export class Colorize {
       const [f11, f12] = fixes[k][1];
       const [f21, f22] = fixes[k][2];
       count += RectangleUtils.diagonal([
-        [f11[0], f11[1], 0],
-        [f12[0], f12[1], 0],
+        new ExcelintVector(f11.x, f11.y, 0),
+        new ExcelintVector(f12.x, f12.y, 0),
       ]);
       count += RectangleUtils.diagonal([
-        [f21[0], f21[1], 0],
-        [f22[0], f22[1], 0],
+        new ExcelintVector(f21.x, f21.y, 0),
+        new ExcelintVector(f22.x, f22.y, 0),
       ]);
     }
     return count;
@@ -1106,16 +1046,12 @@ export class Colorize {
     fixes: Array<
       [
         number,
-        [Colorize.excelintVector, Colorize.excelintVector],
-        [Colorize.excelintVector, Colorize.excelintVector]
+        [ExcelintVector, ExcelintVector],
+        [ExcelintVector, ExcelintVector]
       ]
     >
   ): Array<
-    [
-      number,
-      [Colorize.excelintVector, Colorize.excelintVector],
-      [Colorize.excelintVector, Colorize.excelintVector]
-    ]
+    [number, [ExcelintVector, ExcelintVector], [ExcelintVector, ExcelintVector]]
   > {
     // example: [[-0.8729568798082977,[[4,23],[13,23]],[[3,23,0],[3,23,0]]],[-0.6890824929174288,[[4,6],[7,6]],[[3,6,0],[3,6,0]]],[-0.5943609377704335,[[4,10],[6,10]],[[3,10,0],[3,10,0]]],[-0.42061983571430495,[[3,27],[4,27]],[[5,27,0],[5,27,0]]],[-0.42061983571430495,[[4,14],[5,14]],[[3,14,0],[3,14,0]]],[-0.42061983571430495,[[6,27],[7,27]],[[5,27,0],[5,27,0]]]]
     const count = 0;
@@ -1182,13 +1118,9 @@ export class Colorize {
   }
 
   public static generate_proposed_fixes(groups: {
-    [val: string]: Array<[Colorize.excelintVector, Colorize.excelintVector]>;
+    [val: string]: Array<[ExcelintVector, ExcelintVector]>;
   }): Array<
-    [
-      number,
-      [Colorize.excelintVector, Colorize.excelintVector],
-      [Colorize.excelintVector, Colorize.excelintVector]
-    ]
+    [number, [ExcelintVector, ExcelintVector], [ExcelintVector, ExcelintVector]]
   > {
     //	let t = new Timer('generate_proposed_fixes');
     //	t.split('about to find.');
@@ -1203,9 +1135,9 @@ export class Colorize {
   }
 
   public static merge_groups(groups: {
-    [val: string]: Array<[Colorize.excelintVector, Colorize.excelintVector]>;
+    [val: string]: Array<[ExcelintVector, ExcelintVector]>;
   }): {
-    [val: string]: Array<[Colorize.excelintVector, Colorize.excelintVector]>;
+    [val: string]: Array<[ExcelintVector, ExcelintVector]>;
   } {
     for (const k of Object.keys(groups)) {
       const g = groups[k].slice();
@@ -1215,8 +1147,8 @@ export class Colorize {
   }
 
   public static merge_individual_groups(
-    group: Array<[Colorize.excelintVector, Colorize.excelintVector]>
-  ): Array<[Colorize.excelintVector, Colorize.excelintVector]> {
+    group: Array<[ExcelintVector, ExcelintVector]>
+  ): Array<[ExcelintVector, ExcelintVector]> {
     const t = new Timer("merge_individual_groups");
     let numIterations = 0;
     group = group.sort();
@@ -1262,12 +1194,7 @@ export class Colorize {
         // This is a hack to guarantee convergence.
         console.log("Too many iterations; abandoning this group.");
         t.split("done, " + numIterations + " iterations.");
-        return [
-          [
-            [-1, -1, 0],
-            [-1, -1, 0],
-          ],
-        ];
+        return [[new ExcelintVector(-1, -1, 0), new ExcelintVector(-1, -1, 0)]];
       }
     }
   }
@@ -1358,12 +1285,12 @@ export class Colorize {
   public static find_suspicious_cells(
     cols: number,
     rows: number,
-    origin: [number, number, number],
+    origin: ExcelintVector,
     formulas: any[][],
-    processed_formulas: any[],
-    data_values: any,
+    processed_formulas: [ExcelintVector, string][],
+    data_values: [ExcelintVector, string][],
     threshold: number
-  ) {
+  ): ExcelintVector[] {
     return []; // FIXME disabled for now
     let suspiciousCells: any[];
     {
@@ -1371,8 +1298,8 @@ export class Colorize {
       const formula_matrix = Colorize.processed_to_matrix(
         cols,
         rows,
-        origin[0] - 1,
-        origin[1] - 1,
+        origin.x - 1,
+        origin.y - 1,
         //								processed_formulas);
         processed_formulas.concat(data_values)
       );
@@ -1386,8 +1313,8 @@ export class Colorize {
       const candidateSuspiciousCells = Colorize.generate_suspicious_cells(
         cols,
         rows,
-        origin[0] - 1,
-        origin[1] - 1,
+        origin.x - 1,
+        origin.y - 1,
         formula_matrix,
         probs,
         threshold
@@ -1440,8 +1367,6 @@ export class Colorize {
 }
 
 export namespace Colorize {
-  export type excelintVector = [number, number, number];
-
   export enum BinCategories {
     FatFix = "Inconsistent multiple columns/rows", // fix is not a single column or single row
     RecurrentFormula = "Formula(s) refer to each other", // formulas refer to each other

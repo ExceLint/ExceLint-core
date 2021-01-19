@@ -1,57 +1,59 @@
-type rectangle = [[number, number, number], [number, number, number]];
+import { ExcelintVector } from "./ExcelintVector";
+
+type rectangle = [ExcelintVector, ExcelintVector];
 
 export class RectangleUtils {
   public static is_adjacent(A: rectangle, B: rectangle): boolean {
-    const [[ax1, ay1, az1], [ax2, ay2, az2]] = A;
-    const [[bx1, by1, bz1], [bx2, by2, bz2]] = B;
+    const [a1, a2] = A;
+    const [b1, b2] = B;
 
     const tolerance = 1;
     const adj = !(
-      ax1 - bx2 > tolerance ||
-      bx1 - ax2 > tolerance ||
-      ay1 - by2 > tolerance ||
-      by1 - ay2 > tolerance
+      a1.x - b2.x > tolerance ||
+      b1.x - a2.x > tolerance ||
+      a1.y - b2.y > tolerance ||
+      b1.y - a2.y > tolerance
     );
     return adj;
   }
 
   public static bounding_box(A: rectangle, B: rectangle): rectangle {
-    const [[ax1, ay1, az1], [ax2, ay2, az2]] = A;
-    const [[bx1, by1, bz1], [bx2, by2, bz2]] = B;
+    const [a1, a2] = A;
+    const [b1, b2] = B;
     return [
-      [Math.min(ax1, bx1), Math.min(ay1, by1), 0],
-      [Math.max(ax2, bx2), Math.max(ay2, by2), 0],
+      new ExcelintVector(Math.min(a1.x, b1.x), Math.min(a1.y, b1.y), 0),
+      new ExcelintVector(Math.max(a2.x, b2.x), Math.max(a2.y, b2.y), 0),
     ];
   }
 
   public static area(A: rectangle): number {
-    const [[ax1, ay1, az1], [ax2, ay2, az2]] = A;
-    const length = ax2 - ax1 + 1;
-    const width = ay2 - ay1 + 1;
+    const [a1, a2] = A;
+    const length = a2.x - a1.x + 1;
+    const width = a2.y - a1.y + 1;
     return length * width;
   }
 
   public static diagonal(A: rectangle): number {
-    const [[ax1, ay1, az1], [ax2, ay2, az2]] = A;
-    const length = ax2 - ax1 + 1;
-    const width = ay2 - ay1 + 1;
+    const [a1, a2] = A;
+    const length = a2.x - a1.x + 1;
+    const width = a2.y - a1.y + 1;
     return Math.sqrt(length * length + width * width);
   }
 
   public static overlap(A: rectangle, B: rectangle): number {
-    const [[ax1, ay1, az1], [ax2, ay2, az2]] = A;
-    const [[bx1, by1, bz1], [bx2, by2, bz2]] = B;
+    const [a1, a2] = A;
+    const [b1, b2] = B;
     let width = 0,
       height = 0;
-    if (ax2 > bx2) {
-      width = bx2 - ax1 + 1;
+    if (a2.x > b2.x) {
+      width = b2.x - a1.x + 1;
     } else {
-      width = ax2 - bx1 + 1;
+      width = a2.x - b1.x + 1;
     }
-    if (ay2 > by2) {
-      height = by2 - ay1 + 1;
+    if (a2.y > b2.y) {
+      height = b2.y - a1.y + 1;
     } else {
-      height = ay2 - by1 + 1;
+      height = a2.y - b1.y + 1;
     }
     return width * height; // Math.max(0, Math.min(ax2, bx2) - Math.max(ax1, bx1)) * Math.max(0, Math.min(ay2, by2) - Math.max(ay1, by1));
   }
