@@ -4,7 +4,7 @@
 
 import * as sjcl from "sjcl";
 import { RectangleUtils } from "./rectangleutils";
-import { ExcelintVector } from "./ExcelintVector";
+import { ExcelintVector, Dictionary, Spreadsheet } from "./ExceLintTypes";
 
 export class ExcelUtils {
   // Matchers for all kinds of Excel expressions.
@@ -551,15 +551,19 @@ export class ExcelUtils {
     return deps;
   }
 
+  // This function returns a dictionary (Dictionary<Address,boolean>)) of all of the addresses
+  // that are referenced by some formula.
   public static generate_all_references(
-    formulas: Array<Array<string>>,
+    spreadsheet: Spreadsheet,
     origin_col: number,
     origin_row: number
-  ): { [dep: string]: Array<ExcelintVector> } {
-    const refs = {};
+  ): Dictionary<boolean> {
+    // initialize dictionary
+    const refs: Dictionary<boolean> = {};
+
     let counter = 0;
-    for (let i = 0; i < formulas.length; i++) {
-      const row = formulas[i];
+    for (let i = 0; i < spreadsheet.length; i++) {
+      const row = spreadsheet[i];
       for (let j = 0; j < row.length; j++) {
         const cell = row[j];
         counter++;
@@ -579,24 +583,22 @@ export class ExcelUtils {
               const rowIndex = dep.x - origin_col - 1;
               const colIndex = dep.y - origin_row - 1;
               const outsideFormulaRange =
-                colIndex >= formulas.length ||
-                rowIndex >= formulas[0].length ||
+                colIndex >= spreadsheet.length ||
+                rowIndex >= spreadsheet[0].length ||
                 rowIndex < 0 ||
                 colIndex < 0;
-              if (true) {
-                let addReference = false;
-                if (outsideFormulaRange) {
+              let addReference = false;
+              if (outsideFormulaRange) {
+                addReference = true;
+              } else {
+                // Only include non-formulas (if they are in the range).
+                const referentCell = spreadsheet[colIndex][rowIndex];
+                if (referentCell !== undefined && referentCell[0] !== "=") {
                   addReference = true;
-                } else {
-                  // Only include non-formulas (if they are in the range).
-                  const referentCell = formulas[colIndex][rowIndex];
-                  if (referentCell !== undefined && referentCell[0] !== "=") {
-                    addReference = true;
-                  }
                 }
-                if (addReference) {
-                  refs[dep.asKey()] = true;
-                }
+              }
+              if (addReference) {
+                refs[dep.asKey()] = true;
               }
             }
           }

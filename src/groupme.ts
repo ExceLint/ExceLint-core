@@ -74,7 +74,7 @@ function fix_grouped_formulas(g, newGnum) {
 }
 
 // Knuth-Fisher-Yates shuffle (not currently used).
-function shuffle(a) {
+function shuffle<T>(a: Array<T>): Array<T> {
   let j, x, i;
   for (i = a.length - 1; i > 0; i--) {
     j = Math.floor(Math.random() * (i + 1));

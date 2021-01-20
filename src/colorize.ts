@@ -10,7 +10,9 @@ import { Timer } from "./timer";
 import { JSONclone } from "./jsonclone";
 import { find_all_proposed_fixes } from "./groupme";
 import { Stencil, InfoGain } from "./infogain";
-import { ExcelintVector } from "./ExcelintVector";
+import { ExcelintVector, Dictionary, Spreadsheet } from "./ExceLintTypes";
+
+type Fingerprint = string;
 
 export class Colorize {
   public static maxCategories = 2; // Maximum number of categories for reported errors
@@ -600,7 +602,7 @@ export class Colorize {
   // Returns all referenced data so it can be colored later.
   public static color_all_data(refs: {
     [dep: string]: Array<ExcelintVector>;
-  }): Array<[ExcelintVector, string]> {
+  }): Array<[ExcelintVector, Fingerprint]> {
     //	let t = new Timer('color_all_data');
     const referenced_data = [];
     for (const refvec of Object.keys(refs)) {
@@ -704,10 +706,10 @@ export class Colorize {
     [val: string]: Array<[ExcelintVector, ExcelintVector]>;
   } {
     const columnsort = (a: ExcelintVector, b: ExcelintVector) => {
-      if (a[0] === b[0]) {
-        return a[1] - b[1];
+      if (a.x === b.x) {
+        return a.y - b.y;
       } else {
-        return a[0] - b[0];
+        return a.x - b.x;
       }
     };
     const id = this.identify_ranges(theList, columnsort);
@@ -899,7 +901,7 @@ export class Colorize {
     }
     const useTimeouts = false;
 
-    let referenced_data = [];
+    let referenced_data: [ExcelintVector, Fingerprint][] = [];
     let data_values = [];
     const cols = values.length;
     const rows = values[0].length;
@@ -910,7 +912,7 @@ export class Colorize {
       console.warn("Too many values to perform reference analysis.");
     } else {
       // Compute references (to color referenced data).
-      const refs = ExcelUtils.generate_all_references(
+      const refs: Dictionary<boolean> = ExcelUtils.generate_all_references(
         formulas,
         origin.x - 1,
         origin.y - 1

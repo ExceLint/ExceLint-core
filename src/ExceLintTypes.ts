@@ -1,3 +1,9 @@
+export interface Dictionary<V> {
+  [key: string]: V;
+}
+
+export type Spreadsheet = Array<Array<string>>;
+
 export class ExcelintVector {
   public x: number;
   public y: number;
