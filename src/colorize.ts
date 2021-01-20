@@ -10,9 +10,7 @@ import { Timer } from "./timer";
 import { JSONclone } from "./jsonclone";
 import { find_all_proposed_fixes } from "./groupme";
 import { Stencil, InfoGain } from "./infogain";
-import { ExcelintVector, Dictionary, Spreadsheet } from "./ExceLintTypes";
-
-type Fingerprint = string;
+import { ExcelintVector, Dict, Spreadsheet, DZH } from "./ExceLintTypes";
 
 export class Colorize {
   public static maxCategories = 2; // Maximum number of categories for reported errors
@@ -480,7 +478,7 @@ export class Colorize {
 
   // Generate dependence vectors and their hash for all formulas.
   public static process_formulas(
-    formulas: Array<Array<string>>,
+    formulas: Spreadsheet,
     origin_col: number,
     origin_row: number
   ): Array<[ExcelintVector, string]> {
@@ -536,8 +534,7 @@ export class Colorize {
   }
 
   // Returns all referenced data so it can be colored later.
-  public static color_all_data(refs: Dictionary<boolean>): Array<[ExcelintVector, Fingerprint]> {
-    //	let t = new Timer('color_all_data');
+  public static color_all_data(refs: Dict<boolean>): Array<[ExcelintVector, DZH]> {
     const referenced_data = [];
     for (const refvec of Object.keys(refs)) {
       const rv = refvec.split(",");
@@ -545,19 +542,18 @@ export class Colorize {
       const col = Number(rv[1]);
       referenced_data.push([[row, col, 0], Colorize.distinguishedZeroHash]); // See comment at top of function declaration.
     }
-    //	t.split('processed all data');
     return referenced_data;
   }
 
   // Take all values and return an array of each row and column.
   // Note that for now, the last value of each tuple is set to 1.
   public static process_values(
-    values: Array<Array<string>>,
-    formulas: Array<Array<string>>,
+    values: Spreadsheet,
+    formulas: Spreadsheet,
     origin_col: number,
     origin_row: number
-  ): Array<[ExcelintVector, string]> {
-    const value_array = [];
+  ): [ExcelintVector, DZH][] {
+    const value_array: [ExcelintVector, DZH][] = [];
     //	let t = new Timer('process_values');
     for (let i = 0; i < values.length; i++) {
       const row = values[i];
@@ -570,7 +566,11 @@ export class Colorize {
             // It's a number. Add it.
             const adjustedX = j + origin_col + 1;
             const adjustedY = i + origin_row + 1;
-            value_array.push([[adjustedX, adjustedY, 1], Colorize.distinguishedZeroHash]); // See comment at top of function declaration.
+            // See comment at top of function declaration for DistinguishedZeroHash
+            value_array.push([
+              new ExcelintVector(adjustedX, adjustedY, 1),
+              Colorize.distinguishedZeroHash,
+            ]);
           }
         }
       }
@@ -584,7 +584,7 @@ export class Colorize {
   private static identify_ranges(
     list: Array<[ExcelintVector, string]>,
     sortfn?: (n1: ExcelintVector, n2: ExcelintVector) => number
-  ): { [val: string]: Array<ExcelintVector> } {
+  ): Dict<ExcelintVector[]> {
     // Separate into groups based on their string value.
     const groups = {};
     for (const r of list) {
@@ -599,55 +599,39 @@ export class Colorize {
   }
 
   // Group all ranges by their value.
+  // TODO Dan: What does "value" mean?
   private static group_ranges(
-    groups: { [val: string]: Array<ExcelintVector> },
-    columnFirst: boolean
-  ): {
-    [val: string]: Array<[ExcelintVector, ExcelintVector]>;
-  } {
-    const output = {};
-    let index0 = 0; // column
-    let index1 = 1; // row
-    if (!columnFirst) {
-      index0 = 1; // row
-      index1 = 0; // column
-    }
-    for (const k of Object.keys(groups)) {
-      output[k] = [];
-      let prev = groups[k].shift();
-      let last = prev;
-      for (const v of groups[k]) {
-        // Check if in the same column, adjacent row (if columnFirst; otherwise, vice versa).
-        if (v[index0] === last[index0] && v[index1] === last[index1] + 1) {
+    groups: Dict<ExcelintVector[]>
+  ): Dict<[ExcelintVector, ExcelintVector][]> {
+    const output: Dict<[ExcelintVector, ExcelintVector][]> = {};
+
+    for (const key of Object.keys(groups)) {
+      output[key] = [];
+      let prev = groups[key].shift(); // remove the first vector from the list
+      let last = prev; // initialize last to point to the same vector
+      for (const v of groups[key]) {
+        // Check if v is in the same column, adjacent row
+        if (v.x === last.x && v.y === last.y + 1) {
           last = v;
         } else {
-          output[k].push([prev, last]);
+          output[key].push([prev, last]);
           prev = v;
           last = v;
         }
       }
-      output[k].push([prev, last]);
+      output[key].push([prev, last]);
     }
     return output;
   }
 
   public static identify_groups(
-    theList: Array<[ExcelintVector, string]>
-  ): {
-    [val: string]: Array<[ExcelintVector, ExcelintVector]>;
-  } {
-    const columnsort = (a: ExcelintVector, b: ExcelintVector) => {
-      if (a.x === b.x) {
-        return a.y - b.y;
-      } else {
-        return a.x - b.x;
-      }
-    };
-    const id = this.identify_ranges(theList, columnsort);
-    const gr = this.group_ranges(id, true); // column-first
+    theList: [ExcelintVector, string][]
+  ): Dict<Array<[ExcelintVector, ExcelintVector]>> {
+    const id: Dict<ExcelintVector[]> = Colorize.identify_ranges(theList, ExcelUtils.ColumnSort);
+    const gr: Dict<[ExcelintVector, ExcelintVector][]> = Colorize.group_ranges(id);
     // Now try to merge stuff with the same hash.
     const newGr1 = JSONclone.clone(gr);
-    const mg = this.merge_groups(newGr1);
+    const mg = Colorize.merge_groups(newGr1);
     return mg;
   }
 
@@ -820,14 +804,11 @@ export class Colorize {
     if (totalFormulas > this.formulasThreshold) {
       console.warn("Too many formulas to perform formula analysis.");
     } else {
-      //	    t.split('about to process formulas');
       processed_formulas = Colorize.process_formulas(formulas, origin.x - 1, origin.y - 1);
-      //	    t.split('processed formulas');
     }
-    const useTimeouts = false;
 
-    let referenced_data: [ExcelintVector, Fingerprint][] = [];
-    let data_values = [];
+    let referenced_data: [ExcelintVector, DZH][] = [];
+    let data_values: [ExcelintVector, DZH][] = [];
     const cols = values.length;
     const rows = values[0].length;
 
@@ -837,18 +818,14 @@ export class Colorize {
       console.warn("Too many values to perform reference analysis.");
     } else {
       // Compute references (to color referenced data).
-      const refs: Dictionary<boolean> = ExcelUtils.generate_all_references(
+      const refs: Dict<boolean> = ExcelUtils.generate_all_references(
         formulas,
         origin.x - 1,
         origin.y - 1
       );
-      //	    t.split('generated all references');
 
       referenced_data = Colorize.color_all_data(refs);
-      // console.log('referenced_data = ' + JSON.stringify(referenced_data));
       data_values = Colorize.process_values(values, formulas, origin.x - 1, origin.y - 1);
-
-      // t.split('processed data');
     }
 
     const grouped_data = Colorize.identify_groups(referenced_data);

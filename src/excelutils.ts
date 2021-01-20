@@ -4,9 +4,18 @@
 
 import * as sjcl from "sjcl";
 import { RectangleUtils } from "./rectangleutils";
-import { ExcelintVector, Dictionary, Spreadsheet } from "./ExceLintTypes";
+import { ExcelintVector, Dict, Spreadsheet } from "./ExceLintTypes";
 
 export class ExcelUtils {
+  // sort routine
+  public static ColumnSort = (a: ExcelintVector, b: ExcelintVector) => {
+    if (a.x === b.x) {
+      return a.y - b.y;
+    } else {
+      return a.x - b.x;
+    }
+  };
+
   // Matchers for all kinds of Excel expressions.
   private static general_re = "\\$?[A-Z][A-Z]?\\$?[\\d\\u2000-\\u6000]+"; // column and row number, optionally with $
   private static sheet_re = "[^\\!]+";
@@ -489,19 +498,20 @@ export class ExcelUtils {
     return deps;
   }
 
-  // This function returns a dictionary (Dictionary<Address,boolean>)) of all of the addresses
-  // that are referenced by some formula.
+  // This function returns a dictionary (Dict<boolean>)) of all of the addresses
+  // that are referenced by some formula, where the key is the address and the
+  // value is always the boolean true.
   public static generate_all_references(
-    spreadsheet: Spreadsheet,
+    formulas: Spreadsheet,
     origin_col: number,
     origin_row: number
-  ): Dictionary<boolean> {
+  ): Dict<boolean> {
     // initialize dictionary
-    const refs: Dictionary<boolean> = {};
+    const refs: Dict<boolean> = {};
 
     let counter = 0;
-    for (let i = 0; i < spreadsheet.length; i++) {
-      const row = spreadsheet[i];
+    for (let i = 0; i < formulas.length; i++) {
+      const row = formulas[i];
       for (let j = 0; j < row.length; j++) {
         const cell = row[j];
         counter++;
@@ -521,8 +531,8 @@ export class ExcelUtils {
               const rowIndex = dep.x - origin_col - 1;
               const colIndex = dep.y - origin_row - 1;
               const outsideFormulaRange =
-                colIndex >= spreadsheet.length ||
-                rowIndex >= spreadsheet[0].length ||
+                colIndex >= formulas.length ||
+                rowIndex >= formulas[0].length ||
                 rowIndex < 0 ||
                 colIndex < 0;
               let addReference = false;
@@ -530,7 +540,7 @@ export class ExcelUtils {
                 addReference = true;
               } else {
                 // Only include non-formulas (if they are in the range).
-                const referentCell = spreadsheet[colIndex][rowIndex];
+                const referentCell = formulas[colIndex][rowIndex];
                 if (referentCell !== undefined && referentCell[0] !== "=") {
                   addReference = true;
                 }

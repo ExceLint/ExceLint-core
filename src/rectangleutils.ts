@@ -1,4 +1,4 @@
-import { ExcelintVector } from "./ExcelintVector";
+import { ExcelintVector } from "./ExceLintTypes";
 
 type rectangle = [ExcelintVector, ExcelintVector];
 
@@ -61,9 +61,7 @@ export class RectangleUtils {
   public static is_mergeable(A: rectangle, B: rectangle): boolean {
     return (
       RectangleUtils.is_adjacent(A, B) &&
-      RectangleUtils.area(A) +
-        RectangleUtils.area(B) -
-        RectangleUtils.overlap(A, B) ===
+      RectangleUtils.area(A) + RectangleUtils.area(B) - RectangleUtils.overlap(A, B) ===
         RectangleUtils.area(RectangleUtils.bounding_box(A, B))
     );
   }

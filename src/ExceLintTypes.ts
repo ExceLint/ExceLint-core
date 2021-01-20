@@ -1,8 +1,14 @@
-export interface Dictionary<V> {
+export interface Dict<V> {
   [key: string]: V;
 }
 
 export type Spreadsheet = Array<Array<string>>;
+
+export type DZH = string; // this is for uses of DistinguishedZeroHash
+
+export type ProposedFixes = Array<
+  [number, [ExcelintVector, ExcelintVector], [ExcelintVector, ExcelintVector]]
+>;
 
 export class ExcelintVector {
   public x: number;
@@ -36,5 +42,10 @@ export class ExcelintVector {
   // Return true if this vector encodes a reference
   public isReference(): boolean {
     return !(this.x === 0 && this.y === 0 && this.c !== 0);
+  }
+
+  // Pretty-print vectors
+  public toString(): string {
+    return "<" + this.asKey() + ">";
   }
 }

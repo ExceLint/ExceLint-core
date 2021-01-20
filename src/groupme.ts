@@ -1,7 +1,6 @@
 import { binsearch, strict_binsearch } from "./binsearch";
 import { Colorize } from "./colorize";
-import { Timer } from "./timer";
-import { ExcelintVector } from "./ExcelintVector";
+import { ExcelintVector, Dict, ProposedFixes } from "./ExceLintTypes";
 
 // A comparison function to sort by x-coordinate.
 function sort_x_coord(a, b) {
@@ -298,10 +297,9 @@ function dedup(arr) {
   return arr.filter((e) => !(t[e] = e in t));
 }
 
-export function find_all_proposed_fixes(grouped_formulas: {
-  [val: string]: Array<[ExcelintVector, ExcelintVector]>;
-}): Array<[number, [ExcelintVector, ExcelintVector], [ExcelintVector, ExcelintVector]]> {
-  //    let t = new Timer("find_all_proposed_fixes");
+export function find_all_proposed_fixes(
+  grouped_formulas: Dict<[ExcelintVector, ExcelintVector][]>
+): ProposedFixes {
   let all_matches = [];
   let count = 0;
   rectangles_count = 0;
@@ -365,11 +363,7 @@ export function find_all_proposed_fixes(grouped_formulas: {
       }
     }
   }
-  if (false) {
-    all_matches = all_matches.map((x, _1, _2) => {
-      return [x[0].map((a, _1, _2) => Number(a)), x[1].map((a, _1, _2) => Number(a))];
-    });
-  }
+
   //    console.log("before: " + JSON.stringify(all_matches));
   all_matches = all_matches.map((x, _1, _2) => {
     if (numComparator(x[1], x[2]) < 0) {
