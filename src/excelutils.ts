@@ -28,18 +28,10 @@ export class ExcelUtils {
     "g"
   );
   private static number_dep = new RegExp("([0-9]+\\.?[0-9]*)");
-  public static cell_both_relative = new RegExp(
-    "[^\\$A-Z]?([A-Z][A-Z]?)([\\d\\u2000-\\u6000]+)"
-  );
-  public static cell_col_absolute = new RegExp(
-    "\\$([A-Z][A-Z]?)([\\d\\u2000-\\u6000]+)"
-  );
-  public static cell_row_absolute = new RegExp(
-    "[^\\$A-Z]?([A-Z][A-Z]?)\\$([\\d\\u2000-\\u6000]+)"
-  );
-  public static cell_both_absolute = new RegExp(
-    "\\$([A-Z][A-Z]?)\\$([\\d\\u2000-\\u6000]+)"
-  );
+  public static cell_both_relative = new RegExp("[^\\$A-Z]?([A-Z][A-Z]?)([\\d\\u2000-\\u6000]+)");
+  public static cell_col_absolute = new RegExp("\\$([A-Z][A-Z]?)([\\d\\u2000-\\u6000]+)");
+  public static cell_row_absolute = new RegExp("[^\\$A-Z]?([A-Z][A-Z]?)\\$([\\d\\u2000-\\u6000]+)");
+  public static cell_both_absolute = new RegExp("\\$([A-Z][A-Z]?)\\$([\\d\\u2000-\\u6000]+)");
 
   // We need to filter out all formulas with these characteristics so they don't mess with our dependency regexps.
 
@@ -61,16 +53,10 @@ export class ExcelUtils {
     "g"
   );
   private static formulas_with_unquoted_sheetnames_2 = new RegExp(
-    "[A-Za-z0-9]+!" +
-      "\\$?[A-Z][A-Z]?\\$?\\d+" +
-      ":" +
-      "\\$?[A-Z][A-Z]?\\$?\\d+",
+    "[A-Za-z0-9]+!" + "\\$?[A-Z][A-Z]?\\$?\\d+" + ":" + "\\$?[A-Z][A-Z]?\\$?\\d+",
     "g"
   );
-  private static formulas_with_structured_references = new RegExp(
-    "\\[([^\\]])*\\]",
-    "g"
-  );
+  private static formulas_with_structured_references = new RegExp("\\[([^\\]])*\\]", "g");
 
   private static originalSheetSuffix = "_EL";
 
@@ -82,9 +68,7 @@ export class ExcelUtils {
   // Convert the UID string into a hashed version using SHA256, truncated to a max length.
   public static hash_sheet(uid: string, maxlen = 31): string {
     // We can't just use the UID because it is too long to be a sheet name in Excel (limit is 31 characters).
-    return sjcl.codec.base32
-      .fromBits(sjcl.hash.sha256.hash(uid))
-      .slice(0, maxlen);
+    return sjcl.codec.base32.fromBits(sjcl.hash.sha256.hash(uid)).slice(0, maxlen);
   }
 
   public static get_rectangle(
@@ -114,20 +98,9 @@ export class ExcelUtils {
   public static get_number_of_cells(address: string): number {
     // Compute the number of cells in the range "usedRange".
     const usedRangeAddresses = ExcelUtils.extract_sheet_range(address);
-    const upperLeftCorner = ExcelUtils.cell_dependency(
-      usedRangeAddresses[1],
-      0,
-      0
-    );
-    const lowerRightCorner = ExcelUtils.cell_dependency(
-      usedRangeAddresses[2],
-      0,
-      0
-    );
-    const numberOfCellsUsed = RectangleUtils.area([
-      upperLeftCorner,
-      lowerRightCorner,
-    ]);
+    const upperLeftCorner = ExcelUtils.cell_dependency(usedRangeAddresses[1], 0, 0);
+    const lowerRightCorner = ExcelUtils.cell_dependency(usedRangeAddresses[2], 0, 0);
+    const numberOfCellsUsed = RectangleUtils.area([upperLeftCorner, lowerRightCorner]);
     return numberOfCellsUsed;
   }
 
@@ -228,22 +201,13 @@ export class ExcelUtils {
     }
 
     console.log(
-      "cell is " +
-        cell +
-        ", origin_col = " +
-        origin_col +
-        ", origin_row = " +
-        origin_row
+      "cell is " + cell + ", origin_col = " + origin_col + ", origin_row = " + origin_row
     );
     throw new Error("We should never get here.");
     return ExcelintVector.Zero();
   }
 
-  public static toR1C1(
-    srcCell: string,
-    destCell: string,
-    greek = false
-  ): string {
+  public static toR1C1(srcCell: string, destCell: string, greek = false): string {
     // Dependencies are column, then row.
     const vec1 = ExcelUtils.cell_dependency(srcCell, 0, 0);
     const vec2 = ExcelUtils.cell_dependency(destCell, 0, 0);
@@ -291,11 +255,7 @@ export class ExcelUtils {
     return resultStr;
   }
 
-  public static formulaToR1C1(
-    formula: string,
-    origin_col: number,
-    origin_row: number
-  ): string {
+  public static formulaToR1C1(formula: string, origin_col: number, origin_row: number): string {
     let range = formula.slice();
     const origin = ExcelUtils.column_index_to_name(origin_col) + origin_row;
     // First, get all the range pairs out.
@@ -318,10 +278,7 @@ export class ExcelUtils {
     while ((singleton = ExcelUtils.single_dep.exec(range))) {
       if (singleton) {
         const first_cell = singleton[1];
-        range = range.replace(
-          singleton[0],
-          ExcelUtils.toR1C1(origin, first_cell, true)
-        );
+        range = range.replace(singleton[0], ExcelUtils.toR1C1(origin, first_cell, true));
       }
     }
     // Now, we de-greek.
@@ -409,17 +366,9 @@ export class ExcelUtils {
     while ((found_pair = ExcelUtils.range_pair.exec(range))) {
       if (found_pair) {
         const first_cell = found_pair[1];
-        const first_vec = ExcelUtils.cell_dependency(
-          first_cell,
-          origin_col,
-          origin_row
-        );
+        const first_vec = ExcelUtils.cell_dependency(first_cell, origin_col, origin_row);
         const last_cell = found_pair[2];
-        const last_vec = ExcelUtils.cell_dependency(
-          last_cell,
-          origin_col,
-          origin_row
-        );
+        const last_vec = ExcelUtils.cell_dependency(last_cell, origin_col, origin_row);
 
         // First_vec is the upper-left hand side of a rectangle.
         // Last_vec is the lower-right hand side of a rectangle.
@@ -429,9 +378,7 @@ export class ExcelUtils {
         const width = last_vec.y - first_vec.y + 1;
         for (let x = 0; x < length; x++) {
           for (let y = 0; y < width; y++) {
-            all_vectors.push(
-              new ExcelintVector(x + first_vec.x, y + first_vec.y, 0)
-            );
+            all_vectors.push(new ExcelintVector(x + first_vec.x, y + first_vec.y, 0));
           }
         }
 
@@ -445,11 +392,7 @@ export class ExcelUtils {
     while ((singleton = ExcelUtils.single_dep.exec(range))) {
       if (singleton) {
         const first_cell = singleton[1];
-        const vec = ExcelUtils.cell_dependency(
-          first_cell,
-          origin_col,
-          origin_row
-        );
+        const vec = ExcelUtils.cell_dependency(first_cell, origin_col, origin_row);
         all_vectors.push(vec);
         // Wipe out the matched contents of range.
         range = range.replace(singleton[0], "_");
@@ -533,12 +476,7 @@ export class ExcelUtils {
     let deps = [];
     // Discard references to cells outside the formula range.
 
-    if (
-      row >= formulas.length ||
-      col >= formulas[0].length ||
-      row < 0 ||
-      col < 0
-    ) {
+    if (row >= formulas.length || col >= formulas[0].length || row < 0 || col < 0) {
       return [];
     }
 

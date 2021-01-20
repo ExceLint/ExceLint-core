@@ -30,9 +30,7 @@ export class ExcelintVector {
 
   // Turn this vector into a string that can be used as a dictionary key
   public asKey(): string {
-    return (
-      this.x.toString() + "," + this.y.toString() + "," + this.c.toString()
-    );
+    return this.x.toString() + "," + this.y.toString() + "," + this.c.toString();
   }
 
   // Return true if this vector encodes a reference

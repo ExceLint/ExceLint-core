@@ -25,9 +25,7 @@ function sort_y_coord(a, b) {
   }
 }
 
-function generate_bounding_box(
-  g
-): { [val: string]: [ExcelintVector, ExcelintVector] } {
+function generate_bounding_box(g): { [val: string]: [ExcelintVector, ExcelintVector] } {
   const bb = {};
   for (const i of Object.keys(g)) {
     //	console.log("length of formulas for " + i + " = " + g[i].length);
@@ -65,10 +63,7 @@ function generate_bounding_box(
 function fix_grouped_formulas(g, newGnum) {
   for (const i of Object.keys(g)) {
     newGnum[i] = g[i].sort(sort_x_coord).map((x, _1, _2) => {
-      return [
-        x[0].map((a, _1, _2) => Number(a)),
-        x[1].map((a, _1, _2) => Number(a)),
-      ];
+      return [x[0].map((a, _1, _2) => Number(a)), x[1].map((a, _1, _2) => Number(a))];
     });
   }
 }
@@ -279,22 +274,12 @@ function find_all_matching_rectangles(
       // Skip. Outside the bounding box.
       //		console.log("outside bounding box.");
     } else {
-      const matches = matching_rectangles(
-        base_ul,
-        base_lr,
-        x_ul[key],
-        x_lr[key]
-      );
+      const matches = matching_rectangles(base_ul, base_lr, x_ul[key], x_lr[key]);
       if (matches.length > 0) {
         //		    console.log("found matches for key "+key+" --> " + JSON.stringify(matches));
         match_list = match_list.concat(
           matches.map((item, _1, _2) => {
-            const metric = Colorize.fix_metric(
-              parseFloat(thisKey),
-              rect,
-              parseFloat(key),
-              item
-            );
+            const metric = Colorize.fix_metric(parseFloat(thisKey), rect, parseFloat(key), item);
             return [metric, rect, item];
           })
         );
@@ -315,9 +300,7 @@ function dedup(arr) {
 
 export function find_all_proposed_fixes(grouped_formulas: {
   [val: string]: Array<[ExcelintVector, ExcelintVector]>;
-}): Array<
-  [number, [ExcelintVector, ExcelintVector], [ExcelintVector, ExcelintVector]]
-> {
+}): Array<[number, [ExcelintVector, ExcelintVector], [ExcelintVector, ExcelintVector]]> {
   //    let t = new Timer("find_all_proposed_fixes");
   let all_matches = [];
   let count = 0;
@@ -384,10 +367,7 @@ export function find_all_proposed_fixes(grouped_formulas: {
   }
   if (false) {
     all_matches = all_matches.map((x, _1, _2) => {
-      return [
-        x[0].map((a, _1, _2) => Number(a)),
-        x[1].map((a, _1, _2) => Number(a)),
-      ];
+      return [x[0].map((a, _1, _2) => Number(a)), x[1].map((a, _1, _2) => Number(a))];
     });
   }
   //    console.log("before: " + JSON.stringify(all_matches));
