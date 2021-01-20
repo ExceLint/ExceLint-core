@@ -10,7 +10,7 @@ import { Timer } from "./timer";
 import { JSONclone } from "./jsonclone";
 import { find_all_proposed_fixes } from "./groupme";
 import { Stencil, InfoGain } from "./infogain";
-import { ExcelintVector, Dict, Spreadsheet, DZH } from "./ExceLintTypes";
+import { ExcelintVector, Dict, Spreadsheet, Fingerprint, Region } from "./ExceLintTypes";
 
 export class Colorize {
   public static maxCategories = 2; // Maximum number of categories for reported errors
@@ -80,7 +80,7 @@ export class Colorize {
   // A multiplier for the hash function.
   private static Multiplier = 1; // 103037;
 
-  // A hash string indicating no dependencies.
+  // A hash string indicating no dependencies; in other words, the hash for data.
   private static distinguishedZeroHash = "12345";
 
   public static initialize() {
@@ -534,7 +534,7 @@ export class Colorize {
   }
 
   // Returns all referenced data so it can be colored later.
-  public static color_all_data(refs: Dict<boolean>): Array<[ExcelintVector, DZH]> {
+  public static color_all_data(refs: Dict<boolean>): Array<[ExcelintVector, Fingerprint]> {
     const referenced_data = [];
     for (const refvec of Object.keys(refs)) {
       const rv = refvec.split(",");
@@ -552,8 +552,8 @@ export class Colorize {
     formulas: Spreadsheet,
     origin_col: number,
     origin_row: number
-  ): [ExcelintVector, DZH][] {
-    const value_array: [ExcelintVector, DZH][] = [];
+  ): [ExcelintVector, Fingerprint][] {
+    const value_array: [ExcelintVector, Fingerprint][] = [];
     //	let t = new Timer('process_values');
     for (let i = 0; i < values.length; i++) {
       const row = values[i];
@@ -583,9 +583,9 @@ export class Colorize {
   // sorting them (e.g., by columns).
   private static identify_ranges(
     list: Array<[ExcelintVector, string]>,
-    sortfn?: (n1: ExcelintVector, n2: ExcelintVector) => number
+    sortfn: (n1: ExcelintVector, n2: ExcelintVector) => number
   ): Dict<ExcelintVector[]> {
-    // Separate into groups based on their string value.
+    // Separate into groups based on their fingerprint value.
     const groups = {};
     for (const r of list) {
       groups[r[1]] = groups[r[1]] || [];
@@ -598,28 +598,31 @@ export class Colorize {
     return groups;
   }
 
-  // Group all ranges by their value.
-  // TODO Dan: What does "value" mean?
-  private static group_ranges(
+  // Collect all ranges of cells that share a fingerprint
+  private static find_contiguous_regions(
     groups: Dict<ExcelintVector[]>
   ): Dict<[ExcelintVector, ExcelintVector][]> {
-    const output: Dict<[ExcelintVector, ExcelintVector][]> = {};
+    const output: Dict<Region[]> = {};
 
     for (const key of Object.keys(groups)) {
+      // Here, we scan all of the vectors in this group, accumulating
+      // all adjacent vectors by tracking the start and end. Whevener
+      // we encounter a non-adjacent vector, push the region to the output
+      // list and then start tracking a new region.
       output[key] = [];
-      let prev = groups[key].shift(); // remove the first vector from the list
-      let last = prev; // initialize last to point to the same vector
+      let start = groups[key].shift(); // remove the first vector from the list
+      let end = start;
       for (const v of groups[key]) {
-        // Check if v is in the same column, adjacent row
-        if (v.x === last.x && v.y === last.y + 1) {
-          last = v;
+        // Check if v is in the same column as last, adjacent row
+        if (v.x === end.x && v.y === end.y + 1) {
+          end = v;
         } else {
-          output[key].push([prev, last]);
-          prev = v;
-          last = v;
+          output[key].push([start, end]);
+          start = v;
+          end = v;
         }
       }
-      output[key].push([prev, last]);
+      output[key].push([start, end]);
     }
     return output;
   }
@@ -628,7 +631,7 @@ export class Colorize {
     theList: [ExcelintVector, string][]
   ): Dict<Array<[ExcelintVector, ExcelintVector]>> {
     const id: Dict<ExcelintVector[]> = Colorize.identify_ranges(theList, ExcelUtils.ColumnSort);
-    const gr: Dict<[ExcelintVector, ExcelintVector][]> = Colorize.group_ranges(id);
+    const gr: Dict<[ExcelintVector, ExcelintVector][]> = Colorize.find_contiguous_regions(id);
     // Now try to merge stuff with the same hash.
     const newGr1 = JSONclone.clone(gr);
     const mg = Colorize.merge_groups(newGr1);
@@ -807,8 +810,8 @@ export class Colorize {
       processed_formulas = Colorize.process_formulas(formulas, origin.x - 1, origin.y - 1);
     }
 
-    let referenced_data: [ExcelintVector, DZH][] = [];
-    let data_values: [ExcelintVector, DZH][] = [];
+    let referenced_data: [ExcelintVector, Fingerprint][] = [];
+    let data_values: [ExcelintVector, Fingerprint][] = [];
     const cols = values.length;
     const rows = values[0].length;
 

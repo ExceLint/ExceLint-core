@@ -4,11 +4,11 @@ export interface Dict<V> {
 
 export type Spreadsheet = Array<Array<string>>;
 
-export type DZH = string; // this is for uses of DistinguishedZeroHash
+export type Fingerprint = string;
 
-export type ProposedFixes = Array<
-  [number, [ExcelintVector, ExcelintVector], [ExcelintVector, ExcelintVector]]
->;
+export type Region = [ExcelintVector, ExcelintVector]; // a region is defined by its start and end vectors
+
+export type ProposedFixes = Array<[number, Region, Region]>;
 
 export class ExcelintVector {
   public x: number;

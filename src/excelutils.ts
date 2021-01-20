@@ -8,7 +8,7 @@ import { ExcelintVector, Dict, Spreadsheet } from "./ExceLintTypes";
 
 export class ExcelUtils {
   // sort routine
-  public static ColumnSort = (a: ExcelintVector, b: ExcelintVector) => {
+  static readonly ColumnSort = (a: ExcelintVector, b: ExcelintVector) => {
     if (a.x === b.x) {
       return a.y - b.y;
     } else {
