@@ -1,6 +1,13 @@
 import { binsearch, strict_binsearch } from "./binsearch";
 import { Colorize } from "./colorize";
-import { ExceLintVector, Dict, ProposedFixes, Rectangle } from "./ExceLintTypes";
+import {
+  ExceLintVector,
+  Dict,
+  ProposedFixes,
+  Rectangle,
+  Fingerprint,
+  Metric,
+} from "./ExceLintTypes";
 
 // A comparison function to sort by x-coordinate.
 function sort_x_coord(a: Rectangle, b: Rectangle): number {
@@ -24,7 +31,8 @@ function sort_y_coord(a: Rectangle, b: Rectangle): number {
   }
 }
 
-function generate_bounding_box(g: Dict<Rectangle>): Dict<Rectangle> {
+// Returns a dictionary containing a bounding box for each group (indexed by hash).
+function generate_bounding_box(g: Dict<Rectangle[]>): Dict<Rectangle> {
   const bb: Dict<Rectangle> = {};
   for (const hash of Object.keys(g)) {
     //	console.log("length of formulas for " + i + " = " + g[i].length);
@@ -32,22 +40,24 @@ function generate_bounding_box(g: Dict<Rectangle>): Dict<Rectangle> {
     let yMin = 1000000;
     let xMax = -1000000;
     let yMax = -1000000;
+
+    // find the max/min x and y that bound all the rectangles in the group
     for (let j = 0; j < g[hash].length; j++) {
-      const x1 = g[hash][j][0][0];
-      const x2 = g[hash][j][1][0];
-      const y1 = g[hash][j][0][1];
-      const y2 = g[hash][j][1][1];
-      if (x2 > xMax) {
-        xMax = x2;
+      const x_tl = g[hash][j][0].x; // top left x
+      const x_br = g[hash][j][1].x; // bottom right x
+      const y_tl = g[hash][j][0].y; // top left y
+      const y_br = g[hash][j][1].y; // bottom right y
+      if (x_br > xMax) {
+        xMax = x_br;
       }
-      if (x1 < xMin) {
-        xMin = x1;
+      if (x_tl < xMin) {
+        xMin = x_tl;
       }
-      if (y2 > yMax) {
-        yMax = y2;
+      if (y_br > yMax) {
+        yMax = y_br;
       }
-      if (y1 < yMin) {
-        yMin = y1;
+      if (y_tl < yMin) {
+        yMin = y_tl;
       }
     }
     bb[hash] = [new ExceLintVector(xMin, yMin, 0), new ExceLintVector(xMax, yMax, 0)];
@@ -94,17 +104,19 @@ function numComparator(a_val: ExceLintVector, b_val: ExceLintVector) {
   return 0;
 }
 
+// Return the set of adjacent rectangles that are merge-compatible with the given rectangle
 function matching_rectangles(
-  rect_ul: ExceLintVector,
-  rect_lr: ExceLintVector,
+  rect: Rectangle,
   rect_uls: Array<ExceLintVector>,
   rect_lrs: Array<ExceLintVector>
-): Array<[ExceLintVector, ExceLintVector]> {
+): Rectangle[] {
   // Assumes uls and lrs are already sorted and the same length.
-  const x1 = rect_ul[0];
-  const y1 = rect_ul[1];
-  const x2 = rect_lr[0];
-  const y2 = rect_lr[1];
+  const rect_ul = rect[0];
+  const rect_lr = rect[1];
+  const x1 = rect_ul.x;
+  const y1 = rect_ul.y;
+  const x2 = rect_lr.x;
+  const y2 = rect_lr.y;
 
   // Try to find something adjacent to A = [[x1, y1, 0], [x2, y2, 0]]
   // options are:
@@ -123,37 +135,33 @@ function matching_rectangles(
   const right = new ExceLintVector(x2 + 1, y1, 0);
   // down (ul) = ul_x, lr_y
   const down = new ExceLintVector(x1, y2 + 1, 0);
-  const matches = [];
+  const matches: Rectangle[] = [];
   let ind = -1;
   ind = strict_binsearch(rect_lrs, left, numComparator);
-  //	console.log("left = " + ind);
   if (ind !== -1) {
-    if (rect_uls[ind][1] === y1) {
-      const candidate = [rect_uls[ind], rect_lrs[ind]];
+    if (rect_uls[ind].y === y1) {
+      const candidate: Rectangle = [rect_uls[ind], rect_lrs[ind]];
       matches.push(candidate);
     }
   }
   ind = strict_binsearch(rect_lrs, up, numComparator);
-  //	console.log("up = " + ind);
   if (ind !== -1) {
-    if (rect_uls[ind][0] === x1) {
-      const candidate = [rect_uls[ind], rect_lrs[ind]];
+    if (rect_uls[ind].x === x1) {
+      const candidate: Rectangle = [rect_uls[ind], rect_lrs[ind]];
       matches.push(candidate);
     }
   }
   ind = strict_binsearch(rect_uls, right, numComparator);
-  //	console.log("right = " + ind);
   if (ind !== -1) {
-    if (rect_lrs[ind][1] === y2) {
-      const candidate = [rect_uls[ind], rect_lrs[ind]];
+    if (rect_lrs[ind].y === y2) {
+      const candidate: Rectangle = [rect_uls[ind], rect_lrs[ind]];
       matches.push(candidate);
     }
   }
   ind = strict_binsearch(rect_uls, down, numComparator);
-  //	console.log("down = " + ind);
   if (ind !== -1) {
-    if (rect_lrs[ind][0] === x2) {
-      const candidate = [rect_uls[ind], rect_lrs[ind]];
+    if (rect_lrs[ind].x === x2) {
+      const candidate: Rectangle = [rect_uls[ind], rect_lrs[ind]];
       matches.push(candidate);
     }
   }
@@ -162,52 +170,41 @@ function matching_rectangles(
 
 let rectangles_count = 0;
 
+// find all merge-compatible rectangles for the given rectangle including their
+// fix metrics.
 function find_all_matching_rectangles(
-  thisKey: string,
-  rect: [ExceLintVector, ExceLintVector],
-  grouped_formulas: { [val: string]: Array<[ExceLintVector, ExceLintVector]> },
-  keylistX: Array<string>,
-  keylistY: Array<string>,
-  x_ul: { [val: string]: Array<ExceLintVector> },
-  x_lr: { [val: string]: Array<ExceLintVector> },
-  bb: { [val: string]: [ExceLintVector, ExceLintVector] },
-  bbsX: Array<[ExceLintVector, ExceLintVector]>,
-  bbsY: Array<[ExceLintVector, ExceLintVector]>
-): Array<[number, [ExceLintVector, ExceLintVector]]> {
+  thisfp: string,
+  rect: Rectangle,
+  fingerprintsX: string[],
+  fingerpritnsY: string[],
+  x_ul: Dict<ExceLintVector[]>,
+  x_lr: Dict<ExceLintVector[]>,
+  bb: Dict<Rectangle>,
+  bbsX: Rectangle[],
+  bbsY: Rectangle[]
+): ProposedFixes {
+  // get the upper-left and lower-right vectors for the given rectangle
   const [base_ul, base_lr] = rect;
-  //    console.log("Looking for matches of " + JSON.stringify(base_ul) + ", " + JSON.stringify(base_lr));
-  let match_list = [];
-  const a = grouped_formulas;
-  //	console.log("total formulas = " + keylist.length);
-  //	console.log(JSON.stringify(bbs));
-  const ind1 = binsearch(bbsX, rect, (a, b) => {
-    return a[0][0] - b[0][0];
+
+  // this is the output
+  let match_list: ProposedFixes = [];
+
+  // find the index of the given rectangle in the list of rects sorted by X
+  const ind1 = binsearch(bbsX, rect, (a: Rectangle, b: Rectangle) => {
+    return a[0].x - b[0].x;
   });
-  const ind2 = binsearch(bbsY, rect, (a, b) => {
-    return a[0][1] - b[0][1];
+
+  // find the index of the given rectangle in the list of rects sorted by Y
+  const ind2 = binsearch(bbsY, rect, (a: Rectangle, b: Rectangle) => {
+    return a[0].y - b[0].y;
   });
-  //	console.log("ind1 = " + ind1 + ", ind2 = " + ind2);
-  // Pick the coordinate axis that takes us the furthest in the list.
-  let keylist;
-  let axis;
-  let ind;
-  if (ind1 > ind2) {
-    keylist = keylistX;
-    ind = ind1;
-    axis = 0;
-  } else {
-    keylist = keylistY;
-    ind = ind2;
-    axis = 1;
-  }
-  if (ind > 0) {
-    ind -= 1;
-  }
-  // ind = 0; // FIXME FIXME
-  //	console.log("found the item " + JSON.stringify(rect) + " at position = " + ind);
-  for (let i = ind; i < keylist.length; i++) {
-    const key = keylist[i];
-    if (key === thisKey) {
+
+  // Pick the coordinate axis that takes us the furthest in the fingerprint list.
+  const [fps, itmp, axis] = ind1 > ind2 ? [fingerprintsX, ind1, 0] : [fingerpritnsY, ind2, 1];
+  const ind = ind1 > 0 ? -1 : itmp;
+  for (let i = ind; i < fps.length; i++) {
+    const fp = fps[i];
+    if (fp === thisfp) {
       continue;
     }
     rectangles_count++;
@@ -216,31 +213,26 @@ function find_all_matching_rectangles(
       //            console.log('find_all_matching_rectangles, iteration ' + rectangles_count);
     }
     // Check bounding box.
-    const box = bb[key];
+    const box = bb[fp];
 
-    /* Since the keys are sorted in x-axis order,
-	       we can stop once we have gone too far on the x-axis to ever merge again;
-	       mutatis mutandis for the y-axis. */
+    /* Since fingerprints are sorted in x-axis order,
+	     we can stop once we have gone too far on the x-axis to ever merge again;
+	     mutatis mutandis for the y-axis. */
 
-    if (true) {
-      // early stopping
-
-      if (axis === 0) {
-        /* [rect] ... [box]  */
-        // if left side of box is too far away from right-most edge of the rectangle
-        if (base_lr[0] + 1 < box[0][0]) {
-          //			console.log("horizontal: breaking out");
-          break;
-        }
-      } else {
-        /* [rect]
+    // early stopping
+    if (axis === 0) {
+      /* [rect] ... [box]  */
+      // if left side of box is too far away from right-most edge of the rectangle
+      if (base_lr.x + 1 < box[0].x) {
+        break;
+      }
+    } else {
+      /* [rect]
                            ...
                    [box]  */
-        // if the top side of box is too far away from bottom-most edge of the rectangle
-        if (base_lr[1] + 1 < box[0][1]) {
-          //			console.log("vertical: breaking out");
-          break;
-        }
+      // if the top side of box is too far away from bottom-most edge of the rectangle
+      if (base_lr.y + 1 < box[0].y) {
+        break;
       }
     }
 
@@ -255,37 +247,35 @@ function find_all_matching_rectangles(
 
                           +--------------+
       [lr_x + 1 < min_x ] |   Bounding   |  [ max_x + 1 < ul_x ]
-	                  |      Box     |
-	                  +--------------+
+	                        |      Box     |
+	                        +--------------+
 
-		          [ max_y + 1 < ul_y ]
+		                      [ max_y + 1 < ul_y ]
 
-	     */
+	  */
 
     if (
-      base_lr[0] + 1 < box[0][0] || // left
-      base_lr[1] + 1 < box[0][1] || // top
-      box[1][0] + 1 < base_ul[0] || // right
-      box[1][1] + 1 < base_ul[1]
+      base_lr.x + 1 < box[0].x || // left
+      base_lr.y + 1 < box[0].y || // top
+      box[1].x + 1 < base_ul.x || // right
+      box[1].y + 1 < base_ul.y
     ) {
       // Skip. Outside the bounding box.
       //		console.log("outside bounding box.");
     } else {
-      const matches = matching_rectangles(base_ul, base_lr, x_ul[key], x_lr[key]);
+      const matches = matching_rectangles([base_ul, base_lr], x_ul[fp], x_lr[fp]);
       if (matches.length > 0) {
-        //		    console.log("found matches for key "+key+" --> " + JSON.stringify(matches));
+        // compute the fix metric for every potential merge and
+        // concatenate them into the match_list
         match_list = match_list.concat(
-          matches.map((item, _1, _2) => {
-            const metric = Colorize.fix_metric(parseFloat(thisKey), rect, parseFloat(key), item);
-            return [metric, rect, item];
+          matches.map((item: Rectangle, _1, _2) => {
+            const metric = Colorize.fix_metric(parseFloat(thisfp), rect, parseFloat(fp), item);
+            return [metric, rect];
           })
         );
       }
     }
   }
-  //	console.log("match_list = " + JSON.stringify(match_list));
-  //	t.split("done.");
-  ///	console.log("find_all_matching_rectangles, iteration " + rectangles_count);
   return match_list;
 }
 
@@ -297,56 +287,64 @@ function dedup(arr) {
 
 export function find_all_proposed_fixes(grouped_formulas: Dict<Rectangle[]>): ProposedFixes {
   let all_matches: ProposedFixes = [];
-  let count = 0;
   rectangles_count = 0;
 
   // sort each group of rectangles by their x coordinates
   const aNum = sort_grouped_formulas(grouped_formulas);
-  const x_ul = {};
-  const x_lr = {};
-  for (const key of Object.keys(grouped_formulas)) {
-    x_ul[key] = aNum[key].map((i, _1, _2) => {
-      const [p1, p2] = i;
-      return p1;
+
+  // extract from rects the upper-left and lower-right vectors into dicts, indexed by hash
+  const x_ul: Dict<ExceLintVector[]> = {}; // upper-left
+  const x_lr: Dict<ExceLintVector[]> = {}; // lower-right
+  for (const fp of Object.keys(grouped_formulas)) {
+    x_ul[fp] = aNum[fp].map((rect, _1, _2) => {
+      const [v1, _] = rect;
+      return v1;
     });
-    x_lr[key] = aNum[key].map((i, _1, _2) => {
-      const [p1, p2] = i;
-      return p2;
+    x_lr[fp] = aNum[fp].map((rect, _1, _2) => {
+      const [_, v2] = rect;
+      return v2;
     });
   }
-  //   t.split("generated upper left and lower right arrays.");
+
+  // find the bounding box for each group
   const bb = generate_bounding_box(grouped_formulas);
-  //    t.split("generated bounding box.");
-  const keylistX = Object.keys(grouped_formulas);
 
-  //    console.log("keylist was = " + JSON.stringify(keylist));
-  // Sort the keys by the x-axis of the upper-left corner of their bounding boxes.
-  keylistX.sort((a, b) => {
-    return bb[a][0][0] - bb[b][0][0];
-  });
-  const bbsX = keylistX.map((item, _1, _2) => {
-    return bb[item];
+  // extract fingerprints
+  const fingerprintsX: Fingerprint[] = Object.keys(grouped_formulas);
+
+  // sort fingerprints by the x-coordinate of the upper-left corner of their bounding box.
+  fingerprintsX.sort((a: Fingerprint, b: Fingerprint) => {
+    return bb[a][0].x - bb[b][0].x;
   });
 
-  const keylistY = Object.keys(grouped_formulas);
-  // Sort the keys by the y-axis of the upper-left corner of their bounding boxes.
-  keylistY.sort((a, b) => {
-    return bb[a][0][1] - bb[b][0][1];
-  });
-  const bbsY = keylistY.map((item, _1, _2) => {
-    return bb[item];
+  // generate a sorted list of rectangles
+  const bbsX: Rectangle[] = fingerprintsX.map((fp, _1, _2) => {
+    return bb[fp];
   });
 
-  //    console.log("keylist now = " + JSON.stringify(keylist));
+  // extract fingerprints again
+  const fingerprintsY = Object.keys(grouped_formulas);
 
-  for (const key of Object.keys(grouped_formulas)) {
-    for (let i = 0; i < aNum[key].length; i++) {
-      const matches: [number, Rectangle][] = find_all_matching_rectangles(
-        key,
-        aNum[key][i],
-        aNum,
-        keylistX,
-        keylistY,
+  // sort fingerprints by the x-coordinate of the upper-left corner of their bounding box.
+  fingerprintsY.sort((a: Fingerprint, b: Fingerprint) => {
+    return bb[a][0].y - bb[b][0].y;
+  });
+
+  // generate a sorted list of rectangles
+  const bbsY: Rectangle[] = fingerprintsY.map((fp, _1, _2) => {
+    return bb[fp];
+  });
+
+  // for every group
+  for (const fp of Object.keys(grouped_formulas)) {
+    // and every rectangle in the group
+    for (let i = 0; i < aNum[fp].length; i++) {
+      // find all matching rectangles and their fix scores
+      const matches = find_all_matching_rectangles(
+        fp,
+        aNum[fp][i],
+        fingerprintsX,
+        fingerprintsY,
         x_ul,
         x_lr,
         bb,
@@ -354,10 +352,6 @@ export function find_all_proposed_fixes(grouped_formulas: Dict<Rectangle[]>): Pr
         bbsY
       );
       all_matches = all_matches.concat(matches);
-      count++;
-      if (count % 1000 === 0) {
-        //                console.log('find_all_proposed_fixes, iteration ' + count);
-      }
     }
   }
 

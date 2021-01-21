@@ -17,6 +17,7 @@ import {
   Fingerprint,
   Rectangle,
   ProposedFixes,
+  Metric,
 } from "./ExceLintTypes";
 
 export class Colorize {
@@ -872,10 +873,10 @@ export class Colorize {
   // Compute the normalized distance from merging two ranges.
   public static fix_metric(
     target_norm: number,
-    target: [ExceLintVector, ExceLintVector],
+    target: Rectangle,
     merge_with_norm: number,
-    merge_with: [ExceLintVector, ExceLintVector]
-  ): number {
+    merge_with: Rectangle
+  ): Metric {
     //	console.log('fix_metric: ' + target_norm + ', ' + JSON.stringify(target) + ', ' + merge_with_norm + ', ' + JSON.stringify(merge_with));
     const [t1, t2] = target;
     const [m1, m2] = merge_with;
@@ -892,6 +893,7 @@ export class Colorize {
     const norm_min = Math.min(merge_with_norm, target_norm);
     const norm_max = Math.max(merge_with_norm, target_norm);
     let fix_distance = Math.abs(norm_max - norm_min) / this.Multiplier;
+
     // Ensure that the minimum fix is at least one (we need this if we don't use the L1 norm).
     if (fix_distance < 1.0) {
       fix_distance = 1.0;

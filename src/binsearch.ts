@@ -1,10 +1,6 @@
 type ComparatorType<T> = (arg1: T, arg2: T) => number;
 
-function binsearch_helper<Type>(
-  A: Array<Type>,
-  T: Type,
-  comparator: ComparatorType<Type>
-) {
+function binsearch_helper<Type>(A: Array<Type>, T: Type, comparator: ComparatorType<Type>) {
   const n = A.length;
   let L = 0;
   let R = n;
@@ -20,15 +16,14 @@ function binsearch_helper<Type>(
   return L;
 }
 
-
 // Find the index of the earliest occurrence of v in arr using binary search.
 // Return -1 if not found.
 export function binsearch<T>(
   arr: Array<T>,
   v: T,
   comparator: ComparatorType<T> = undefined
-) {
-  if (typeof comparator === 'undefined') {
+): number {
+  if (typeof comparator === "undefined") {
     //	console.log("undefined");
     comparator = (a, b) => {
       //	    console.log("Comparing " + JSON.stringify(a) + " to " + JSON.stringify(b));
@@ -50,7 +45,7 @@ export function strict_binsearch<T>(
   arr: Array<T>,
   v: T,
   comparator: ComparatorType<T> = undefined
-) {
+): number {
   const ind = binsearch_helper(arr, v, comparator);
   if (ind === arr.length) {
     return -1;
@@ -85,9 +80,7 @@ export function test_binsearch() {
         // Check to make sure this is the earliest.
         if (arr[ind - 1] === arr[j]) {
           failures++;
-          console.log(
-            'Failure: ' + JSON.stringify(arr) + ', ind = ' + ind + ', j = ' + j
-          );
+          console.log("Failure: " + JSON.stringify(arr) + ", ind = " + ind + ", j = " + j);
         }
       }
     }
@@ -95,23 +88,16 @@ export function test_binsearch() {
     for (let j = 0; j < len; j++) {
       const val = Math.random() * len;
       const ind = binsearch(arr, val);
-      if (
-        (ind > 0 && ind < arr.length && arr[ind - 1] > val) ||
-        (ind === 0 && arr[ind] < val)
-      ) {
+      if ((ind > 0 && ind < arr.length && arr[ind - 1] > val) || (ind === 0 && arr[ind] < val)) {
         failures++;
         console.log(
-          'Found an item which should almost certainly not be there: ' +
-            val +
-            ' at position ' +
-            ind
+          "Found an item which should almost certainly not be there: " + val + " at position " + ind
         );
         console.log(JSON.stringify(arr));
       }
     }
   }
-  const passPercentage =
-    100.0 * ((2 * iterations - failures) / (2 * iterations));
-  console.log('Passed = ' + passPercentage + ' percent.');
+  const passPercentage = 100.0 * ((2 * iterations - failures) / (2 * iterations));
+  console.log("Passed = " + passPercentage + " percent.");
   return passPercentage;
 }

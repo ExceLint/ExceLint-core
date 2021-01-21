@@ -6,10 +6,12 @@ export type Spreadsheet = Array<Array<string>>;
 
 export type Fingerprint = string;
 
+export type Metric = number;
+
 // a rectangle is defined by its start and end vectors
 export type Rectangle = [ExceLintVector, ExceLintVector];
 
-export type ProposedFixes = [number, Rectangle, Rectangle][];
+export type ProposedFixes = [number, Rectangle][];
 
 export class ExceLintVector {
   public x: number;
