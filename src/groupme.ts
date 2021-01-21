@@ -1,6 +1,6 @@
 import { binsearch, strict_binsearch } from "./binsearch";
 import { Colorize } from "./colorize";
-import { ExcelintVector, Dict, ProposedFixes } from "./ExceLintTypes";
+import { ExceLintVector, Dict, ProposedFixes } from "./ExceLintTypes";
 
 // A comparison function to sort by x-coordinate.
 function sort_x_coord(a, b) {
@@ -24,7 +24,7 @@ function sort_y_coord(a, b) {
   }
 }
 
-function generate_bounding_box(g): { [val: string]: [ExcelintVector, ExcelintVector] } {
+function generate_bounding_box(g): { [val: string]: [ExceLintVector, ExceLintVector] } {
   const bb = {};
   for (const i of Object.keys(g)) {
     //	console.log("length of formulas for " + i + " = " + g[i].length);
@@ -83,7 +83,7 @@ function shuffle<T>(a: Array<T>): Array<T> {
 
 let comparisons = 0;
 
-function numComparator(a_val: ExcelintVector, b_val: ExcelintVector) {
+function numComparator(a_val: ExceLintVector, b_val: ExceLintVector) {
   for (let i = 0; i < 3; i++) {
     // note: length of excelint vector
     if (a_val[i] < b_val[i]) {
@@ -97,11 +97,11 @@ function numComparator(a_val: ExcelintVector, b_val: ExcelintVector) {
 }
 
 function matching_rectangles(
-  rect_ul: ExcelintVector,
-  rect_lr: ExcelintVector,
-  rect_uls: Array<ExcelintVector>,
-  rect_lrs: Array<ExcelintVector>
-): Array<[ExcelintVector, ExcelintVector]> {
+  rect_ul: ExceLintVector,
+  rect_lr: ExceLintVector,
+  rect_uls: Array<ExceLintVector>,
+  rect_lrs: Array<ExceLintVector>
+): Array<[ExceLintVector, ExceLintVector]> {
   // Assumes uls and lrs are already sorted and the same length.
   const x1 = rect_ul[0];
   const y1 = rect_ul[1];
@@ -118,13 +118,13 @@ function matching_rectangles(
   //                                   [ ] --> [ (x1, y2+1) ... (x2, ?) ]
 
   // left (lr) = ul_x, lr_y
-  const left = new ExcelintVector(x1 - 1, y2, 0);
+  const left = new ExceLintVector(x1 - 1, y2, 0);
   // up (lr) = lr_x, ul_y
-  const up = new ExcelintVector(x2, y1 - 1, 0);
+  const up = new ExceLintVector(x2, y1 - 1, 0);
   // right (ul) = lr_x, ul_y
-  const right = new ExcelintVector(x2 + 1, y1, 0);
+  const right = new ExceLintVector(x2 + 1, y1, 0);
   // down (ul) = ul_x, lr_y
-  const down = new ExcelintVector(x1, y2 + 1, 0);
+  const down = new ExceLintVector(x1, y2 + 1, 0);
   const matches = [];
   let ind = -1;
   ind = strict_binsearch(rect_lrs, left, numComparator);
@@ -166,16 +166,16 @@ let rectangles_count = 0;
 
 function find_all_matching_rectangles(
   thisKey: string,
-  rect: [ExcelintVector, ExcelintVector],
-  grouped_formulas: { [val: string]: Array<[ExcelintVector, ExcelintVector]> },
+  rect: [ExceLintVector, ExceLintVector],
+  grouped_formulas: { [val: string]: Array<[ExceLintVector, ExceLintVector]> },
   keylistX: Array<string>,
   keylistY: Array<string>,
-  x_ul: { [val: string]: Array<ExcelintVector> },
-  x_lr: { [val: string]: Array<ExcelintVector> },
-  bb: { [val: string]: [ExcelintVector, ExcelintVector] },
-  bbsX: Array<[ExcelintVector, ExcelintVector]>,
-  bbsY: Array<[ExcelintVector, ExcelintVector]>
-): Array<[number, [ExcelintVector, ExcelintVector]]> {
+  x_ul: { [val: string]: Array<ExceLintVector> },
+  x_lr: { [val: string]: Array<ExceLintVector> },
+  bb: { [val: string]: [ExceLintVector, ExceLintVector] },
+  bbsX: Array<[ExceLintVector, ExceLintVector]>,
+  bbsY: Array<[ExceLintVector, ExceLintVector]>
+): Array<[number, [ExceLintVector, ExceLintVector]]> {
   const [base_ul, base_lr] = rect;
   //    console.log("Looking for matches of " + JSON.stringify(base_ul) + ", " + JSON.stringify(base_lr));
   let match_list = [];
@@ -298,7 +298,7 @@ function dedup(arr) {
 }
 
 export function find_all_proposed_fixes(
-  grouped_formulas: Dict<[ExcelintVector, ExcelintVector][]>
+  grouped_formulas: Dict<[ExceLintVector, ExceLintVector][]>
 ): ProposedFixes {
   let all_matches = [];
   let count = 0;

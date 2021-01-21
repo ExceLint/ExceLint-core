@@ -6,11 +6,11 @@ export type Spreadsheet = Array<Array<string>>;
 
 export type Fingerprint = string;
 
-export type Region = [ExcelintVector, ExcelintVector]; // a region is defined by its start and end vectors
+export type Region = [ExceLintVector, ExceLintVector]; // a region is defined by its start and end vectors
 
 export type ProposedFixes = Array<[number, Region, Region]>;
 
-export class ExcelintVector {
+export class ExceLintVector {
   public x: number;
   public y: number;
   public c: number;
@@ -25,13 +25,13 @@ export class ExcelintVector {
     return this.c === 1;
   }
 
-  public static Zero(): ExcelintVector {
-    return new ExcelintVector(0, 0, 0);
+  public static Zero(): ExceLintVector {
+    return new ExceLintVector(0, 0, 0);
   }
 
   // Subtract other from this vector
-  public subtract(v: ExcelintVector): ExcelintVector {
-    return new ExcelintVector(this.x - v.x, this.y - v.y, this.c - v.c);
+  public subtract(v: ExceLintVector): ExceLintVector {
+    return new ExceLintVector(this.x - v.x, this.y - v.y, this.c - v.c);
   }
 
   // Turn this vector into a string that can be used as a dictionary key
@@ -48,4 +48,13 @@ export class ExcelintVector {
   public toString(): string {
     return "<" + this.asKey() + ">";
   }
+
+  // performs a deep eqality check
+  public equals(other: ExceLintVector): boolean {
+    return this.x === other.x && this.y === other.y && this.c === other.c;
+  }
+
+  // vector sum reduction
+  public static readonly VectorSum = (acc: ExceLintVector, curr: ExceLintVector): ExceLintVector =>
+    new ExceLintVector(acc.x + curr.x, acc.y + curr.y, acc.c + curr.c);
 }

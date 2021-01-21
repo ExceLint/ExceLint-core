@@ -1,9 +1,9 @@
-import { ExcelintVector } from "./ExceLintTypes";
+import { ExceLintVector } from "./ExceLintTypes";
 
-type rectangle = [ExcelintVector, ExcelintVector];
+type Rectangle = [ExceLintVector, ExceLintVector];
 
 export class RectangleUtils {
-  public static is_adjacent(A: rectangle, B: rectangle): boolean {
+  public static is_adjacent(A: Rectangle, B: Rectangle): boolean {
     const [a1, a2] = A;
     const [b1, b2] = B;
 
@@ -17,30 +17,30 @@ export class RectangleUtils {
     return adj;
   }
 
-  public static bounding_box(A: rectangle, B: rectangle): rectangle {
+  public static bounding_box(A: Rectangle, B: Rectangle): Rectangle {
     const [a1, a2] = A;
     const [b1, b2] = B;
     return [
-      new ExcelintVector(Math.min(a1.x, b1.x), Math.min(a1.y, b1.y), 0),
-      new ExcelintVector(Math.max(a2.x, b2.x), Math.max(a2.y, b2.y), 0),
+      new ExceLintVector(Math.min(a1.x, b1.x), Math.min(a1.y, b1.y), 0),
+      new ExceLintVector(Math.max(a2.x, b2.x), Math.max(a2.y, b2.y), 0),
     ];
   }
 
-  public static area(A: rectangle): number {
+  public static area(A: Rectangle): number {
     const [a1, a2] = A;
     const length = a2.x - a1.x + 1;
     const width = a2.y - a1.y + 1;
     return length * width;
   }
 
-  public static diagonal(A: rectangle): number {
+  public static diagonal(A: Rectangle): number {
     const [a1, a2] = A;
     const length = a2.x - a1.x + 1;
     const width = a2.y - a1.y + 1;
     return Math.sqrt(length * length + width * width);
   }
 
-  public static overlap(A: rectangle, B: rectangle): number {
+  public static overlap(A: Rectangle, B: Rectangle): number {
     const [a1, a2] = A;
     const [b1, b2] = B;
     let width = 0,
@@ -58,7 +58,7 @@ export class RectangleUtils {
     return width * height; // Math.max(0, Math.min(ax2, bx2) - Math.max(ax1, bx1)) * Math.max(0, Math.min(ay2, by2) - Math.max(ay1, by1));
   }
 
-  public static is_mergeable(A: rectangle, B: rectangle): boolean {
+  public static is_mergeable(A: Rectangle, B: Rectangle): boolean {
     return (
       RectangleUtils.is_adjacent(A, B) &&
       RectangleUtils.area(A) + RectangleUtils.area(B) - RectangleUtils.overlap(A, B) ===

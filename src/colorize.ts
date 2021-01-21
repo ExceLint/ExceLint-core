@@ -10,7 +10,7 @@ import { Timer } from "./timer";
 import { JSONclone } from "./jsonclone";
 import { find_all_proposed_fixes } from "./groupme";
 import { Stencil, InfoGain } from "./infogain";
-import { ExcelintVector, Dict, Spreadsheet, Fingerprint, Region } from "./ExceLintTypes";
+import { ExceLintVector, Dict, Spreadsheet, Fingerprint, Region } from "./ExceLintTypes";
 
 export class Colorize {
   public static maxCategories = 2; // Maximum number of categories for reported errors
@@ -80,8 +80,9 @@ export class Colorize {
   // A multiplier for the hash function.
   private static Multiplier = 1; // 103037;
 
-  // A hash string indicating no dependencies; in other words, the hash for data.
-  private static noFormulasHash = "12345";
+  // A hash string indicating no dependencies; in other words,
+  // either a formula that makes no references (like `=RAND()`) or a data cell (like `1`)
+  private static noDependenciesHash = "12345";
 
   public static initialize() {
     if (!this.initialized) {
@@ -466,11 +467,11 @@ export class Colorize {
   }
 
   // Convert a rectangle into a list of indices.
-  public static expand(first: ExcelintVector, second: ExcelintVector): Array<ExcelintVector> {
-    const expanded: Array<ExcelintVector> = [];
+  public static expand(first: ExceLintVector, second: ExceLintVector): Array<ExceLintVector> {
+    const expanded: Array<ExceLintVector> = [];
     for (let i = first.x; i <= second.x; i++) {
       for (let j = first.y; j <= second.y; j++) {
-        expanded.push(new ExcelintVector(i, j, 0));
+        expanded.push(new ExceLintVector(i, j, 0));
       }
     }
     return expanded;
@@ -481,13 +482,9 @@ export class Colorize {
     formulas: Spreadsheet,
     origin_col: number,
     origin_row: number
-  ): Array<[ExcelintVector, string]> {
-    const base_vector = JSON.stringify(ExcelUtils.baseVector());
-    const reducer = (
-      acc: [number, number, number],
-      curr: [number, number, number]
-    ): [number, number, number] => [acc[0] + curr[0], acc[1] + curr[1], acc[2] + curr[2]];
-    const output: Array<[ExcelintVector, string]> = [];
+  ): [ExceLintVector, Fingerprint][] {
+    const base_vector = ExcelUtils.baseVector();
+    const output: Array<[ExceLintVector, Fingerprint]> = [];
 
     // Compute the vectors for all of the formulas.
     for (let i = 0; i < formulas.length; i++) {
@@ -497,7 +494,7 @@ export class Colorize {
         // If it's a formula, process it.
         if (cell.length > 0) {
           // FIXME MAYBE  && (row[j][0] === '=')) {
-          const vec_array = ExcelUtils.all_dependencies(
+          const vec_array: ExceLintVector[] = ExcelUtils.all_dependencies(
             i,
             j,
             origin_row + i,
@@ -509,19 +506,24 @@ export class Colorize {
           if (vec_array.length === 0) {
             if (cell[0] === "=") {
               // It's a formula but it has no dependencies (i.e., it just has constants). Use a distinguished value.
-              output.push([new ExcelintVector(adjustedX, adjustedY, 0), Colorize.noFormulasHash]);
+              output.push([
+                new ExceLintVector(adjustedX, adjustedY, 0),
+                Colorize.noDependenciesHash,
+              ]);
             }
           } else {
-            const vec = vec_array.reduce(reducer);
-            if (JSON.stringify(vec) === base_vector) {
+            const vec = vec_array.reduce(ExceLintVector.VectorSum);
+            if (vec.equals(base_vector)) {
               // No dependencies! Use a distinguished value.
-              // FIXME RESTORE THIS output.push([[adjustedX, adjustedY, 0], Colorize.distinguishedZeroHash]);
-              output.push([new ExcelintVector(adjustedX, adjustedY, 0), vec.toString()]);
+              // Emery's FIXME: RESTORE THIS output.push([[adjustedX, adjustedY, 0], Colorize.distinguishedZeroHash]);
+              // DAN TODO: I don't understand this case.
+              output.push([
+                new ExceLintVector(adjustedX, adjustedY, 0),
+                Colorize.noDependenciesHash,
+              ]);
             } else {
-              const hash = this.hash_vector(vec);
-              const str = hash.toString();
-              //			    console.log('hash for ' + adjustedX + ', ' + adjustedY + ' = ' + str);
-              output.push([new ExcelintVector(adjustedX, adjustedY, 0), str]);
+              const hash = Colorize.hash_vector(vec);
+              output.push([new ExceLintVector(adjustedX, adjustedY, 0), hash.toString()]);
             }
           }
         }
@@ -531,13 +533,13 @@ export class Colorize {
   }
 
   // Returns all referenced data so it can be colored later.
-  public static color_all_data(refs: Dict<boolean>): [ExcelintVector, Fingerprint][] {
-    const referenced_data: [ExcelintVector, Fingerprint][] = [];
+  public static color_all_data(refs: Dict<boolean>): [ExceLintVector, Fingerprint][] {
+    const referenced_data: [ExceLintVector, Fingerprint][] = [];
     for (const refvec of Object.keys(refs)) {
       const rv = refvec.split(",");
       const row = Number(rv[0]);
       const col = Number(rv[1]);
-      referenced_data.push([new ExcelintVector(row, col, 0), Colorize.noFormulasHash]); // See comment at top of function declaration.
+      referenced_data.push([new ExceLintVector(row, col, 0), Colorize.noDependenciesHash]); // See comment at top of function declaration.
     }
     return referenced_data;
   }
@@ -549,8 +551,8 @@ export class Colorize {
     formulas: Spreadsheet,
     origin_col: number,
     origin_row: number
-  ): [ExcelintVector, Fingerprint][] {
-    const value_array: [ExcelintVector, Fingerprint][] = [];
+  ): [ExceLintVector, Fingerprint][] {
+    const value_array: [ExceLintVector, Fingerprint][] = [];
     //	let t = new Timer('process_values');
     for (let i = 0; i < values.length; i++) {
       const row = values[i];
@@ -565,8 +567,8 @@ export class Colorize {
             const adjustedY = i + origin_row + 1;
             // See comment at top of function declaration for DistinguishedZeroHash
             value_array.push([
-              new ExcelintVector(adjustedX, adjustedY, 1),
-              Colorize.noFormulasHash,
+              new ExceLintVector(adjustedX, adjustedY, 1),
+              Colorize.noDependenciesHash,
             ]);
           }
         }
@@ -579,9 +581,9 @@ export class Colorize {
   // Take in a list of [[row, col], color] pairs and group them,
   // sorting them (e.g., by columns).
   private static identify_ranges(
-    list: Array<[ExcelintVector, string]>,
-    sortfn: (n1: ExcelintVector, n2: ExcelintVector) => number
-  ): Dict<ExcelintVector[]> {
+    list: Array<[ExceLintVector, string]>,
+    sortfn: (n1: ExceLintVector, n2: ExceLintVector) => number
+  ): Dict<ExceLintVector[]> {
     // Separate into groups based on their fingerprint value.
     const groups = {};
     for (const r of list) {
@@ -596,7 +598,7 @@ export class Colorize {
   }
 
   // Collect all ranges of cells that share a fingerprint
-  private static find_contiguous_regions(groups: Dict<ExcelintVector[]>): Dict<Region[]> {
+  private static find_contiguous_regions(groups: Dict<ExceLintVector[]>): Dict<Region[]> {
     const output: Dict<Region[]> = {};
 
     for (const key of Object.keys(groups)) {
@@ -622,7 +624,7 @@ export class Colorize {
     return output;
   }
 
-  public static identify_groups(theList: [ExcelintVector, string][]): Dict<Region[]> {
+  public static identify_groups(theList: [ExceLintVector, string][]): Dict<Region[]> {
     const id = Colorize.identify_ranges(theList, ExcelUtils.ColumnSort);
     const gr = Colorize.find_contiguous_regions(id);
     // Now try to merge stuff with the same hash.
@@ -636,7 +638,7 @@ export class Colorize {
     rows: number,
     origin_col: number,
     origin_row: number,
-    processed: Array<[ExcelintVector, string]>
+    processed: Array<[ExceLintVector, string]>
   ): Array<Array<number>> {
     // Invert the hash table.
     // First, initialize a zero-filled matrix.
@@ -651,7 +653,7 @@ export class Colorize {
       //	    console.log('C) cols = ' + rows + ', rows = ' + cols + '; row = ' + row + ', col = ' + col);
       const adjustedX = vect.y - origin_row - 1;
       const adjustedY = vect.x - origin_col - 1;
-      let value = Number(Colorize.noFormulasHash);
+      let value = Number(Colorize.noDependenciesHash);
       if (vect.isConstant()) {
         // That means it was a constant.
         // Set to a fixed value (as above).
@@ -745,7 +747,7 @@ export class Colorize {
     matrix: Array<Array<number>>,
     probs: Array<Array<number>>,
     threshold = 0.01
-  ): Array<ExcelintVector> {
+  ): Array<ExceLintVector> {
     const cells = [];
     let sumValues = 0;
     let countValues = 0;
@@ -793,7 +795,7 @@ export class Colorize {
     const [sheetName, startCell] = ExcelUtils.extract_sheet_cell(usedRangeAddress);
     const origin = ExcelUtils.cell_dependency(startCell, 0, 0);
 
-    let processed_formulas: [ExcelintVector, string][] = [];
+    let processed_formulas: [ExceLintVector, string][] = [];
     // Filter out non-empty items from whole matrix.
     const totalFormulas = (formulas as any).flat().filter(Boolean).length;
 
@@ -803,8 +805,8 @@ export class Colorize {
       processed_formulas = Colorize.process_formulas(formulas, origin.x - 1, origin.y - 1);
     }
 
-    let referenced_data: [ExcelintVector, Fingerprint][] = [];
-    let data_values: [ExcelintVector, Fingerprint][] = [];
+    let referenced_data: [ExceLintVector, Fingerprint][] = [];
+    let data_values: [ExceLintVector, Fingerprint][] = [];
     const cols = values.length;
     const rows = values[0].length;
 
@@ -832,7 +834,7 @@ export class Colorize {
     //	t.split('grouped formulas');
 
     // Identify suspicious cells.
-    let suspicious_cells: ExcelintVector[] = [];
+    let suspicious_cells: ExceLintVector[] = [];
 
     if (values.length < 10000) {
       // Disabled for now. FIXME
@@ -850,8 +852,8 @@ export class Colorize {
 
     const proposed_fixes: [
       number,
-      [ExcelintVector, ExcelintVector],
-      [ExcelintVector, ExcelintVector]
+      [ExceLintVector, ExceLintVector],
+      [ExceLintVector, ExceLintVector]
     ][] = Colorize.generate_proposed_fixes(grouped_formulas);
 
     if (false) {
@@ -881,20 +883,20 @@ export class Colorize {
   // Compute the normalized distance from merging two ranges.
   public static fix_metric(
     target_norm: number,
-    target: [ExcelintVector, ExcelintVector],
+    target: [ExceLintVector, ExceLintVector],
     merge_with_norm: number,
-    merge_with: [ExcelintVector, ExcelintVector]
+    merge_with: [ExceLintVector, ExceLintVector]
   ): number {
     //	console.log('fix_metric: ' + target_norm + ', ' + JSON.stringify(target) + ', ' + merge_with_norm + ', ' + JSON.stringify(merge_with));
     const [t1, t2] = target;
     const [m1, m2] = merge_with;
     const n_target = RectangleUtils.area([
-      new ExcelintVector(t1.x, t1.y, 0),
-      new ExcelintVector(t2.x, t2.y, 0),
+      new ExceLintVector(t1.x, t1.y, 0),
+      new ExceLintVector(t2.x, t2.y, 0),
     ]);
     const n_merge_with = RectangleUtils.area([
-      new ExcelintVector(m1.x, m1.y, 0),
-      new ExcelintVector(m2.x, m2.y, 0),
+      new ExceLintVector(m1.x, m1.y, 0),
+      new ExceLintVector(m2.x, m2.y, 0),
     ]);
     const n_min = Math.min(n_target, n_merge_with);
     const n_max = Math.max(n_target, n_merge_with);
@@ -913,7 +915,7 @@ export class Colorize {
 
   // Iterate through the size of proposed fixes.
   public static count_proposed_fixes(
-    fixes: Array<[number, [ExcelintVector, ExcelintVector], [ExcelintVector, ExcelintVector]]>
+    fixes: Array<[number, [ExceLintVector, ExceLintVector], [ExceLintVector, ExceLintVector]]>
   ): number {
     let count = 0;
     // tslint:disable-next-line: forin
@@ -921,12 +923,12 @@ export class Colorize {
       const [f11, f12] = fixes[k][1];
       const [f21, f22] = fixes[k][2];
       count += RectangleUtils.diagonal([
-        new ExcelintVector(f11.x, f11.y, 0),
-        new ExcelintVector(f12.x, f12.y, 0),
+        new ExceLintVector(f11.x, f11.y, 0),
+        new ExceLintVector(f12.x, f12.y, 0),
       ]);
       count += RectangleUtils.diagonal([
-        new ExcelintVector(f21.x, f21.y, 0),
-        new ExcelintVector(f22.x, f22.y, 0),
+        new ExceLintVector(f21.x, f21.y, 0),
+        new ExceLintVector(f22.x, f22.y, 0),
       ]);
     }
     return count;
@@ -934,8 +936,8 @@ export class Colorize {
 
   // Try to merge fixes into larger groups.
   public static fix_proposed_fixes(
-    fixes: Array<[number, [ExcelintVector, ExcelintVector], [ExcelintVector, ExcelintVector]]>
-  ): Array<[number, [ExcelintVector, ExcelintVector], [ExcelintVector, ExcelintVector]]> {
+    fixes: Array<[number, [ExceLintVector, ExceLintVector], [ExceLintVector, ExceLintVector]]>
+  ): Array<[number, [ExceLintVector, ExceLintVector], [ExceLintVector, ExceLintVector]]> {
     // example: [[-0.8729568798082977,[[4,23],[13,23]],[[3,23,0],[3,23,0]]],[-0.6890824929174288,[[4,6],[7,6]],[[3,6,0],[3,6,0]]],[-0.5943609377704335,[[4,10],[6,10]],[[3,10,0],[3,10,0]]],[-0.42061983571430495,[[3,27],[4,27]],[[5,27,0],[5,27,0]]],[-0.42061983571430495,[[4,14],[5,14]],[[3,14,0],[3,14,0]]],[-0.42061983571430495,[[6,27],[7,27]],[[5,27,0],[5,27,0]]]]
     const count = 0;
     // Search for fixes where the same coordinate pair appears in the front and in the back.
@@ -999,8 +1001,8 @@ export class Colorize {
   }
 
   public static generate_proposed_fixes(groups: {
-    [val: string]: Array<[ExcelintVector, ExcelintVector]>;
-  }): Array<[number, [ExcelintVector, ExcelintVector], [ExcelintVector, ExcelintVector]]> {
+    [val: string]: Array<[ExceLintVector, ExceLintVector]>;
+  }): Array<[number, [ExceLintVector, ExceLintVector], [ExceLintVector, ExceLintVector]]> {
     const proposed_fixes_new = find_all_proposed_fixes(groups);
     proposed_fixes_new.sort((a, b) => {
       return a[0] - b[0];
@@ -1055,33 +1057,17 @@ export class Colorize {
       if (numIterations > 2000) {
         // This is a hack to guarantee convergence.
         console.log("Too many iterations; abandoning this group.");
-        return [[new ExcelintVector(-1, -1, 0), new ExcelintVector(-1, -1, 0)]];
+        return [[new ExceLintVector(-1, -1, 0), new ExceLintVector(-1, -1, 0)]];
       }
     }
   }
 
-  public static hash_vector(vec: Array<number>): number {
-    const useL1norm = true; // false;
-    if (useL1norm) {
-      const baseX = 0; // 7;
-      const baseY = 0; // 3;
-      const v0 = Math.abs(vec[0] - baseX);
-      //	v0 = v0 * v0;
-      const v1 = Math.abs(vec[1] - baseY);
-      //	v1 = v1 * v1;
-      const v2 = vec[2];
-      return this.Multiplier * (v0 + v1 + v2);
-    } else {
-      const baseX = -7; // was 7
-      const baseY = -3; // was 3
-      let v0 = vec[0] - baseX;
-      v0 = v0 * v0;
-      let v1 = vec[1] - baseY;
-      v1 = v1 * v1;
-      const v2 = vec[2];
-      return this.Multiplier * Math.sqrt(v0 + v1 + v2);
-    }
-    //	return this.Multiplier * (Math.sqrt(v0 + v1) + v2);
+  public static hash_vector(vec: ExceLintVector): number {
+    // This computes a weighted L1 norm of the vector
+    const v0 = Math.abs(vec.x);
+    const v1 = Math.abs(vec.y);
+    const v2 = vec.c;
+    return Colorize.Multiplier * (v0 + v1 + v2);
   }
 
   // Discount proposed fixes if they have different formats.
@@ -1142,12 +1128,12 @@ export class Colorize {
   public static find_suspicious_cells(
     cols: number,
     rows: number,
-    origin: ExcelintVector,
+    origin: ExceLintVector,
     formulas: any[][],
-    processed_formulas: [ExcelintVector, string][],
-    data_values: [ExcelintVector, string][],
+    processed_formulas: [ExceLintVector, string][],
+    data_values: [ExceLintVector, string][],
     threshold: number
-  ): ExcelintVector[] {
+  ): ExceLintVector[] {
     return []; // FIXME disabled for now
     let suspiciousCells: any[];
     {
@@ -1157,10 +1143,8 @@ export class Colorize {
         rows,
         origin.x - 1,
         origin.y - 1,
-        //								processed_formulas);
         processed_formulas.concat(data_values)
       );
-      //									processed_formulas);
 
       const stencil = Colorize.stencilize(formula_matrix);
       // console.log('after stencilize: stencil = ' + JSON.stringify(stencil));

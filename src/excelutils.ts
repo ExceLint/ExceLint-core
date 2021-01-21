@@ -4,11 +4,11 @@
 
 import * as sjcl from "sjcl";
 import { RectangleUtils } from "./rectangleutils";
-import { ExcelintVector, Dict, Spreadsheet } from "./ExceLintTypes";
+import { ExceLintVector, Dict, Spreadsheet } from "./ExceLintTypes";
 
 export class ExcelUtils {
   // sort routine
-  static readonly ColumnSort = (a: ExcelintVector, b: ExcelintVector) => {
+  static readonly ColumnSort = (a: ExceLintVector, b: ExceLintVector) => {
     if (a.x === b.x) {
       return a.y - b.y;
     } else {
@@ -143,7 +143,7 @@ export class ExcelUtils {
     cell: string,
     origin_col: number,
     origin_row: number
-  ): ExcelintVector {
+  ): ExceLintVector {
     const alwaysReturnAdjustedColRow = false;
     {
       const r = ExcelUtils.cell_both_absolute.exec(cell);
@@ -154,9 +154,9 @@ export class ExcelUtils {
           row = Number(r[2].charCodeAt(0) - 16384);
         }
         if (alwaysReturnAdjustedColRow) {
-          return new ExcelintVector(col - origin_col, row - origin_row, 0);
+          return new ExceLintVector(col - origin_col, row - origin_row, 0);
         } else {
-          return new ExcelintVector(col, row, 0);
+          return new ExceLintVector(col, row, 0);
         }
       }
     }
@@ -170,9 +170,9 @@ export class ExcelUtils {
           row = Number(r[2].charCodeAt(0) - 16384);
         }
         if (alwaysReturnAdjustedColRow) {
-          return new ExcelintVector(col, row, 0);
+          return new ExceLintVector(col, row, 0);
         } else {
-          return new ExcelintVector(col, row - origin_row, 0);
+          return new ExceLintVector(col, row - origin_row, 0);
         }
       }
     }
@@ -186,9 +186,9 @@ export class ExcelUtils {
           row = Number(r[2].charCodeAt(0) - 16384);
         }
         if (alwaysReturnAdjustedColRow) {
-          return new ExcelintVector(col, row, 0);
+          return new ExceLintVector(col, row, 0);
         } else {
-          return new ExcelintVector(col - origin_col, row, 0);
+          return new ExceLintVector(col - origin_col, row, 0);
         }
       }
     }
@@ -202,9 +202,9 @@ export class ExcelUtils {
           row = Number(r[2].charCodeAt(0) - 16384);
         }
         if (alwaysReturnAdjustedColRow) {
-          return new ExcelintVector(col, row, 0);
+          return new ExceLintVector(col, row, 0);
         } else {
-          return new ExcelintVector(col - origin_col, row - origin_row, 0);
+          return new ExceLintVector(col - origin_col, row - origin_row, 0);
         }
       }
     }
@@ -213,7 +213,7 @@ export class ExcelUtils {
       "cell is " + cell + ", origin_col = " + origin_col + ", origin_row = " + origin_row
     );
     throw new Error("We should never get here.");
-    return ExcelintVector.Zero();
+    return ExceLintVector.Zero();
   }
 
   public static toR1C1(srcCell: string, destCell: string, greek = false): string {
@@ -319,7 +319,7 @@ export class ExcelUtils {
     return ExcelUtils.extract_sheet_cell(str);
   }
 
-  public static make_range_string(theRange: Array<ExcelintVector>): string {
+  public static make_range_string(theRange: Array<ExceLintVector>): string {
     const r = theRange;
     const col0 = r[0].x;
     const row0 = r[0].y;
@@ -348,13 +348,13 @@ export class ExcelUtils {
     origin_col: number,
     origin_row: number,
     include_numbers = true
-  ): Array<ExcelintVector> {
+  ): ExceLintVector[] {
     //	console.log("looking for dependencies in " + range);
 
     const originalRange = range;
 
     let found_pair: RegExpExecArray;
-    const all_vectors: Array<ExcelintVector> = [];
+    const all_vectors: ExceLintVector[] = [];
 
     if (typeof range !== "string") {
       return null;
@@ -387,7 +387,7 @@ export class ExcelUtils {
         const width = last_vec.y - first_vec.y + 1;
         for (let x = 0; x < length; x++) {
           for (let y = 0; y < width; y++) {
-            all_vectors.push(new ExcelintVector(x + first_vec.x, y + first_vec.y, 0));
+            all_vectors.push(new ExceLintVector(x + first_vec.x, y + first_vec.y, 0));
           }
         }
 
@@ -413,7 +413,7 @@ export class ExcelUtils {
       let number: RegExpExecArray;
       while ((number = ExcelUtils.number_dep.exec(range))) {
         if (number) {
-          all_vectors.push(new ExcelintVector(0, 0, 1)); // just add 1 for every number
+          all_vectors.push(new ExceLintVector(0, 0, 1)); // just add 1 for every number
           // Wipe out the matched contents of range.
           range = range.replace(number[0], "_");
         }
@@ -471,8 +471,8 @@ export class ExcelUtils {
     return numbers; // total;
   }
 
-  public static baseVector(): [number, number, number] {
-    return [0, 0, 0];
+  public static baseVector(): ExceLintVector {
+    return new ExceLintVector(0, 0, 0);
   }
 
   public static all_dependencies(
@@ -480,11 +480,9 @@ export class ExcelUtils {
     col: number,
     origin_row: number,
     origin_col: number,
-    formulas: Array<Array<string>>
-  ): Array<[number, number, number]> {
-    let deps = [];
+    formulas: Spreadsheet
+  ): ExceLintVector[] {
     // Discard references to cells outside the formula range.
-
     if (row >= formulas.length || col >= formulas[0].length || row < 0 || col < 0) {
       return [];
     }
@@ -493,9 +491,10 @@ export class ExcelUtils {
     const cell = formulas[row][col];
     if (cell.length > 1 && cell[0] === "=") {
       // It is. Compute the dependencies.
-      deps = ExcelUtils.all_cell_dependencies(cell, origin_col, origin_row);
+      return ExcelUtils.all_cell_dependencies(cell, origin_col, origin_row);
+    } else {
+      return [];
     }
-    return deps;
   }
 
   // This function returns a dictionary (Dict<boolean>)) of all of the addresses
