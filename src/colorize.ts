@@ -596,9 +596,7 @@ export class Colorize {
   }
 
   // Collect all ranges of cells that share a fingerprint
-  private static find_contiguous_regions(
-    groups: Dict<ExcelintVector[]>
-  ): Dict<[ExcelintVector, ExcelintVector][]> {
+  private static find_contiguous_regions(groups: Dict<ExcelintVector[]>): Dict<Region[]> {
     const output: Dict<Region[]> = {};
 
     for (const key of Object.keys(groups)) {
@@ -624,11 +622,9 @@ export class Colorize {
     return output;
   }
 
-  public static identify_groups(
-    theList: [ExcelintVector, string][]
-  ): Dict<Array<[ExcelintVector, ExcelintVector]>> {
-    const id: Dict<ExcelintVector[]> = Colorize.identify_ranges(theList, ExcelUtils.ColumnSort);
-    const gr: Dict<[ExcelintVector, ExcelintVector][]> = Colorize.find_contiguous_regions(id);
+  public static identify_groups(theList: [ExcelintVector, string][]): Dict<Region[]> {
+    const id = Colorize.identify_ranges(theList, ExcelUtils.ColumnSort);
+    const gr = Colorize.find_contiguous_regions(id);
     // Now try to merge stuff with the same hash.
     const newGr1 = JSONclone.clone(gr);
     const mg = Colorize.merge_groups(newGr1);
@@ -1005,23 +1001,14 @@ export class Colorize {
   public static generate_proposed_fixes(groups: {
     [val: string]: Array<[ExcelintVector, ExcelintVector]>;
   }): Array<[number, [ExcelintVector, ExcelintVector], [ExcelintVector, ExcelintVector]]> {
-    //	let t = new Timer('generate_proposed_fixes');
-    //	t.split('about to find.');
     const proposed_fixes_new = find_all_proposed_fixes(groups);
-    //	t.split('sorting fixes.');
     proposed_fixes_new.sort((a, b) => {
       return a[0] - b[0];
     });
-    //	t.split('done.');
-    //	console.log(JSON.stringify(proposed_fixes_new));
     return proposed_fixes_new;
   }
 
-  public static merge_groups(groups: {
-    [val: string]: Array<[ExcelintVector, ExcelintVector]>;
-  }): {
-    [val: string]: Array<[ExcelintVector, ExcelintVector]>;
-  } {
+  public static merge_groups(groups: Dict<Region[]>): Dict<Region[]> {
     for (const k of Object.keys(groups)) {
       const g = groups[k].slice();
       groups[k] = this.merge_individual_groups(g);
@@ -1029,10 +1016,7 @@ export class Colorize {
     return groups;
   }
 
-  public static merge_individual_groups(
-    group: Array<[ExcelintVector, ExcelintVector]>
-  ): Array<[ExcelintVector, ExcelintVector]> {
-    const t = new Timer("merge_individual_groups");
+  public static merge_individual_groups(group: Region[]): Region[] {
     let numIterations = 0;
     group = group.sort();
     while (true) {
@@ -1071,7 +1055,6 @@ export class Colorize {
       if (numIterations > 2000) {
         // This is a hack to guarantee convergence.
         console.log("Too many iterations; abandoning this group.");
-        t.split("done, " + numIterations + " iterations.");
         return [[new ExcelintVector(-1, -1, 0), new ExcelintVector(-1, -1, 0)]];
       }
     }
