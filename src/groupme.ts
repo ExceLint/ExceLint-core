@@ -1,13 +1,7 @@
 import { binsearch, strict_binsearch } from "./binsearch";
 import { Colorize } from "./colorize";
-import {
-  ExceLintVector,
-  Dict,
-  ProposedFixes,
-  Rectangle,
-  Fingerprint,
-  Metric,
-} from "./ExceLintTypes";
+import { ExceLintVector, Dict, ProposedFix, Rectangle, Fingerprint, Metric } from "./ExceLintTypes";
+import { ExcelJSON } from "./exceljson";
 
 // A comparison function to sort by x-coordinate.
 function sort_x_coord(a: Rectangle, b: Rectangle): number {
@@ -91,17 +85,26 @@ function shuffle<T>(a: Array<T>): Array<T> {
 
 let comparisons = 0;
 
-function numComparator(a_val: ExceLintVector, b_val: ExceLintVector) {
-  for (let i = 0; i < 3; i++) {
-    // note: length of excelint vector
-    if (a_val[i] < b_val[i]) {
-      return -1;
-    }
-    if (a_val[i] > b_val[i]) {
-      return 1;
-    }
+function numComparator(a_val: ExceLintVector, b_val: ExceLintVector): number {
+  if (a_val.x < b_val.x) {
+    return -1;
   }
-  return 0;
+  if (a_val.x > b_val.x) {
+    return 1;
+  }
+  if (a_val.y < b_val.y) {
+    return -1;
+  }
+  if (a_val.y > b_val.y) {
+    return 1;
+  }
+  if (a_val.c < b_val.c) {
+    return -1;
+  }
+  if (a_val.c > b_val.c) {
+    return 1;
+  }
+  return 0; // they're the same
 }
 
 // Return the set of adjacent rectangles that are merge-compatible with the given rectangle
@@ -182,12 +185,12 @@ function find_all_matching_rectangles(
   bb: Dict<Rectangle>,
   bbsX: Rectangle[],
   bbsY: Rectangle[]
-): ProposedFixes {
+): ProposedFix[] {
   // get the upper-left and lower-right vectors for the given rectangle
   const [base_ul, base_lr] = rect;
 
   // this is the output
-  let match_list: ProposedFixes = [];
+  let match_list: ProposedFix[] = [];
 
   // find the index of the given rectangle in the list of rects sorted by X
   const ind1 = binsearch(bbsX, rect, (a: Rectangle, b: Rectangle) => {
@@ -270,7 +273,7 @@ function find_all_matching_rectangles(
         match_list = match_list.concat(
           matches.map((item: Rectangle, _1, _2) => {
             const metric = Colorize.fix_metric(parseFloat(thisfp), rect, parseFloat(fp), item);
-            return [metric, rect];
+            return [metric, rect, item];
           })
         );
       }
@@ -285,8 +288,8 @@ function dedup(arr) {
   return arr.filter((e) => !(t[e] = e in t));
 }
 
-export function find_all_proposed_fixes(grouped_formulas: Dict<Rectangle[]>): ProposedFixes {
-  let all_matches: ProposedFixes = [];
+export function find_all_proposed_fixes(grouped_formulas: Dict<Rectangle[]>): ProposedFix[] {
+  let all_matches: ProposedFix[] = [];
   rectangles_count = 0;
 
   // sort each group of rectangles by their x coordinates
@@ -357,7 +360,8 @@ export function find_all_proposed_fixes(grouped_formulas: Dict<Rectangle[]>): Pr
 
   //    console.log("before: " + JSON.stringify(all_matches));
   all_matches = all_matches.map((x, _1, _2) => {
-    if (numComparator(x[1], x[2]) < 0) {
+    const [score, rect1, rect2] = x;
+    if (numComparator(rect1, rect2) < 0) {
       return [x[0], x[2], x[1]];
     } else {
       return [x[0], x[1], x[2]];

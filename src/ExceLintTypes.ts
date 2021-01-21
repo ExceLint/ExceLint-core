@@ -11,7 +11,12 @@ export type Metric = number;
 // a rectangle is defined by its start and end vectors
 export type Rectangle = [ExceLintVector, ExceLintVector];
 
-export type ProposedFixes = [number, Rectangle][];
+/* a tuple where:
+   - Metric is a "fix distance",
+   - the first Rectangle is the suspected buggy rectangle, and
+   - the second Rectangle is the merge candidate.
+*/
+export type ProposedFix = [Metric, Rectangle, Rectangle];
 
 export class ExceLintVector {
   public x: number;
