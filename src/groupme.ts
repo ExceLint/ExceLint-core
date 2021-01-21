@@ -1,42 +1,42 @@
 import { binsearch, strict_binsearch } from "./binsearch";
 import { Colorize } from "./colorize";
-import { ExceLintVector, Dict, ProposedFixes } from "./ExceLintTypes";
+import { ExceLintVector, Dict, ProposedFixes, Rectangle } from "./ExceLintTypes";
 
 // A comparison function to sort by x-coordinate.
-function sort_x_coord(a, b) {
+function sort_x_coord(a: Rectangle, b: Rectangle): number {
   const [a1, a2] = a;
   const [b1, b2] = b;
-  if (a1[0] !== b1[0]) {
-    return a1[0] - b1[0];
+  if (a1.x !== b1.x) {
+    return a1.x - b1.x;
   } else {
-    return a1[1] - b1[1];
+    return a1.y - b1.y;
   }
 }
 
 // A comparison function to sort by y-coordinate.
-function sort_y_coord(a, b) {
+function sort_y_coord(a: Rectangle, b: Rectangle): number {
   const [a1, a2] = a;
   const [b1, b2] = b;
-  if (a1[1] !== b1[1]) {
-    return a1[1] - b1[1];
+  if (a1.y !== b1.y) {
+    return a1.y - b1.y;
   } else {
-    return a1[0] - b1[0];
+    return a1.x - b1.x;
   }
 }
 
-function generate_bounding_box(g): { [val: string]: [ExceLintVector, ExceLintVector] } {
-  const bb = {};
-  for (const i of Object.keys(g)) {
+function generate_bounding_box(g: Dict<Rectangle>): Dict<Rectangle> {
+  const bb: Dict<Rectangle> = {};
+  for (const hash of Object.keys(g)) {
     //	console.log("length of formulas for " + i + " = " + g[i].length);
     let xMin = 1000000;
     let yMin = 1000000;
     let xMax = -1000000;
     let yMax = -1000000;
-    for (let j = 0; j < g[i].length; j++) {
-      const x1 = g[i][j][0][0];
-      const x2 = g[i][j][1][0];
-      const y1 = g[i][j][0][1];
-      const y2 = g[i][j][1][1];
+    for (let j = 0; j < g[hash].length; j++) {
+      const x1 = g[hash][j][0][0];
+      const x2 = g[hash][j][1][0];
+      const y1 = g[hash][j][0][1];
+      const y2 = g[hash][j][1][1];
       if (x2 > xMax) {
         xMax = x2;
       }
@@ -50,21 +50,19 @@ function generate_bounding_box(g): { [val: string]: [ExceLintVector, ExceLintVec
         yMin = y1;
       }
     }
-    bb[i] = [
-      [xMin, yMin, 0],
-      [xMax, yMax, 0],
-    ];
+    bb[hash] = [new ExceLintVector(xMin, yMin, 0), new ExceLintVector(xMax, yMax, 0)];
     //	console.log("bounding rectangle = (" + xMin + ", " + yMin + "), (" + xMax + ", " + yMax + ")");
   }
   return bb;
 }
 
-function fix_grouped_formulas(g, newGnum) {
-  for (const i of Object.keys(g)) {
-    newGnum[i] = g[i].sort(sort_x_coord).map((x, _1, _2) => {
-      return [x[0].map((a, _1, _2) => Number(a)), x[1].map((a, _1, _2) => Number(a))];
-    });
+// Sort formulas in each group by x coordinate
+function sort_grouped_formulas(grouped_formulas: Dict<Rectangle[]>): Dict<Rectangle[]> {
+  const newGnum: Dict<Rectangle[]> = {};
+  for (const key of Object.keys(grouped_formulas)) {
+    newGnum[key] = grouped_formulas[key].sort(sort_x_coord);
   }
+  return newGnum;
 }
 
 // Knuth-Fisher-Yates shuffle (not currently used).
@@ -297,14 +295,13 @@ function dedup(arr) {
   return arr.filter((e) => !(t[e] = e in t));
 }
 
-export function find_all_proposed_fixes(
-  grouped_formulas: Dict<[ExceLintVector, ExceLintVector][]>
-): ProposedFixes {
-  let all_matches = [];
+export function find_all_proposed_fixes(grouped_formulas: Dict<Rectangle[]>): ProposedFixes {
+  let all_matches: ProposedFixes = [];
   let count = 0;
   rectangles_count = 0;
-  const aNum = {};
-  fix_grouped_formulas(grouped_formulas, aNum);
+
+  // sort each group of rectangles by their x coordinates
+  const aNum = sort_grouped_formulas(grouped_formulas);
   const x_ul = {};
   const x_lr = {};
   for (const key of Object.keys(grouped_formulas)) {
@@ -344,7 +341,7 @@ export function find_all_proposed_fixes(
 
   for (const key of Object.keys(grouped_formulas)) {
     for (let i = 0; i < aNum[key].length; i++) {
-      const matches = find_all_matching_rectangles(
+      const matches: [number, Rectangle][] = find_all_matching_rectangles(
         key,
         aNum[key][i],
         aNum,

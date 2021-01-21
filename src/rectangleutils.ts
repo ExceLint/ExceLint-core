@@ -1,6 +1,4 @@
-import { ExceLintVector } from "./ExceLintTypes";
-
-type Rectangle = [ExceLintVector, ExceLintVector];
+import { ExceLintVector, Rectangle } from "./ExceLintTypes";
 
 export class RectangleUtils {
   public static is_adjacent(A: Rectangle, B: Rectangle): boolean {

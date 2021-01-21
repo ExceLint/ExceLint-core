@@ -6,9 +6,10 @@ export type Spreadsheet = Array<Array<string>>;
 
 export type Fingerprint = string;
 
-export type Region = [ExceLintVector, ExceLintVector]; // a region is defined by its start and end vectors
+// a rectangle is defined by its start and end vectors
+export type Rectangle = [ExceLintVector, ExceLintVector];
 
-export type ProposedFixes = Array<[number, Region, Region]>;
+export type ProposedFixes = [number, Rectangle, Rectangle][];
 
 export class ExceLintVector {
   public x: number;

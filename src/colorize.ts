@@ -10,7 +10,14 @@ import { Timer } from "./timer";
 import { JSONclone } from "./jsonclone";
 import { find_all_proposed_fixes } from "./groupme";
 import { Stencil, InfoGain } from "./infogain";
-import { ExceLintVector, Dict, Spreadsheet, Fingerprint, Region } from "./ExceLintTypes";
+import {
+  ExceLintVector,
+  Dict,
+  Spreadsheet,
+  Fingerprint,
+  Rectangle,
+  ProposedFixes,
+} from "./ExceLintTypes";
 
 export class Colorize {
   public static maxCategories = 2; // Maximum number of categories for reported errors
@@ -598,8 +605,8 @@ export class Colorize {
   }
 
   // Collect all ranges of cells that share a fingerprint
-  private static find_contiguous_regions(groups: Dict<ExceLintVector[]>): Dict<Region[]> {
-    const output: Dict<Region[]> = {};
+  private static find_contiguous_regions(groups: Dict<ExceLintVector[]>): Dict<Rectangle[]> {
+    const output: Dict<Rectangle[]> = {};
 
     for (const key of Object.keys(groups)) {
       // Here, we scan all of the vectors in this group, accumulating
@@ -624,7 +631,7 @@ export class Colorize {
     return output;
   }
 
-  public static identify_groups(theList: [ExceLintVector, string][]): Dict<Region[]> {
+  public static identify_groups(theList: [ExceLintVector, string][]): Dict<Rectangle[]> {
     const id = Colorize.identify_ranges(theList, ExcelUtils.ColumnSort);
     const gr = Colorize.find_contiguous_regions(id);
     // Now try to merge stuff with the same hash.
@@ -826,35 +833,17 @@ export class Colorize {
       data_values = Colorize.process_values(values, formulas, origin.x - 1, origin.y - 1);
     }
 
+    // find regions for data
     const grouped_data = Colorize.identify_groups(referenced_data);
 
-    //	t.split('identified groups');
-
+    // find regions for formulas
     const grouped_formulas = Colorize.identify_groups(processed_formulas);
-    //	t.split('grouped formulas');
 
-    // Identify suspicious cells.
+    // Identify suspicious cells (disabled)
     let suspicious_cells: ExceLintVector[] = [];
 
-    if (values.length < 10000) {
-      // Disabled for now. FIXME
-      //            suspicious_cells = Colorize.find_suspicious_cells(cols, rows, origin, formulas, processed_formulas, data_values, 1 - Colorize.getReportingThreshold() / 100); // Must be more rare than this fraction.
-      suspicious_cells = Colorize.find_suspicious_cells(
-        cols,
-        rows,
-        origin,
-        formulas,
-        processed_formulas,
-        data_values,
-        1
-      ); // Must be more rare than this fraction.
-    }
-
-    const proposed_fixes: [
-      number,
-      [ExceLintVector, ExceLintVector],
-      [ExceLintVector, ExceLintVector]
-    ][] = Colorize.generate_proposed_fixes(grouped_formulas);
+    // find proposed fixes
+    const proposed_fixes = Colorize.generate_proposed_fixes(grouped_formulas);
 
     if (false) {
       console.log("results:");
@@ -1000,17 +989,16 @@ export class Colorize {
     return new_fixes;
   }
 
-  public static generate_proposed_fixes(groups: {
-    [val: string]: Array<[ExceLintVector, ExceLintVector]>;
-  }): Array<[number, [ExceLintVector, ExceLintVector], [ExceLintVector, ExceLintVector]]> {
+  public static generate_proposed_fixes(groups: Dict<Rectangle[]>): ProposedFixes {
     const proposed_fixes_new = find_all_proposed_fixes(groups);
+    // sort by number
     proposed_fixes_new.sort((a, b) => {
       return a[0] - b[0];
     });
     return proposed_fixes_new;
   }
 
-  public static merge_groups(groups: Dict<Region[]>): Dict<Region[]> {
+  public static merge_groups(groups: Dict<Rectangle[]>): Dict<Rectangle[]> {
     for (const k of Object.keys(groups)) {
       const g = groups[k].slice();
       groups[k] = this.merge_individual_groups(g);
@@ -1018,7 +1006,7 @@ export class Colorize {
     return groups;
   }
 
-  public static merge_individual_groups(group: Region[]): Region[] {
+  public static merge_individual_groups(group: Rectangle[]): Rectangle[] {
     let numIterations = 0;
     group = group.sort();
     while (true) {
