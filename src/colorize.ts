@@ -81,7 +81,7 @@ export class Colorize {
   private static Multiplier = 1; // 103037;
 
   // A hash string indicating no dependencies; in other words, the hash for data.
-  private static distinguishedZeroHash = "12345";
+  private static noFormulasHash = "12345";
 
   public static initialize() {
     if (!this.initialized) {
@@ -509,10 +509,7 @@ export class Colorize {
           if (vec_array.length === 0) {
             if (cell[0] === "=") {
               // It's a formula but it has no dependencies (i.e., it just has constants). Use a distinguished value.
-              output.push([
-                new ExcelintVector(adjustedX, adjustedY, 0),
-                Colorize.distinguishedZeroHash,
-              ]);
+              output.push([new ExcelintVector(adjustedX, adjustedY, 0), Colorize.noFormulasHash]);
             }
           } else {
             const vec = vec_array.reduce(reducer);
@@ -534,13 +531,13 @@ export class Colorize {
   }
 
   // Returns all referenced data so it can be colored later.
-  public static color_all_data(refs: Dict<boolean>): Array<[ExcelintVector, Fingerprint]> {
-    const referenced_data = [];
+  public static color_all_data(refs: Dict<boolean>): [ExcelintVector, Fingerprint][] {
+    const referenced_data: [ExcelintVector, Fingerprint][] = [];
     for (const refvec of Object.keys(refs)) {
       const rv = refvec.split(",");
       const row = Number(rv[0]);
       const col = Number(rv[1]);
-      referenced_data.push([[row, col, 0], Colorize.distinguishedZeroHash]); // See comment at top of function declaration.
+      referenced_data.push([new ExcelintVector(row, col, 0), Colorize.noFormulasHash]); // See comment at top of function declaration.
     }
     return referenced_data;
   }
@@ -569,7 +566,7 @@ export class Colorize {
             // See comment at top of function declaration for DistinguishedZeroHash
             value_array.push([
               new ExcelintVector(adjustedX, adjustedY, 1),
-              Colorize.distinguishedZeroHash,
+              Colorize.noFormulasHash,
             ]);
           }
         }
@@ -658,7 +655,7 @@ export class Colorize {
       //	    console.log('C) cols = ' + rows + ', rows = ' + cols + '; row = ' + row + ', col = ' + col);
       const adjustedX = vect.y - origin_row - 1;
       const adjustedY = vect.x - origin_col - 1;
-      let value = Number(Colorize.distinguishedZeroHash);
+      let value = Number(Colorize.noFormulasHash);
       if (vect.isConstant()) {
         // That means it was a constant.
         // Set to a fixed value (as above).
