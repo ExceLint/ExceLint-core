@@ -18,6 +18,7 @@ import {
   Rectangle,
   ProposedFix,
   Metric,
+  Analysis,
 } from "./ExceLintTypes";
 import { WorkbookOutput } from "./exceljson";
 
@@ -127,10 +128,8 @@ export class Colorize {
   }
 
   public static process_workbook(inp: WorkbookOutput, sheetName: string): any {
-    const output = {
-      workbookName: path.basename(inp["workbookName"]),
-      worksheets: {},
-    };
+    // this object gets mangled along the way... don't expect a WorkbookOutput at the end
+    const output = WorkbookOutput.AdjustWorkbookName(inp, path.basename(inp["workbookName"]));
 
     // look for the requested sheet
     for (let i = 0; i < inp.worksheets.length; i++) {
@@ -148,36 +147,27 @@ export class Colorize {
       const myTimer = new Timer("excelint");
 
       // Get anomalous cells and proposed fixes, among others.
-      let [
-        _anomalous_cells,
-        grouped_formulas,
-        grouped_data,
-        proposed_fixes,
-      ] = Colorize.process_suspicious(usedRangeAddress, sheet.formulas, sheet.values);
+      const a = Colorize.process_suspicious(usedRangeAddress, sheet.formulas, sheet.values);
 
       // Adjust the fixes based on font stuff. We should allow parameterization here for weighting (as for thresholding).
       // NB: origin_col and origin_row currently hard-coded at 0,0.
-      proposed_fixes = Colorize.adjust_proposed_fixes(proposed_fixes, sheet.styles, 0, 0);
+      a.proposed_fixes = Colorize.adjust_proposed_fixes(a.proposed_fixes, sheet.styles, 0, 0);
 
       // Adjust the proposed fixes for real (just adjusting the scores downwards by the formatting discount).
-      const initial_adjusted_fixes = [];
-      const final_adjusted_fixes = []; // We will eventually trim these.
+      const initial_adjusted_fixes: ProposedFix[] = [];
+      const final_adjusted_fixes: ProposedFix[] = []; // We will eventually trim these.
       // tslint:disable-next-line: forin
-      for (let ind = 0; ind < proposed_fixes.length; ind++) {
-        const f = proposed_fixes[ind];
-        const [score, first, second, sameFormat] = f;
+      for (let ind = 0; ind < a.proposed_fixes.length; ind++) {
+        const f = a.proposed_fixes[ind];
+        const [score, first, second] = f;
         let adjusted_score = -score;
-        if (!sameFormat) {
-          adjusted_score *= (100 - Colorize.formattingDiscount) / 100;
-        }
         if (adjusted_score * 100 >= Colorize.reportingThreshold) {
           initial_adjusted_fixes.push([adjusted_score, first, second]);
         }
       }
 
       // Process all the fixes, classifying and optionally pruning them.
-
-      const example_fixes_r1c1 = [];
+      const example_fixes_r1c1 = []; // TODO DAN: this really needs a type
       for (let ind = 0; ind < initial_adjusted_fixes.length; ind++) {
         // Determine the direction of the range (vertical or horizontal) by looking at the axes.
         let direction = "";
@@ -787,9 +777,9 @@ export class Colorize {
 
   public static process_suspicious(
     usedRangeAddress: string,
-    formulas: Array<Array<string>>,
-    values: Array<Array<string>>
-  ): [any, any, any, any] {
+    formulas: Spreadsheet,
+    values: Spreadsheet
+  ): Analysis {
     if (false) {
       console.log("process_suspicious:");
       console.log(JSON.stringify(usedRangeAddress));
@@ -853,7 +843,7 @@ export class Colorize {
       console.log(JSON.stringify(proposed_fixes));
     }
 
-    return [suspicious_cells, grouped_formulas, grouped_data, proposed_fixes];
+    return new Analysis(suspicious_cells, grouped_formulas, grouped_data, proposed_fixes);
   }
 
   // Shannon entropy.
@@ -1061,8 +1051,8 @@ export class Colorize {
 
   // Discount proposed fixes if they have different formats.
   public static adjust_proposed_fixes(
-    fixes: any[],
-    propertiesToGet: any[][],
+    fixes: ProposedFix[],
+    propertiesToGet: Spreadsheet,
     origin_col: number,
     origin_row: number
   ): any {
@@ -1079,7 +1069,10 @@ export class Colorize {
         // console.log('trimmed ' + (-score));
         continue;
       }
-      // Sort the fixes.
+
+      // DAN TODO: use new rectangle comparator function!
+
+      // Sort the fixes by their upper-left x and then upper-left y coordinates.
       // This is a pain because if we don't pad appropriately, [1,9] is 'less than' [1,10]. (Seriously.)
       // So we make sure that numbers are always left padded with zeroes to make the number 10 digits long
       // (which is 1 more than Excel needs right now).

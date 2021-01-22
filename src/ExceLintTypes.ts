@@ -66,3 +66,55 @@ export class ExceLintVector {
   public static readonly VectorSum = (acc: ExceLintVector, curr: ExceLintVector): ExceLintVector =>
     new ExceLintVector(acc.x + curr.x, acc.y + curr.y, acc.c + curr.c);
 }
+
+export class Analysis {
+  suspicious_cells: ExceLintVector[];
+  grouped_formulas: Dict<Rectangle[]>;
+  grouped_data: Dict<Rectangle[]>;
+  proposed_fixes: ProposedFix[];
+
+  constructor(
+    suspicious_cells: ExceLintVector[],
+    grouped_formulas: Dict<Rectangle[]>,
+    grouped_data: Dict<Rectangle[]>,
+    proposed_fixes: ProposedFix[]
+  ) {
+    this.suspicious_cells = suspicious_cells;
+    this.grouped_formulas = grouped_formulas;
+    this.grouped_data = grouped_data;
+    this.proposed_fixes = proposed_fixes;
+  }
+}
+
+export function vectorComparator(v1: ExceLintVector, v2: ExceLintVector): number {
+  if (v1.x < v2.x) {
+    return -1;
+  }
+  if (v1.x > v2.x) {
+    return 1;
+  }
+  if (v1.y < v2.y) {
+    return -1;
+  }
+  if (v1.y > v2.y) {
+    return 1;
+  }
+  if (v1.c < v2.c) {
+    return -1;
+  }
+  if (v1.c > v2.c) {
+    return 1;
+  }
+  return 0;
+}
+
+// A comparator that sorts rectangles by their upper-left and then lower-right
+// vectors.
+export function rectangleComparator(r1: Rectangle, r2: Rectangle): number {
+  const cmp = vectorComparator(r1[0], r2[0]);
+  if (cmp == 0) {
+    return vectorComparator(r1[1], r2[1]);
+  } else {
+    return cmp;
+  }
+}

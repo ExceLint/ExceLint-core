@@ -38,6 +38,13 @@ export class WorkbookOutput {
   public addWorksheet(ws: WorksheetOutput): void {
     this.worksheets.push(ws);
   }
+
+  // Makes a copy of a WorkbookOutput object, replacing the name
+  public static AdjustWorkbookName(wb: WorkbookOutput, workbookName: string) {
+    const wbnew = new WorkbookOutput(workbookName);
+    wbnew.worksheets = wb.worksheets;
+    return wbnew;
+  }
 }
 
 export class ExcelJSON {
