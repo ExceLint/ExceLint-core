@@ -2,16 +2,16 @@
 // by Emery Berger, Microsoft Research / University of Massachusetts Amherst
 // www.emeryberger.com
 
-'use strict';
-const fs = require('fs');
-const path = require('path');
-import {ExcelJSON} from './exceljson';
-import {ExcelUtils} from './excelutils';
-import {Colorize} from './colorize';
-import {Timer} from './timer';
-import {string} from 'prop-types';
+"use strict";
+const fs = require("fs");
+const path = require("path");
+import { ExcelJSON } from "./exceljson";
+import { ExcelUtils } from "./excelutils";
+import { Colorize } from "./colorize";
+import { Timer } from "./timer";
+import { string } from "prop-types";
 
-const usageString = 'Usage: $0 <command> [options]';
+const usageString = "Usage: $0 <command> [options]";
 const defaultFormattingDiscount = Colorize.getFormattingDiscount();
 const defaultReportingThreshold = Colorize.getReportingThreshold();
 const defaultMaxCategories = Colorize.maxCategories; // FIXME should be an accessor
@@ -26,65 +26,47 @@ let numSheets = 0;
 let numSheetsWithErrors = 0;
 
 // Process command-line arguments.
-const args = require('yargs')
+const args = require("yargs")
   .usage(usageString)
-  .command('input', 'Input from FILENAME (.xls / .xlsx file).')
-  .alias('i', 'input')
-  .nargs('input', 1)
+  .command("input", "Input from FILENAME (.xls / .xlsx file).")
+  .alias("i", "input")
+  .nargs("input", 1)
+  .command("directory", "Read from a directory of files (all ending in .xls / .xlsx).")
+  .alias("d", "directory")
   .command(
-    'directory',
-    'Read from a directory of files (all ending in .xls / .xlsx).'
-  )
-  .alias('d', 'directory')
-  .command(
-    'formattingDiscount',
-    'Set discount for formatting differences (default = ' +
-      defaultFormattingDiscount +
-      ').'
+    "formattingDiscount",
+    "Set discount for formatting differences (default = " + defaultFormattingDiscount + ")."
   )
   .command(
-    'reportingThreshold',
-    'Set the threshold % for reporting anomalous formulas (default = ' +
+    "reportingThreshold",
+    "Set the threshold % for reporting anomalous formulas (default = " +
       defaultReportingThreshold +
-      ').'
+      ")."
   )
-  .command('suppressOutput', "Don't output the processed JSON to stdout.")
+  .command("suppressOutput", "Don't output the processed JSON to stdout.")
+  .command("noElapsedTime", "Suppress elapsed time output (for regression testing).")
   .command(
-    'noElapsedTime',
-    'Suppress elapsed time output (for regression testing).'
-  )
-  .command(
-    'maxCategories',
-    'Maximum number of categories for reported errors (default = ' +
-      defaultMaxCategories +
-      ').'
+    "maxCategories",
+    "Maximum number of categories for reported errors (default = " + defaultMaxCategories + ")."
   )
   .command(
-    'minFixSize',
-    'Minimum size of a fix in number of cells (default = ' +
-      defaultMinFixSize +
-      ')'
+    "minFixSize",
+    "Minimum size of a fix in number of cells (default = " + defaultMinFixSize + ")"
   )
-  .command(
-    'maxEntropy',
-    'Maximum entropy of a proposed fix (default = ' + defaultMaxEntropy + ')'
-  )
-  .command('suppressFatFix', '')
-  .command('suppressDifferentReferentCount', '')
-  .command('suppressRecurrentFormula', '')
-  .command('suppressOneExtraConstant', '')
-  .command('suppressNumberOfConstantsMismatch', '')
-  .command('suppressBothConstants', '')
-  .command('suppressOneIsAllConstants', '')
-  .command('suppressR1C1Mismatch', '')
-  .command('suppressAbsoluteRefMismatch', '')
-  .command('suppressOffAxisReference', '')
-  .command(
-    'sweep',
-    'Perform a parameter sweep and report the best settings overall.'
-  )
-  .help('h')
-  .alias('h', 'help').argv;
+  .command("maxEntropy", "Maximum entropy of a proposed fix (default = " + defaultMaxEntropy + ")")
+  .command("suppressFatFix", "")
+  .command("suppressDifferentReferentCount", "")
+  .command("suppressRecurrentFormula", "")
+  .command("suppressOneExtraConstant", "")
+  .command("suppressNumberOfConstantsMismatch", "")
+  .command("suppressBothConstants", "")
+  .command("suppressOneIsAllConstants", "")
+  .command("suppressR1C1Mismatch", "")
+  .command("suppressAbsoluteRefMismatch", "")
+  .command("suppressOffAxisReference", "")
+  .command("sweep", "Perform a parameter sweep and report the best settings overall.")
+  .help("h")
+  .alias("h", "help").argv;
 
 if (args.help) {
   process.exit(0);
@@ -96,27 +78,27 @@ if (args.directory) {
   // Load up all files to process.
   allFiles = fs
     .readdirSync(args.directory)
-    .filter((x: string) => x.endsWith('.xls') || x.endsWith('.xlsx'));
+    .filter((x: string) => x.endsWith(".xls") || x.endsWith(".xlsx"));
 }
 //console.log(JSON.stringify(allFiles));
 
 // argument:
 // input = filename. Default file is standard input.
-let fname = '/dev/stdin';
+let fname = "/dev/stdin";
 if (args.input) {
   fname = args.input;
   allFiles = [fname];
 }
 
 if (!args.directory && !args.input) {
-  console.warn('Must specify either --directory or --input.');
+  console.warn("Must specify either --directory or --input.");
   process.exit(-1);
 }
 
 // argument:
 // formattingDiscount = amount of impact of formatting on fix reporting (0-100%).
 let formattingDiscount = defaultFormattingDiscount;
-if ('formattingDiscount' in args) {
+if ("formattingDiscount" in args) {
   formattingDiscount = args.formattingDiscount;
 }
 // Ensure formatting discount is within range (0-100, inclusive).
@@ -161,7 +143,7 @@ if (args.suppressOffAxisReference) {
 
 // As above, but for reporting threshold.
 let reportingThreshold = defaultReportingThreshold;
-if ('reportingThreshold' in args) {
+if ("reportingThreshold" in args) {
   reportingThreshold = args.reportingThreshold;
 }
 // Ensure formatting discount is within range (0-100, inclusive).
@@ -173,16 +155,16 @@ if (reportingThreshold > 100) {
 }
 Colorize.setReportingThreshold(reportingThreshold);
 
-if ('maxCategories' in args) {
+if ("maxCategories" in args) {
   Colorize.maxCategories = args.maxCategories;
 }
 
-if ('minFixSize' in args) {
+if ("minFixSize" in args) {
   Colorize.minFixSize = args.minFixSize;
 }
 
 let maxEntropy = defaultMaxEntropy;
-if ('maxEntropy' in args) {
+if ("maxEntropy" in args) {
   maxEntropy = args.maxEntropy;
   // Entropy must be between 0 and 1.
   if (maxEntropy < 0.0) {
@@ -197,18 +179,16 @@ if ('maxEntropy' in args) {
 // Ready to start processing.
 //
 
-let inp = null;
-
-let annotated_bugs = '{}';
+let annotated_bugs = "{}";
 try {
-  annotated_bugs = fs.readFileSync('annotations-processed.json');
+  annotated_bugs = fs.readFileSync("annotations-processed.json");
 } catch (e) {}
 
 const theBugs = JSON.parse(annotated_bugs);
 
-let base = '';
+let base = "";
 if (args.directory) {
-  base = args.directory + '/';
+  base = args.directory + "/";
 }
 
 let parameters = [];
@@ -237,8 +217,8 @@ for (const parms of parameters) {
   for (const fname of allFiles) {
     numWorkbooks += 1;
     // Read from file.
-    console.warn('processing ' + fname);
-    inp = ExcelJSON.processWorkbook(base, fname);
+    console.warn("processing " + fname);
+    const inp = ExcelJSON.processWorkbook(base, fname);
 
     {
       let hasError = false;
@@ -246,10 +226,10 @@ for (const parms of parameters) {
       for (let i = 0; i < inp.worksheets.length; i++) {
         const sheet = inp.worksheets[i];
         numSheets += 1;
-        const workbookBasename = path.basename(inp['workbookName']);
+        const workbookBasename = path.basename(inp["workbookName"]);
         if (workbookBasename in theBugs) {
           if (sheet.sheetName in theBugs[workbookBasename]) {
-            if (theBugs[workbookBasename][sheet.sheetName]['bugs'].length > 0) {
+            if (theBugs[workbookBasename][sheet.sheetName]["bugs"].length > 0) {
               hasError = true;
               numSheetsWithErrors += 1;
             }
@@ -290,5 +270,5 @@ f1scores.sort((a, b) => {
 });
 
 if (!args.suppressOutput) {
-  console.log(JSON.stringify(outputs, null, '\t'));
+  console.log(JSON.stringify(outputs, null, "\t"));
 }

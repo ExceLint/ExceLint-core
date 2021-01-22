@@ -19,6 +19,7 @@ import {
   ProposedFix,
   Metric,
 } from "./ExceLintTypes";
+import { WorkbookOutput } from "./exceljson";
 
 export class Colorize {
   public static maxCategories = 2; // Maximum number of categories for reported errors
@@ -125,9 +126,7 @@ export class Colorize {
     return addr.replace(/!(!+)/, "!");
   }
 
-  public static process_workbook(inp: any, sheetName: string): any {
-    console.log("THIS HAPPENS");
-
+  public static process_workbook(inp: WorkbookOutput, sheetName: string): any {
     const output = {
       workbookName: path.basename(inp["workbookName"]),
       worksheets: {},

@@ -9,26 +9,19 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "removeComments": false,
-    "outDir": "dist",
     "allowUnusedLabels": false,
     "noImplicitReturns": true,
     "noUnusedParameters": true,
     "noUnusedLocals": false,
     "downlevelIteration": true,
     "pretty": true,
-    "typeRoots": [
-      "node_modules/@types"
-    ],
+    "typeRoots": ["node_modules/@types"],
     "rootDir": ".",
-    "outDir": "build"
+    "outDir": "build",
+    "target": "ES2019"
   },
-  "exclude": [
-    "node_modules"
-  ],
-  "include": [
-    "src/**/*.ts",
-    "test/**/*.ts"
-  ],
+  "exclude": ["node_modules"],
+  "include": ["src/**/*.ts", "test/**/*.ts"],
   "compileOnSave": false,
   "buildOnSave": false
 }
