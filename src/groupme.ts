@@ -204,17 +204,13 @@ function find_all_matching_rectangles(
 
   // Pick the coordinate axis that takes us the furthest in the fingerprint list.
   const [fps, itmp, axis] = ind1 > ind2 ? [fingerprintsX, ind1, 0] : [fingerpritnsY, ind2, 1];
-  const ind = ind1 > 0 ? -1 : itmp;
+  const ind = itmp > 0 ? itmp - 1 : itmp;
   for (let i = ind; i < fps.length; i++) {
     const fp = fps[i];
     if (fp === thisfp) {
       continue;
     }
     rectangles_count++;
-    if (rectangles_count % 10000 === 0) {
-      //	    if (true) { // rectangles_count % 1000 === 0) {
-      //            console.log('find_all_matching_rectangles, iteration ' + rectangles_count);
-    }
     // Check bounding box.
     const box = bb[fp];
 
