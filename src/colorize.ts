@@ -16,7 +16,7 @@ import {
   Spreadsheet,
   Fingerprint,
   Rectangle,
-  ProposedFixes,
+  ProposedFix,
   Metric,
 } from "./ExceLintTypes";
 
@@ -871,7 +871,7 @@ export class Colorize {
   }
 
   // Compute the normalized distance from merging two ranges.
-  public static fix_metric(
+  public static compute_fix_metric(
     target_norm: number,
     target: Rectangle,
     merge_with_norm: number,
@@ -991,9 +991,9 @@ export class Colorize {
     return new_fixes;
   }
 
-  public static generate_proposed_fixes(groups: Dict<Rectangle[]>): ProposedFixes {
+  public static generate_proposed_fixes(groups: Dict<Rectangle[]>): ProposedFix[] {
     const proposed_fixes_new = find_all_proposed_fixes(groups);
-    // sort by number
+    // sort by fix metric
     proposed_fixes_new.sort((a, b) => {
       return a[0] - b[0];
     });

@@ -266,14 +266,20 @@ function find_all_matching_rectangles(
       // Skip. Outside the bounding box.
       //		console.log("outside bounding box.");
     } else {
-      const matches = matching_rectangles([base_ul, base_lr], x_ul[fp], x_lr[fp]);
+      const matches: Rectangle[] = matching_rectangles([base_ul, base_lr], x_ul[fp], x_lr[fp]);
       if (matches.length > 0) {
         // compute the fix metric for every potential merge and
         // concatenate them into the match_list
         match_list = match_list.concat(
           matches.map((item: Rectangle, _1, _2) => {
-            const metric = Colorize.fix_metric(parseFloat(thisfp), rect, parseFloat(fp), item);
-            return [metric, rect, item];
+            const metric = Colorize.compute_fix_metric(
+              parseFloat(thisfp),
+              rect,
+              parseFloat(fp),
+              item
+            );
+            const pf: ProposedFix = [metric, rect, item];
+            return pf;
           })
         );
       }
@@ -342,7 +348,7 @@ export function find_all_proposed_fixes(grouped_formulas: Dict<Rectangle[]>): Pr
   for (const fp of Object.keys(grouped_formulas)) {
     // and every rectangle in the group
     for (let i = 0; i < aNum[fp].length; i++) {
-      // find all matching rectangles and their fix scores
+      // find all matching rectangles and compute their fix scores
       const matches = find_all_matching_rectangles(
         fp,
         aNum[fp][i],
@@ -354,36 +360,23 @@ export function find_all_proposed_fixes(grouped_formulas: Dict<Rectangle[]>): Pr
         bbsX,
         bbsY
       );
+
+      // add these matches to the output
       all_matches = all_matches.concat(matches);
     }
   }
 
-  //    console.log("before: " + JSON.stringify(all_matches));
-  all_matches = all_matches.map((x, _1, _2) => {
-    const [score, rect1, rect2] = x;
-    if (numComparator(rect1, rect2) < 0) {
-      return [x[0], x[2], x[1]];
-    } else {
-      return [x[0], x[1], x[2]];
-    }
+  // reorganize proposed fixes so that the rectangle
+  // with the lowest column number comes first
+  all_matches = all_matches.map((pf: ProposedFix, _1, _2) => {
+    const [score, rect1, rect2] = pf;
+    const rect1_ul = rect1[0];
+    const rect2_ul = rect2[0];
+    // swap rect1 and rect2 depending on the outcome of the comparison
+    const newpf: ProposedFix = numComparator(rect1_ul, rect2_ul) < 0 ? [score, rect2, rect1] : pf;
+    return newpf;
   });
-  all_matches = dedup(all_matches);
-  //    console.log("after: " + JSON.stringify(all_matches));
-  //    t.split("done.");
-  return all_matches;
-}
 
-export function test_find_all_proposed_fixes(grouped_formulas) {
-  comparisons = 0;
-  const all_fixes = find_all_proposed_fixes(grouped_formulas);
-  console.log("all matches = " + JSON.stringify(all_fixes));
-  //    console.log("comparisons = " + comparisons);
-  let theLength = 0;
-  for (const k of Object.keys(grouped_formulas)) {
-    theLength += grouped_formulas[k].length;
-  }
-  console.log("total length of grouped_formulas = " + theLength);
+  // remove duplicate entries
+  return dedup(all_matches);
 }
-
-//let r = require('./grouped_formulas.js');
-//test_find_all_proposed_fixes(r.grouped_formulas);
