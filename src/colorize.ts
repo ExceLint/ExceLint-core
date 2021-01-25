@@ -128,6 +128,19 @@ export class Colorize {
     return addr.replace(/!(!+)/, "!");
   }
 
+  // Filter fixes by entropy score threshold
+  private static filterFixesByUserThreshold(fixes: ProposedFix[], thresh: number): ProposedFix[] {
+    const fixes2: ProposedFix[] = [];
+    for (let ind = 0; ind < fixes.length; ind++) {
+      const [score, first, second] = fixes[ind];
+      let adjusted_score = -score;
+      if (adjusted_score * 100 >= thresh) {
+        fixes2.push([adjusted_score, first, second]);
+      }
+    }
+    return fixes2;
+  }
+
   public static process_workbook(inp: WorkbookOutput, sheetName: string): any {
     // this object gets mangled along the way... don't expect a WorkbookOutput at the end
     const output = WorkbookOutput.AdjustWorkbookName(inp, path.basename(inp["workbookName"]));
@@ -155,17 +168,11 @@ export class Colorize {
       a.proposed_fixes = Colorize.adjust_proposed_fixes(a.proposed_fixes, sheet.styles, 0, 0);
 
       // Adjust the proposed fixes for real (just adjusting the scores downwards by the formatting discount).
-      const initial_adjusted_fixes: ProposedFix[] = [];
       const final_adjusted_fixes: ProposedFix[] = []; // We will eventually trim these.
-      // tslint:disable-next-line: forin
-      for (let ind = 0; ind < a.proposed_fixes.length; ind++) {
-        const f = a.proposed_fixes[ind];
-        const [score, first, second] = f;
-        let adjusted_score = -score;
-        if (adjusted_score * 100 >= Colorize.reportingThreshold) {
-          initial_adjusted_fixes.push([adjusted_score, first, second]);
-        }
-      }
+      const initial_adjusted_fixes = Colorize.filterFixesByUserThreshold(
+        a.proposed_fixes,
+        Colorize.reportingThreshold
+      );
 
       // Process all the fixes, classifying and optionally pruning them.
       const example_fixes_r1c1 = []; // TODO DAN: this really needs a type
