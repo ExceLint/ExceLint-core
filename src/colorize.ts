@@ -19,6 +19,7 @@ import {
   ProposedFix,
   Metric,
   Analysis,
+  rectangleComparator,
 } from "./ExceLintTypes";
 import { WorkbookOutput } from "./exceljson";
 
@@ -1049,7 +1050,7 @@ export class Colorize {
     return Colorize.Multiplier * (v0 + v1 + v2);
   }
 
-  // Discount proposed fixes if they have different formats.
+  // Filter out any proposed fixes that do not have the same format.
   public static adjust_proposed_fixes(
     fixes: ProposedFix[],
     propertiesToGet: Spreadsheet,
@@ -1063,38 +1064,37 @@ export class Colorize {
       // entropy, and two ranges:
       //    upper-left corner of range (column, row), lower-right corner of range (column, row)
 
-      const score = fixes[k][0];
+      const [score, rect1, rect2] = fixes[k];
       // Get rid of scores below 0.01.
       if (-score * 100 < 1) {
-        // console.log('trimmed ' + (-score));
         continue;
       }
 
-      // DAN TODO: use new rectangle comparator function!
+      // Find out which range is "first," i.e., sort by x and then by y.
+      const [first, second] =
+        rectangleComparator(rect1, rect2) <= 0 ? [rect1, rect2] : [rect2, rect1];
 
-      // Sort the fixes by their upper-left x and then upper-left y coordinates.
-      // This is a pain because if we don't pad appropriately, [1,9] is 'less than' [1,10]. (Seriously.)
-      // So we make sure that numbers are always left padded with zeroes to make the number 10 digits long
-      // (which is 1 more than Excel needs right now).
-      const firstPadded = fixes[k][1].map((a) => a.toString().padStart(10, "0"));
-      const secondPadded = fixes[k][2].map((a) => a.toString().padStart(10, "0"));
+      // get the upper-left and bottom-right vectors for the two rectangles
+      const [ul, _a] = first;
+      const [_b, br] = second;
 
-      const first = firstPadded < secondPadded ? fixes[k][1] : fixes[k][2];
-      const second = firstPadded < secondPadded ? fixes[k][2] : fixes[k][1];
-
-      const [[ax1, ay1], [ax2, ay2]] = first;
-      const [[bx1, by1], [bx2, by2]] = second;
-
-      const col0 = ax1 - origin_col - 1;
-      const row0 = ay1 - origin_row - 1;
-      const col1 = bx2 - origin_col - 1;
-      const row1 = by2 - origin_row - 1;
+      // get the column and row for the upper-left and bottom-right vectors
+      const ul_col = ul.x - origin_col - 1;
+      const ul_row = ul.y - origin_row - 1;
+      const br_col = br.x - origin_col - 1;
+      const br_row = br.y - origin_row - 1;
 
       // Now check whether the formats are all the same or not.
+      // Get the first format and then check that all other cells in the
+      // range have the same format.
+      // We can iterate over the combination of both ranges at the same
+      // time because all proposed fixes must be "merge compatible," i.e.,
+      // adjacent rectangles that, when merged, form a new rectangle.
       let sameFormats = true;
-      const firstFormat = JSON.stringify(propertiesToGet[row0][col0]);
-      for (let i = row0; i <= row1; i++) {
-        for (let j = col0; j <= col1; j++) {
+      const prop = propertiesToGet[ul_row][ul_col];
+      const firstFormat = JSON.stringify(prop);
+      for (let i = ul_row; i <= br_row; i++) {
+        for (let j = ul_col; j <= br_col; j++) {
           const str = JSON.stringify(propertiesToGet[i][j]);
           if (str !== firstFormat) {
             sameFormats = false;
@@ -1102,7 +1102,7 @@ export class Colorize {
           }
         }
       }
-      proposed_fixes.push([score, first, second, sameFormats]);
+      proposed_fixes.push([score, first, second]);
     }
     return proposed_fixes;
   }
