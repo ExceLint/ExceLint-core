@@ -200,6 +200,31 @@ export class Colorize {
     return fixEntropy;
   }
 
+  // Checks for "fat" fixes (that result in more than a single row or single column).
+  private static isFatFix(fix: ProposedFix): boolean {
+    let sameRow = false;
+    let sameColumn = false;
+    {
+      const fixColumn = upperleft(rect1(fix)).x;
+      if (
+        bottomright(rect1(fix)).x === fixColumn &&
+        upperleft(rect2(fix)).x === fixColumn &&
+        bottomright(rect2(fix)).x === fixColumn
+      ) {
+        sameColumn = true;
+      }
+      const fixRow = upperleft(rect1(fix)).y;
+      if (
+        bottomright(rect1(fix)).y === fixRow &&
+        upperleft(rect2(fix)).y === fixRow &&
+        bottomright(rect2(fix)).y === fixRow
+      ) {
+        sameRow = true;
+      }
+      return !sameColumn && !sameRow;
+    }
+  }
+
   public static process_workbook(inp: WorkbookOutput, sheetName: string): any {
     // this object gets mangled along the way... don't expect a WorkbookOutput at the end
     const output = WorkbookOutput.AdjustWorkbookName(inp, path.basename(inp["workbookName"]));
@@ -240,6 +265,7 @@ export class Colorize {
 
       // Process all the fixes, classifying and optionally pruning them.
       const example_fixes_r1c1 = []; // TODO DAN: this really needs a type
+
       for (let ind = 0; ind < initial_adjusted_fixes.length; ind++) {
         // Get this fix
         const fix = initial_adjusted_fixes[ind];
@@ -268,35 +294,13 @@ export class Colorize {
         }
 
         // Binning.
-        let bin = [];
+        let bin: Colorize.BinCategories[] = [];
 
-        // Check for "fat" fixes (that result in more than a single row or single column).
-        // Check if all in the same row.
-        let sameRow = false;
-        let sameColumn = false;
-        {
-          const fixColumn = initial_adjusted_fixes[ind][1][0][0];
-          if (
-            initial_adjusted_fixes[ind][1][1][0] === fixColumn &&
-            initial_adjusted_fixes[ind][2][0][0] === fixColumn &&
-            initial_adjusted_fixes[ind][2][1][0] === fixColumn
-          ) {
-            sameColumn = true;
-          }
-          const fixRow = initial_adjusted_fixes[ind][1][0][1];
-          if (
-            initial_adjusted_fixes[ind][1][1][1] === fixRow &&
-            initial_adjusted_fixes[ind][2][0][1] === fixRow &&
-            initial_adjusted_fixes[ind][2][1][1] === fixRow
-          ) {
-            sameRow = true;
-          }
-          if (!sameColumn && !sameRow) {
-            bin.push(Colorize.BinCategories.FatFix);
-          }
-        }
+        // Is this a "fat" fix?
+        if (Colorize.isFatFix(fix)) bin.push(Colorize.BinCategories.FatFix);
 
         // Check for recurrent formulas. NOTE: not sure if this is working currently
+        const dependence_vectors = rect_info.map((rect) => rect.dependencies);
         for (let i = 0; i < dependence_vectors.length; i++) {
           // If there are at least two dependencies and one of them is -1 in the column (row),
           // it is a recurrence (the common recurrence relation of starting at a value and
