@@ -177,8 +177,8 @@ export class Colorize {
 
   // Returns true if the "direction" of a fix is vertical
   private static fixIsVertical(fix: ProposedFix): boolean {
-    const rect1_ul_x = fix[1][0].x;
-    const rect2_ul_x = fix[2][0].x;
+    const rect1_ul_x = upperleft(rect1(fix)).x;
+    const rect2_ul_x = upperleft(rect2(fix)).x;
     return rect1_ul_x === rect2_ul_x;
   }
 
@@ -223,6 +223,33 @@ export class Colorize {
       }
       return !sameColumn && !sameRow;
     }
+  }
+
+  // Checks for recurrent formula fixes
+  private static isRecurrentFormula(rect_info: RectInfo[], direction_is_vert: boolean): boolean {
+    const rect_dependencies = rect_info.map((ri) => ri.dependencies);
+    for (let rect = 0; rect < rect_dependencies.length; rect++) {
+      // get the dependencies for this fix rectangle
+      const dependencies = rect_dependencies[rect];
+      // If any part of any of a rectangle's dependence vectors "points backward," the formula
+      // is recurrent.
+      for (let i = 0; i < dependencies.length; i++) {
+        if (direction_is_vert && dependencies[i].x === 0 && dependencies[i].y === -1) {
+          return true;
+        }
+        if (!direction_is_vert && dependencies[i].x === -1 && dependencies[i].y === 0) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // Checks whether rectangles in fix have different refcounts
+  private static hasDifferingRefcounts(rect_info: RectInfo[]): boolean {
+    const dependence_count = rect_info.map((ri) => ri.dependence_count);
+    // Different number of referents (dependencies).
+    return dependence_count[0] !== dependence_count[1];
   }
 
   public static process_workbook(inp: WorkbookOutput, sheetName: string): any {
@@ -271,7 +298,7 @@ export class Colorize {
         const fix = initial_adjusted_fixes[ind];
 
         // Determine the direction of the range (vertical or horizontal) by looking at the axes.
-        const direction_is_vert: boolean = this.fixIsVertical(fix);
+        const direction_is_vert: boolean = Colorize.fixIsVertical(fix);
 
         // Formula info for each rectangle
         const rect_info = rectangles(fix).map((rect) => new RectInfo(rect, sheet));
@@ -300,34 +327,13 @@ export class Colorize {
         if (Colorize.isFatFix(fix)) bin.push(Colorize.BinCategories.FatFix);
 
         // Check for recurrent formulas. NOTE: not sure if this is working currently
-        const dependence_vectors = rect_info.map((rect) => rect.dependencies);
-        for (let i = 0; i < dependence_vectors.length; i++) {
-          // If there are at least two dependencies and one of them is -1 in the column (row),
-          // it is a recurrence (the common recurrence relation of starting at a value and
-          // referencing, say, =B10+1).
-          if (dependence_vectors[i].length > 0) {
-            if (
-              direction_is_vert &&
-              dependence_vectors[i][0][0] === 0 &&
-              dependence_vectors[i][0][1] === -1
-            ) {
-              bin.push(Colorize.BinCategories.RecurrentFormula);
-              break;
-            }
-            if (
-              !direction_is_vert &&
-              dependence_vectors[i][0][0] === -1 &&
-              dependence_vectors[i][0][1] === 0
-            ) {
-              bin.push(Colorize.BinCategories.RecurrentFormula);
-              break;
-            }
-          }
-        }
-        // Different number of referents (dependencies).
-        if (dependence_count[0] !== dependence_count[1]) {
+        if (Colorize.isRecurrentFormula(rect_info, direction_is_vert))
+          bin.push(Colorize.BinCategories.RecurrentFormula);
+
+        // Check for differing refcounts
+        if (Colorize.hasDifferingRefcounts(rect_info))
           bin.push(Colorize.BinCategories.DifferentReferentCount);
-        }
+
         // Different number of constants.
         if (all_numbers[0].length !== all_numbers[1].length) {
           if (Math.abs(all_numbers[0].length - all_numbers[1].length) === 1) {
