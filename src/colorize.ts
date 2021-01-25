@@ -226,6 +226,7 @@ export class Colorize {
   }
 
   // Checks for recurrent formula fixes
+  // NOTE: not sure if this is working currently
   private static isRecurrentFormula(rect_info: RectInfo[], direction_is_vert: boolean): boolean {
     const rect_dependencies = rect_info.map((ri) => ri.dependencies);
     for (let rect = 0; rect < rect_dependencies.length; rect++) {
@@ -250,6 +251,24 @@ export class Colorize {
     const dependence_count = rect_info.map((ri) => ri.dependence_count);
     // Different number of referents (dependencies).
     return dependence_count[0] !== dependence_count[1];
+  }
+
+  // Checks whether one formula has one more constant than the other
+  private static hasOneExtraConstant(rect_info: RectInfo[]): boolean {
+    const constants = rect_info.map((ri) => ri.constants);
+    return (
+      constants[0].length !== constants[1].length &&
+      Math.abs(constants[0].length - constants[1].length) === 1
+    );
+  }
+
+  // Checks whether one formula has one more constant than the other
+  private static numberOfConstantsMismatch(rect_info: RectInfo[]): boolean {
+    const constants = rect_info.map((ri) => ri.constants);
+    return (
+      constants[0].length !== constants[1].length &&
+      !(Math.abs(constants[0].length - constants[1].length) === 1)
+    );
   }
 
   public static process_workbook(inp: WorkbookOutput, sheetName: string): any {
@@ -326,7 +345,7 @@ export class Colorize {
         // Is this a "fat" fix?
         if (Colorize.isFatFix(fix)) bin.push(Colorize.BinCategories.FatFix);
 
-        // Check for recurrent formulas. NOTE: not sure if this is working currently
+        // Check for recurrent formulas.
         if (Colorize.isRecurrentFormula(rect_info, direction_is_vert))
           bin.push(Colorize.BinCategories.RecurrentFormula);
 
@@ -334,14 +353,15 @@ export class Colorize {
         if (Colorize.hasDifferingRefcounts(rect_info))
           bin.push(Colorize.BinCategories.DifferentReferentCount);
 
-        // Different number of constants.
-        if (all_numbers[0].length !== all_numbers[1].length) {
-          if (Math.abs(all_numbers[0].length - all_numbers[1].length) === 1) {
-            bin.push(Colorize.BinCategories.OneExtraConstant);
-          } else {
-            bin.push(Colorize.BinCategories.NumberOfConstantsMismatch);
-          }
-        }
+        // Check for one extra constant
+        if (Colorize.hasOneExtraConstant(rect_info))
+          bin.push(Colorize.BinCategories.OneExtraConstant);
+
+        // Check that there isn't a mismatch in constant counts
+        // (excluding "one extra constant")
+        if (Colorize.numberOfConstantsMismatch(rect_info))
+          bin.push(Colorize.BinCategories.NumberOfConstantsMismatch);
+
         // Both constants.
         if (all_numbers[0].length > 0 && all_numbers[1].length > 0) {
           // Both have numbers.
