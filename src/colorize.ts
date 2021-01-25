@@ -141,6 +141,13 @@ export class Colorize {
     return fixes2;
   }
 
+  // Returns true if the "direction" of a fix is vertical
+  private static fixIsVertical(fix: ProposedFix): boolean {
+    const rect1_ul_x = fix[1][0].x;
+    const rect2_ul_x = fix[2][0].x;
+    return rect1_ul_x === rect2_ul_x;
+  }
+
   public static process_workbook(inp: WorkbookOutput, sheetName: string): any {
     // this object gets mangled along the way... don't expect a WorkbookOutput at the end
     const output = WorkbookOutput.AdjustWorkbookName(inp, path.basename(inp["workbookName"]));
@@ -163,27 +170,29 @@ export class Colorize {
       // Get anomalous cells and proposed fixes, among others.
       const a = Colorize.process_suspicious(usedRangeAddress, sheet.formulas, sheet.values);
 
-      // Adjust the fixes based on font stuff. We should allow parameterization here for weighting (as for thresholding).
-      // NB: origin_col and origin_row currently hard-coded at 0,0.
-      a.proposed_fixes = Colorize.adjust_proposed_fixes(a.proposed_fixes, sheet.styles, 0, 0);
-
-      // Adjust the proposed fixes for real (just adjusting the scores downwards by the formatting discount).
+      // Eliminate fixes below user threshold
       const final_adjusted_fixes: ProposedFix[] = []; // We will eventually trim these.
-      const initial_adjusted_fixes = Colorize.filterFixesByUserThreshold(
+      a.proposed_fixes = Colorize.filterFixesByUserThreshold(
         a.proposed_fixes,
         Colorize.reportingThreshold
+      );
+
+      // Remove fixes that require fixing both a formula AND formatting.
+      // NB: origin_col and origin_row currently hard-coded at 0,0.
+      const initial_adjusted_fixes = Colorize.adjust_proposed_fixes(
+        a.proposed_fixes,
+        sheet.styles,
+        0,
+        0
       );
 
       // Process all the fixes, classifying and optionally pruning them.
       const example_fixes_r1c1 = []; // TODO DAN: this really needs a type
       for (let ind = 0; ind < initial_adjusted_fixes.length; ind++) {
         // Determine the direction of the range (vertical or horizontal) by looking at the axes.
-        let direction = "";
-        if (initial_adjusted_fixes[ind][1][0][0] === initial_adjusted_fixes[ind][2][0][0]) {
-          direction = "vertical";
-        } else {
-          direction = "horizontal";
-        }
+        const rect1_ul_x = initial_adjusted_fixes[ind][1][0].x;
+        const rect2_ul_x = initial_adjusted_fixes[ind][2][0].x;
+        const direction_is_vert: boolean = rect1_ul_x === rect2_ul_x;
         const formulas = []; // actual formulas
         const print_formulas = []; // formulas with a preface (the cell name containing each)
         const r1c1_formulas = []; // formulas in R1C1 format
@@ -405,7 +414,7 @@ export class Colorize {
 
         example_fixes_r1c1.push({
           bin: bin,
-          direction: direction,
+          direction: direction_is_vert,
           numbers: numbers,
           numeric_difference: totalNumericDiff,
           magnitude_numeric_difference: totalNumericDiff === 0 ? 0 : Math.log10(totalNumericDiff),
@@ -1071,11 +1080,7 @@ export class Colorize {
       // entropy, and two ranges:
       //    upper-left corner of range (column, row), lower-right corner of range (column, row)
 
-      const [score, rect1, rect2] = fixes[k];
-      // Get rid of scores below 0.01.
-      if (-score * 100 < 1) {
-        continue;
-      }
+      const [_, rect1, rect2] = fixes[k];
 
       // Find out which range is "first," i.e., sort by x and then by y.
       const [first, second] =
