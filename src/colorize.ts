@@ -349,16 +349,16 @@ export class Colorize {
         if (Colorize.isRecurrentFormula(rect_info, direction_is_vert))
           bin.push(Colorize.BinCategories.RecurrentFormula);
 
-        // Check for differing refcounts
+        // Check for differing refcounts.
         if (Colorize.hasDifferingRefcounts(rect_info))
           bin.push(Colorize.BinCategories.DifferentReferentCount);
 
-        // Check for one extra constant
+        // Check for one extra constant.
         if (Colorize.hasOneExtraConstant(rect_info))
           bin.push(Colorize.BinCategories.OneExtraConstant);
 
         // Check that there isn't a mismatch in constant counts
-        // (excluding "one extra constant")
+        // (excluding "one extra constant").
         if (Colorize.numberOfConstantsMismatch(rect_info))
           bin.push(Colorize.BinCategories.NumberOfConstantsMismatch);
 
