@@ -33,6 +33,7 @@ export class WorkbookOutput {
 
   constructor(filename: string) {
     this.workbookName = filename;
+    this.worksheets = [];
   }
 
   public addWorksheet(ws: WorksheetOutput): void {
@@ -116,7 +117,8 @@ export class ExcelJSON {
     const sheetNames = f.SheetNames;
     const sheets: Dict<XLSX.WorkSheet> = f.Sheets;
     for (const sheetName of sheetNames) {
-      if (!sheets[sheetName]) {
+      const sheet = sheets[sheetName];
+      if (!sheet) {
         // Weird edge case here.
         continue;
       }
@@ -124,8 +126,8 @@ export class ExcelJSON {
       // Try to parse the ref to see if it's a pair (e.g., A1:B10) or a singleton (e.g., C9).
       // If the latter, make it into a pair (e.g., C9:C9).
       let ref;
-      if ("!ref" in sheets[sheetName]) {
-        ref = sheets[sheetName]["!ref"];
+      if ("!ref" in sheet) {
+        ref = sheet["!ref"];
       } else {
         // Empty sheet.
         ref = "A1:A1";
@@ -141,15 +143,17 @@ export class ExcelJSON {
         ref = ref + ":" + ref;
       }
       const sheetRange = sheetName + "!" + ref;
-      output.addWorksheet(
-        new WorksheetOutput(
-          sheetName,
-          sheetRange,
-          ExcelJSON.processWorksheet(sheets[sheetName], ExcelJSON.selections.FORMULAS),
-          ExcelJSON.processWorksheet(sheets[sheetName], ExcelJSON.selections.VALUES),
-          ExcelJSON.processWorksheet(sheets[sheetName], ExcelJSON.selections.STYLES)
-        )
+      const sheet_formulas = ExcelJSON.processWorksheet(sheet, ExcelJSON.selections.FORMULAS);
+      const sheet_values = ExcelJSON.processWorksheet(sheet, ExcelJSON.selections.VALUES);
+      const sheet_styles = ExcelJSON.processWorksheet(sheet, ExcelJSON.selections.STYLES);
+      const wso = new WorksheetOutput(
+        sheetName,
+        sheetRange,
+        sheet_formulas,
+        sheet_values,
+        sheet_styles
       );
+      output.addWorksheet(wso);
     }
     return output;
   }
