@@ -18,6 +18,27 @@ export type Rectangle = [ExceLintVector, ExceLintVector];
 */
 export type ProposedFix = [Metric, Rectangle, Rectangle];
 
+export function rectangles(pf: ProposedFix): Rectangle[] {
+  const [_, rect1, rect2] = pf;
+  return [rect1, rect2];
+}
+
+export function rect1(pf: ProposedFix): Rectangle {
+  return pf[1];
+}
+
+export function rect2(pf: ProposedFix): Rectangle {
+  return pf[2];
+}
+
+export function upperleft(r: Rectangle): ExceLintVector {
+  return r[0];
+}
+
+export function bottomright(r: Rectangle): ExceLintVector {
+  return r[1];
+}
+
 export class ExceLintVector {
   public x: number;
   public y: number;

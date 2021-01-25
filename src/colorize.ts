@@ -20,8 +20,42 @@ import {
   Metric,
   Analysis,
   rectangleComparator,
+  rectangles,
+  rect1,
+  rect2,
+  upperleft,
+  bottomright,
 } from "./ExceLintTypes";
-import { WorkbookOutput } from "./exceljson";
+import { WorkbookOutput, WorksheetOutput } from "./exceljson";
+
+class RectInfo {
+  formula: string; // actual formulas
+  constants: number[] = []; // all the numeric constants in each formula
+  sum: number; // the sum of all the numeric constants in each formula
+  dependencies: ExceLintVector[] = []; // the set of no-constant dependence vectors in the formula
+  dependence_count: number; // the number of dependent cells
+  absolute_refcount: number; // the number of absolute references in each formula
+  r1c1_formula: string; // formula in R1C1 format
+  r1c1_print_formula: string; // as above, but for R1C1 formulas
+  print_formula: string; // formula with a preface (the cell name containing each)
+
+  constructor(rect: Rectangle, sheet: WorksheetOutput) {
+    // the coordinates of the cell containing the first formula in the proposed fix range
+    const formulaCoord = rect[0];
+    const y = formulaCoord.y - 1; // row
+    const x = formulaCoord.x - 1; // col
+    this.formula = sheet.formulas[y][x]; // the formula itself
+    this.constants = ExcelUtils.numeric_constants(this.formula); // all numeric constants in the formula
+    this.sum = this.constants.reduce((a, b) => a + b, 0); // the sum of all numeric constants
+    this.dependencies = ExcelUtils.all_cell_dependencies(this.formula, x + 1, y + 1, false);
+    this.dependence_count = this.dependencies.length;
+    this.absolute_refcount = (this.formula.match(/\$/g) || []).length;
+    this.r1c1_formula = ExcelUtils.formulaToR1C1(this.formula, x + 1, y + 1);
+    const preface = ExcelUtils.column_index_to_name(x + 1) + (y + 1) + ":";
+    this.r1c1_print_formula = preface + this.r1c1_formula;
+    this.print_formula = preface + this.formula;
+  }
+}
 
 export class Colorize {
   public static maxCategories = 2; // Maximum number of categories for reported errors
@@ -148,6 +182,13 @@ export class Colorize {
     return rect1_ul_x === rect2_ul_x;
   }
 
+  private static fixCellCount(fix: ProposedFix): number {
+    const fixRange = Colorize.expand(upperleft(rect1(fix)), bottomright(rect1(fix))).concat(
+      Colorize.expand(upperleft(rect2(fix)), bottomright(rect2(fix)))
+    );
+    return fixRange.length;
+  }
+
   public static process_workbook(inp: WorkbookOutput, sheetName: string): any {
     // this object gets mangled along the way... don't expect a WorkbookOutput at the end
     const output = WorkbookOutput.AdjustWorkbookName(inp, path.basename(inp["workbookName"]));
@@ -189,59 +230,22 @@ export class Colorize {
       // Process all the fixes, classifying and optionally pruning them.
       const example_fixes_r1c1 = []; // TODO DAN: this really needs a type
       for (let ind = 0; ind < initial_adjusted_fixes.length; ind++) {
+        // Get this fix
+        const fix = initial_adjusted_fixes[ind];
+
         // Determine the direction of the range (vertical or horizontal) by looking at the axes.
-        const rect1_ul_x = initial_adjusted_fixes[ind][1][0].x;
-        const rect2_ul_x = initial_adjusted_fixes[ind][2][0].x;
-        const direction_is_vert: boolean = rect1_ul_x === rect2_ul_x;
-        const formulas = []; // actual formulas
-        const print_formulas = []; // formulas with a preface (the cell name containing each)
-        const r1c1_formulas = []; // formulas in R1C1 format
-        const r1c1_print_formulas = []; // as above, but for R1C1 formulas
-        const all_numbers = []; // all the numeric constants in each formula
-        const numbers = []; // the sum of all the numeric constants in each formula
-        const dependence_count = []; // the number of dependent cells
-        const absolute_refs = []; // the number of absolute references in each formula
-        const dependence_vectors = [];
-        // Generate info about the formulas.
-        for (let i = 0; i < 2; i++) {
-          // the coordinates of the cell containing the first formula in the proposed fix range
-          const formulaCoord = initial_adjusted_fixes[ind][i + 1][0];
-          const formulaX = formulaCoord[1] - 1; // row
-          const formulaY = formulaCoord[0] - 1; // column
-          const formula = sheet.formulas[formulaX][formulaY]; // the formula itself
-          const numeric_constants = ExcelUtils.numeric_constants(formula); // all numeric constants in the formula
-          all_numbers.push(numeric_constants);
-          numbers.push(numbers.reduce((a, b) => a + b, 0)); // the sum of all numeric constants
-          const dependences_wo_constants = ExcelUtils.all_cell_dependencies(
-            formula,
-            formulaY + 1,
-            formulaX + 1,
-            false
-          );
-          dependence_count.push(dependences_wo_constants.length);
-          const r1c1 = ExcelUtils.formulaToR1C1(formula, formulaY + 1, formulaX + 1);
-          const preface = ExcelUtils.column_index_to_name(formulaY + 1) + (formulaX + 1) + ":";
-          const cellPlusFormula = preface + r1c1;
-          // Add the formulas plus their prefaces (the latter for printing).
-          r1c1_formulas.push(r1c1);
-          r1c1_print_formulas.push(cellPlusFormula);
-          formulas.push(formula);
-          print_formulas.push(preface + formula);
-          absolute_refs.push((formula.match(/\$/g) || []).length);
-          // console.log(preface + JSON.stringify(dependences_wo_constants));
-          dependence_vectors.push(dependences_wo_constants);
-        }
-        const totalNumericDiff = Math.abs(numbers[0] - numbers[1]);
+        const direction_is_vert: boolean = this.fixIsVertical(fix);
+
+        // Formula info for each rectangle
+        const rect_info = rectangles(fix).map((rect) => new RectInfo(rect, sheet));
+
+        // Compute the difference in constant sums
+        const totalNumericDiff = Math.abs(rect_info[0].sum - rect_info[1].sum);
 
         // Omit fixes that are too small (too few cells).
-        const fixRange = Colorize.expand(
-          initial_adjusted_fixes[ind][1][0],
-          initial_adjusted_fixes[ind][1][1]
-        ).concat(
-          Colorize.expand(initial_adjusted_fixes[ind][2][0], initial_adjusted_fixes[ind][2][1])
-        );
-        if (fixRange.length < Colorize.minFixSize) {
-          console.warn("Omitted " + JSON.stringify(print_formulas) + "(too small)");
+        if (Colorize.fixCellCount(fix) < Colorize.minFixSize) {
+          const print_formulas = JSON.stringify(rect_info.map((fi) => fi.print_formula));
+          console.warn("Omitted " + print_formulas + "(too small)");
           continue;
         }
 
@@ -301,7 +305,7 @@ export class Colorize {
           // referencing, say, =B10+1).
           if (dependence_vectors[i].length > 0) {
             if (
-              direction === "vertical" &&
+              direction_is_vert &&
               dependence_vectors[i][0][0] === 0 &&
               dependence_vectors[i][0][1] === -1
             ) {
@@ -309,7 +313,7 @@ export class Colorize {
               break;
             }
             if (
-              direction === "horizontal" &&
+              !direction_is_vert &&
               dependence_vectors[i][0][0] === -1 &&
               dependence_vectors[i][0][1] === 0
             ) {
@@ -481,8 +485,8 @@ export class Colorize {
   }
 
   // Convert a rectangle into a list of indices.
-  public static expand(first: ExceLintVector, second: ExceLintVector): Array<ExceLintVector> {
-    const expanded: Array<ExceLintVector> = [];
+  public static expand(first: ExceLintVector, second: ExceLintVector): ExceLintVector[] {
+    const expanded: ExceLintVector[] = [];
     for (let i = first.x; i <= second.x; i++) {
       for (let j = first.y; j <= second.y; j++) {
         expanded.push(new ExceLintVector(i, j, 0));
