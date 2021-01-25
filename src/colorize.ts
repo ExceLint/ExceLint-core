@@ -189,6 +189,17 @@ export class Colorize {
     return fixRange.length;
   }
 
+  private static fixEntropy(fix: ProposedFix): number {
+    const leftFixSize = Colorize.expand(upperleft(rect1(fix)), bottomright(rect1(fix))).length;
+    const rightFixSize = Colorize.expand(upperleft(rect2(fix)), bottomright(rect2(fix))).length;
+    const totalSize = leftFixSize + rightFixSize;
+    const fixEntropy = -(
+      (leftFixSize / totalSize) * Math.log2(leftFixSize / totalSize) +
+      (rightFixSize / totalSize) * Math.log2(rightFixSize / totalSize)
+    );
+    return fixEntropy;
+  }
+
   public static process_workbook(inp: WorkbookOutput, sheetName: string): any {
     // this object gets mangled along the way... don't expect a WorkbookOutput at the end
     const output = WorkbookOutput.AdjustWorkbookName(inp, path.basename(inp["workbookName"]));
@@ -249,22 +260,9 @@ export class Colorize {
           continue;
         }
 
-        // Entropy cutoff.
-        const leftFixSize = Colorize.expand(
-          initial_adjusted_fixes[ind][1][0],
-          initial_adjusted_fixes[ind][1][1]
-        ).length;
-        const rightFixSize = Colorize.expand(
-          initial_adjusted_fixes[ind][2][0],
-          initial_adjusted_fixes[ind][2][1]
-        ).length;
-        const totalSize = leftFixSize + rightFixSize;
-        const fixEntropy = -(
-          (leftFixSize / totalSize) * Math.log2(leftFixSize / totalSize) +
-          (rightFixSize / totalSize) * Math.log2(rightFixSize / totalSize)
-        );
-        // console.warn('fix entropy = ' + fixEntropy);
-        if (fixEntropy > Colorize.maxEntropy) {
+        // Omit fixes with entropy change over threshold
+        if (Colorize.fixEntropy(fix) > Colorize.maxEntropy) {
+          const print_formulas = JSON.stringify(rect_info.map((fi) => fi.print_formula));
           console.warn("Omitted " + JSON.stringify(print_formulas) + "(too high entropy)");
           continue;
         }
@@ -1084,7 +1082,7 @@ export class Colorize {
       // entropy, and two ranges:
       //    upper-left corner of range (column, row), lower-right corner of range (column, row)
 
-      const [_, rect1, rect2] = fixes[k];
+      const [score, rect1, rect2] = fixes[k];
 
       // Find out which range is "first," i.e., sort by x and then by y.
       const [first, second] =
