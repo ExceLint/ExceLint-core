@@ -1055,8 +1055,8 @@ export class Colorize {
     propertiesToGet: Spreadsheet,
     origin_col: number,
     origin_row: number
-  ): any {
-    const proposed_fixes = [];
+  ): ProposedFix[] {
+    const proposed_fixes: ProposedFix[] = [];
     // tslint:disable-next-line: forin
     for (const k in fixes) {
       // Format of proposed fixes =, e.g., [-3.016844756293869, [[5,7],[5,11]],[[6,7],[6,11]]]
