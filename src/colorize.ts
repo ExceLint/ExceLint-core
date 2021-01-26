@@ -333,6 +333,101 @@ export class Colorize {
     return false;
   }
 
+  // Apply some labels to fixes based on their structural properties.
+  private static classifyFixes(
+    fix: ProposedFix,
+    direction_is_vert: boolean,
+    rect_info: RectInfo[]
+  ): Colorize.BinCategories[] {
+    // Binning.
+    let bin: Colorize.BinCategories[] = [];
+
+    // Check for "fat" fix.
+    if (Colorize.isFatFix(fix)) bin.push(Colorize.BinCategories.FatFix);
+
+    // Check for recurrent formulas.
+    if (Colorize.isRecurrentFormula(rect_info, direction_is_vert))
+      bin.push(Colorize.BinCategories.RecurrentFormula);
+
+    // Check for differing refcounts.
+    if (Colorize.hasDifferingRefcounts(rect_info))
+      bin.push(Colorize.BinCategories.DifferentReferentCount);
+
+    // Check for one extra constant.
+    if (Colorize.hasOneExtraConstant(rect_info)) bin.push(Colorize.BinCategories.OneExtraConstant);
+
+    // Check that there isn't a mismatch in constant counts
+    // (excluding "one extra constant").
+    if (Colorize.numberOfConstantsMismatch(rect_info))
+      bin.push(Colorize.BinCategories.NumberOfConstantsMismatch);
+
+    // Check whether both formulas are constants-only.
+    if (Colorize.bothConstantOnly(rect_info)) bin.push(Colorize.BinCategories.BothConstants);
+
+    // Check whether exactly one formula is constant-only.
+    if (Colorize.onlyOneIsConstantOnly(rect_info))
+      bin.push(Colorize.BinCategories.OneIsAllConstants);
+
+    // Check for mismatched R1C1 representation.
+    if (Colorize.hasR1C1Mismatch(rect_info)) bin.push(Colorize.BinCategories.R1C1Mismatch);
+
+    // Different number of absolute ($, a.k.a. "anchor") references.
+    if (Colorize.absoluteRefMismatch(rect_info))
+      bin.push(Colorize.BinCategories.AbsoluteRefMismatch);
+
+    // Dependencies that are neither vertical or horizontal
+    // (likely errors if there is also an absolute-ref-mismatch).
+    if (Colorize.offAxisReference(rect_info)) bin.push(Colorize.BinCategories.OffAxisReference);
+
+    // If no predicates were triggered, classify this as "unclassified"
+    if (bin.length == 0) bin.push(Colorize.BinCategories.Unclassified);
+
+    return bin;
+  }
+
+  // In case there's more than one classification, prune some by priority (best explanation).
+  private static pruneFixes(bin: Colorize.BinCategories[]): Colorize.BinCategories[] {
+    if (bin.includes(Colorize.BinCategories.OneIsAllConstants)) {
+      return [Colorize.BinCategories.OneIsAllConstants];
+    }
+    return bin;
+  }
+
+  // Should we omit some fixes depending on the user configuration?
+  private static omitFixes(bin: Colorize.BinCategories[], rect_info: RectInfo[]): boolean {
+    const print_formulas = rect_info.map((ri) => ri.print_formula);
+
+    if (
+      bin.length > Colorize.maxCategories || // Too many categories
+      (bin.indexOf(Colorize.BinCategories.FatFix) !== -1 && Colorize.suppressFatFix) ||
+      (bin.indexOf(Colorize.BinCategories.DifferentReferentCount) !== -1 &&
+        Colorize.suppressDifferentReferentCount) ||
+      (bin.indexOf(Colorize.BinCategories.RecurrentFormula) !== -1 &&
+        Colorize.suppressRecurrentFormula) ||
+      (bin.indexOf(Colorize.BinCategories.OneExtraConstant) !== -1 &&
+        Colorize.suppressOneExtraConstant) ||
+      (bin.indexOf(Colorize.BinCategories.NumberOfConstantsMismatch) != -1 &&
+        Colorize.suppressNumberOfConstantsMismatch) ||
+      (bin.indexOf(Colorize.BinCategories.BothConstants) !== -1 &&
+        Colorize.suppressBothConstants) ||
+      (bin.indexOf(Colorize.BinCategories.OneIsAllConstants) !== -1 &&
+        Colorize.suppressOneIsAllConstants) ||
+      (bin.indexOf(Colorize.BinCategories.R1C1Mismatch) !== -1 && Colorize.suppressR1C1Mismatch) ||
+      (bin.indexOf(Colorize.BinCategories.AbsoluteRefMismatch) !== -1 &&
+        Colorize.suppressAbsoluteRefMismatch) ||
+      (bin.indexOf(Colorize.BinCategories.OffAxisReference) !== -1 &&
+        Colorize.suppressOffAxisReference)
+    ) {
+      console.warn("Omitted " + JSON.stringify(print_formulas) + "(" + JSON.stringify(bin) + ")");
+      return true;
+    } else {
+      console.warn(
+        "NOT omitted " + JSON.stringify(print_formulas) + "(" + JSON.stringify(bin) + ")"
+      );
+      return false;
+    }
+  }
+
   public static process_workbook(inp: WorkbookOutput, sheetName: string): any {
     // this object gets mangled along the way... don't expect a WorkbookOutput at the end
     const output = WorkbookOutput.AdjustWorkbookName(inp, path.basename(inp["workbookName"]));
@@ -401,89 +496,17 @@ export class Colorize {
           continue;
         }
 
-        // Binning.
-        let bin: Colorize.BinCategories[] = [];
+        // Classify fixes & prune based on the best explanation
+        const bin = Colorize.pruneFixes(Colorize.classifyFixes(fix, direction_is_vert, rect_info));
 
-        // Check for "fat" fix.
-        if (Colorize.isFatFix(fix)) bin.push(Colorize.BinCategories.FatFix);
-
-        // Check for recurrent formulas.
-        if (Colorize.isRecurrentFormula(rect_info, direction_is_vert))
-          bin.push(Colorize.BinCategories.RecurrentFormula);
-
-        // Check for differing refcounts.
-        if (Colorize.hasDifferingRefcounts(rect_info))
-          bin.push(Colorize.BinCategories.DifferentReferentCount);
-
-        // Check for one extra constant.
-        if (Colorize.hasOneExtraConstant(rect_info))
-          bin.push(Colorize.BinCategories.OneExtraConstant);
-
-        // Check that there isn't a mismatch in constant counts
-        // (excluding "one extra constant").
-        if (Colorize.numberOfConstantsMismatch(rect_info))
-          bin.push(Colorize.BinCategories.NumberOfConstantsMismatch);
-
-        // Check whether both formulas are constants-only.
-        if (Colorize.bothConstantOnly(rect_info)) bin.push(Colorize.BinCategories.BothConstants);
-
-        // Check whether exactly one formula is constant-only.
-        if (Colorize.onlyOneIsConstantOnly(rect_info))
-          bin.push(Colorize.BinCategories.OneIsAllConstants);
-
-        // Check for mismatched R1C1 representation.
-        if (Colorize.hasR1C1Mismatch(rect_info)) bin.push(Colorize.BinCategories.R1C1Mismatch);
-
-        // Different number of absolute ($, a.k.a. "anchor") references.
-        if (Colorize.absoluteRefMismatch(rect_info))
-          bin.push(Colorize.BinCategories.AbsoluteRefMismatch);
-
-        // Dependencies that are neither vertical or horizontal
-        // (likely errors if there is also an absolute-ref-mismatch).
-        if (Colorize.offAxisReference(rect_info)) bin.push(Colorize.BinCategories.OffAxisReference);
-
-        // If no predicates were triggered, classify this as "unclassified"
-        if (bin.length == 0) bin.push(Colorize.BinCategories.Unclassified);
-
-        // In case there's more than one classification, prune some by priority (best explanation).
-        if (bin.includes(Colorize.BinCategories.OneIsAllConstants)) {
-          bin = [Colorize.BinCategories.OneIsAllConstants];
-        }
         // IMPORTANT:
         // Exclude reported bugs subject to certain conditions.
-        if (
-          bin.length > Colorize.maxCategories || // Too many categories
-          (bin.indexOf(Colorize.BinCategories.FatFix) !== -1 && Colorize.suppressFatFix) ||
-          (bin.indexOf(Colorize.BinCategories.DifferentReferentCount) !== -1 &&
-            Colorize.suppressDifferentReferentCount) ||
-          (bin.indexOf(Colorize.BinCategories.RecurrentFormula) !== -1 &&
-            Colorize.suppressRecurrentFormula) ||
-          (bin.indexOf(Colorize.BinCategories.OneExtraConstant) !== -1 &&
-            Colorize.suppressOneExtraConstant) ||
-          (bin.indexOf(Colorize.BinCategories.NumberOfConstantsMismatch) != -1 &&
-            Colorize.suppressNumberOfConstantsMismatch) ||
-          (bin.indexOf(Colorize.BinCategories.BothConstants) !== -1 &&
-            Colorize.suppressBothConstants) ||
-          (bin.indexOf(Colorize.BinCategories.OneIsAllConstants) !== -1 &&
-            Colorize.suppressOneIsAllConstants) ||
-          (bin.indexOf(Colorize.BinCategories.R1C1Mismatch) !== -1 &&
-            Colorize.suppressR1C1Mismatch) ||
-          (bin.indexOf(Colorize.BinCategories.AbsoluteRefMismatch) !== -1 &&
-            Colorize.suppressAbsoluteRefMismatch) ||
-          (bin.indexOf(Colorize.BinCategories.OffAxisReference) !== -1 &&
-            Colorize.suppressOffAxisReference)
-        ) {
-          console.warn(
-            "Omitted " + JSON.stringify(print_formulas) + "(" + JSON.stringify(bin) + ")"
-          );
-          continue;
-        } else {
-          console.warn(
-            "NOT omitted " + JSON.stringify(print_formulas) + "(" + JSON.stringify(bin) + ")"
-          );
-        }
-        final_adjusted_fixes.push(initial_adjusted_fixes[ind]);
+        if (Colorize.omitFixes(bin, rect_info)) continue;
 
+        // If we're still here, accept this fix
+        final_adjusted_fixes.push(fix);
+
+        // Also collect some stats
         example_fixes_r1c1.push({
           bin: bin,
           direction: direction_is_vert,
