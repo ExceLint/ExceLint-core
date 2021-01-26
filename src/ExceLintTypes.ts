@@ -83,9 +83,43 @@ export class ExceLintVector {
     return this.x === other.x && this.y === other.y && this.c === other.c;
   }
 
+  public hash(): number {
+    // This computes a weighted L1 norm of the vector
+    const v0 = Math.abs(this.x);
+    const v1 = Math.abs(this.y);
+    const v2 = this.c;
+    return ExceLintVector.Multiplier * (v0 + v1 + v2);
+  }
+
   // vector sum reduction
   public static readonly VectorSum = (acc: ExceLintVector, curr: ExceLintVector): ExceLintVector =>
     new ExceLintVector(acc.x + curr.x, acc.y + curr.y, acc.c + curr.c);
+
+  public static vectorSetEquals(set1: ExceLintVector[], set2: ExceLintVector[]): boolean {
+    // create a hashs et with elements from set1,
+    // and then check that set2 induces the same set
+    const hset1: Set<number> = new Set();
+    set1.forEach((v) => hset1.add(v.hash()));
+
+    // check hset1 for hashes of elements in set2.
+    // if there is a match, remove the element from hset1.
+    // if there isn't a match, return early.
+    for (let i = 0; i < set2.length; i++) {
+      const h = set2[i].hash();
+      if (hset1.has(h)) {
+        hset1.delete(h);
+      } else {
+        // sets are definitely not equal
+        return false;
+      }
+    }
+
+    // sets are equal iff hset1 has no remaining elements
+    return hset1.size === 0;
+  }
+
+  // A multiplier for the hash function.
+  public static readonly Multiplier = 1; // 103037;
 }
 
 export class Analysis {

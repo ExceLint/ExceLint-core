@@ -20,6 +20,7 @@ import {
   Metric,
   Analysis,
   rectangleComparator,
+  vectorComparator,
   rectangles,
   rect1,
   rect2,
@@ -121,9 +122,6 @@ export class Colorize {
 
   // The array of colors (used to hash into).
   private static color_list = [];
-
-  // A multiplier for the hash function.
-  private static Multiplier = 1; // 103037;
 
   // A hash string indicating no dependencies; in other words,
   // either a formula that makes no references (like `=RAND()`) or a data cell (like `1`)
@@ -271,6 +269,48 @@ export class Colorize {
     );
   }
 
+  // Checks whether both rectangles in a fix are constant-only
+  private static bothConstantOnly(rect_info: RectInfo[]): boolean {
+    const rect1 = rect_info[0];
+    const rect2 = rect_info[1];
+
+    // both have constants and neither have any other dependencies
+    return (
+      rect1.constants.length > 0 &&
+      rect2.constants.length > 0 &&
+      rect1.dependence_count + rect2.dependence_count === 0
+    );
+  }
+
+  // Checks whether only one rectangle is constant-only
+  private static onlyOneIsConstantOnly(rect_info: RectInfo[]): boolean {
+    const rect1 = rect_info[0];
+    const rect2 = rect_info[1];
+
+    // exactly one has constants and no other dependencies
+    return (
+      (rect1.constants.length > 0 && rect1.dependence_count === 0) ||
+      (rect2.constants.length > 0 && rect2.dependence_count === 0)
+    );
+  }
+
+  // Checks whether formulas have different R1C1 representations but
+  // induce the same set of dependencies.
+  private static hasR1C1Mismatch(rect_info: RectInfo[]): boolean {
+    const rect1 = rect_info[0];
+    const rect2 = rect_info[1];
+
+    // If the formulas don't match, it could
+    // be because of the presence of (possibly
+    // different) constants instead of the
+    // dependencies being different, so augment
+    // with a deep comparison.
+    return (
+      rect1.r1c1_formula !== rect2.r1c1_formula &&
+      !ExceLintVector.vectorSetEquals(rect1.dependencies, rect2.dependencies)
+    );
+  }
+
   public static process_workbook(inp: WorkbookOutput, sheetName: string): any {
     // this object gets mangled along the way... don't expect a WorkbookOutput at the end
     const output = WorkbookOutput.AdjustWorkbookName(inp, path.basename(inp["workbookName"]));
@@ -362,33 +402,16 @@ export class Colorize {
         if (Colorize.numberOfConstantsMismatch(rect_info))
           bin.push(Colorize.BinCategories.NumberOfConstantsMismatch);
 
-        // Both constants.
-        if (all_numbers[0].length > 0 && all_numbers[1].length > 0) {
-          // Both have numbers.
-          if (dependence_count[0] + dependence_count[1] === 0) {
-            // Both have no dependents.
-            bin.push(Colorize.BinCategories.BothConstants);
-          } else {
-            if (dependence_count[0] * dependence_count[1] === 0) {
-              // One is a constant.
-              bin.push(Colorize.BinCategories.OneIsAllConstants);
-            }
-          }
-        }
+        // Check whether both formulas are constants-only.
+        if (Colorize.bothConstantOnly(rect_info)) bin.push(Colorize.BinCategories.BothConstants);
+
+        // Check whether exactly one formula is constant-only.
+        if (Colorize.onlyOneIsConstantOnly(rect_info))
+          bin.push(Colorize.BinCategories.OneIsAllConstants);
+
         // Mismatched R1C1 representation.
-        if (r1c1_formulas[0] !== r1c1_formulas[1]) {
-          // The formulas don't match, but it could
-          // be because of the presence of (possibly
-          // different) constants instead of the
-          // dependencies being different. Do a deep comparison
-          // here.
-          if (
-            JSON.stringify(dependence_vectors[0].sort()) !==
-            JSON.stringify(dependence_vectors[1].sort())
-          ) {
-            bin.push(Colorize.BinCategories.R1C1Mismatch);
-          }
-        }
+        if (Colorize.hasR1C1Mismatch(rect_info)) bin.push(Colorize.BinCategories.R1C1Mismatch);
+
         // Different number of absolute ($, a.k.a. "anchor") references.
         if (absolute_refs[0] !== absolute_refs[1]) {
           bin.push(Colorize.BinCategories.AbsoluteRefMismatch);
@@ -568,7 +591,7 @@ export class Colorize {
                 Colorize.noDependenciesHash,
               ]);
             } else {
-              const hash = Colorize.hash_vector(vec);
+              const hash = vec.hash();
               output.push([new ExceLintVector(adjustedX, adjustedY, 0), hash.toString()]);
             }
           }
@@ -930,7 +953,7 @@ export class Colorize {
     const n_max = Math.max(n_target, n_merge_with);
     const norm_min = Math.min(merge_with_norm, target_norm);
     const norm_max = Math.max(merge_with_norm, target_norm);
-    let fix_distance = Math.abs(norm_max - norm_min) / this.Multiplier;
+    let fix_distance = Math.abs(norm_max - norm_min) / ExceLintVector.Multiplier;
 
     // Ensure that the minimum fix is at least one (we need this if we don't use the L1 norm).
     if (fix_distance < 1.0) {
@@ -1088,14 +1111,6 @@ export class Colorize {
         return [[new ExceLintVector(-1, -1, 0), new ExceLintVector(-1, -1, 0)]];
       }
     }
-  }
-
-  public static hash_vector(vec: ExceLintVector): number {
-    // This computes a weighted L1 norm of the vector
-    const v0 = Math.abs(vec.x);
-    const v1 = Math.abs(vec.y);
-    const v2 = vec.c;
-    return Colorize.Multiplier * (v0 + v1 + v2);
   }
 
   // Filter out any proposed fixes that do not have the same format.
