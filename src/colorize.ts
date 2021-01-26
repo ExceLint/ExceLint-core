@@ -311,6 +311,28 @@ export class Colorize {
     );
   }
 
+  // Checks that the number of absolute references is the same.
+  private static absoluteRefMismatch(rect_info: RectInfo[]) {
+    return rect_info[0].absolute_refcount !== rect_info[1].absolute_refcount;
+  }
+
+  // Checks for off-axis reference
+  private static offAxisReference(rect_info: RectInfo[]) {
+    const all_dependencies = rect_info.map((ri) => ri.dependencies);
+
+    for (let rect = 0; rect < all_dependencies.length; rect++) {
+      // if both x and y offsets are not zero, their product will not be zero;
+      // this is an "off-axis" reference.
+      if (
+        all_dependencies[rect].length > 0 &&
+        all_dependencies[rect][0].x * all_dependencies[rect][0].y !== 0
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   public static process_workbook(inp: WorkbookOutput, sheetName: string): any {
     // this object gets mangled along the way... don't expect a WorkbookOutput at the end
     const output = WorkbookOutput.AdjustWorkbookName(inp, path.basename(inp["workbookName"]));
@@ -382,7 +404,7 @@ export class Colorize {
         // Binning.
         let bin: Colorize.BinCategories[] = [];
 
-        // Is this a "fat" fix?
+        // Check for "fat" fix.
         if (Colorize.isFatFix(fix)) bin.push(Colorize.BinCategories.FatFix);
 
         // Check for recurrent formulas.
@@ -409,25 +431,20 @@ export class Colorize {
         if (Colorize.onlyOneIsConstantOnly(rect_info))
           bin.push(Colorize.BinCategories.OneIsAllConstants);
 
-        // Mismatched R1C1 representation.
+        // Check for mismatched R1C1 representation.
         if (Colorize.hasR1C1Mismatch(rect_info)) bin.push(Colorize.BinCategories.R1C1Mismatch);
 
         // Different number of absolute ($, a.k.a. "anchor") references.
-        if (absolute_refs[0] !== absolute_refs[1]) {
+        if (Colorize.absoluteRefMismatch(rect_info))
           bin.push(Colorize.BinCategories.AbsoluteRefMismatch);
-        }
-        // Dependencies that are neither vertical or horizontal (likely errors if an absolute-ref-mismatch).
-        for (let i = 0; i < dependence_vectors.length; i++) {
-          if (dependence_vectors[i].length > 0) {
-            if (dependence_vectors[i][0][0] * dependence_vectors[i][0][1] !== 0) {
-              bin.push(Colorize.BinCategories.OffAxisReference);
-              break;
-            }
-          }
-        }
-        if (bin === []) {
-          bin.push(Colorize.BinCategories.Unclassified);
-        }
+
+        // Dependencies that are neither vertical or horizontal
+        // (likely errors if there is also an absolute-ref-mismatch).
+        if (Colorize.offAxisReference(rect_info)) bin.push(Colorize.BinCategories.OffAxisReference);
+
+        // If no predicates were triggered, classify this as "unclassified"
+        if (bin.length == 0) bin.push(Colorize.BinCategories.Unclassified);
+
         // In case there's more than one classification, prune some by priority (best explanation).
         if (bin.includes(Colorize.BinCategories.OneIsAllConstants)) {
           bin = [Colorize.BinCategories.OneIsAllConstants];
