@@ -7,7 +7,7 @@ import { RectangleUtils } from "./rectangleutils";
 import { Timer } from "./timer";
 import { JSONclone } from "./jsonclone";
 import { find_all_proposed_fixes } from "./groupme";
-import { Stencil, InfoGain } from "./infogain";
+import { Stencil } from "./infogain";
 import {
   ExceLintVector,
   Dict,
@@ -23,195 +23,17 @@ import {
   rect2,
   upperleft,
   bottomright,
+  expand,
+  WorksheetAnalysis,
+  WorkbookAnalysis,
+  FixAnalysis,
+  RectInfo,
 } from "./ExceLintTypes";
 import { WorkbookOutput, WorksheetOutput } from "./exceljson";
-import { flatMap, Some, None } from "./option";
-
-export class RectInfo {
-  formula: string; // actual formulas
-  constants: number[] = []; // all the numeric constants in each formula
-  sum: number; // the sum of all the numeric constants in each formula
-  dependencies: ExceLintVector[] = []; // the set of no-constant dependence vectors in the formula
-  dependence_count: number; // the number of dependent cells
-  absolute_refcount: number; // the number of absolute references in each formula
-  r1c1_formula: string; // formula in R1C1 format
-  r1c1_print_formula: string; // as above, but for R1C1 formulas
-  print_formula: string; // formula with a preface (the cell name containing each)
-
-  constructor(rect: Rectangle, sheet: WorksheetOutput) {
-    // the coordinates of the cell containing the first formula in the proposed fix range
-    const formulaCoord = rect[0];
-    const y = formulaCoord.y - 1; // row
-    const x = formulaCoord.x - 1; // col
-    this.formula = sheet.formulas[y][x]; // the formula itself
-    this.constants = ExcelUtils.numeric_constants(this.formula); // all numeric constants in the formula
-    this.sum = this.constants.reduce((a, b) => a + b, 0); // the sum of all numeric constants
-    this.dependencies = ExcelUtils.all_cell_dependencies(this.formula, x + 1, y + 1, false);
-    this.dependence_count = this.dependencies.length;
-    this.absolute_refcount = (this.formula.match(/\$/g) || []).length;
-    this.r1c1_formula = ExcelUtils.formulaToR1C1(this.formula, x + 1, y + 1);
-    const preface = ExcelUtils.column_index_to_name(x + 1) + (y + 1) + ":";
-    this.r1c1_print_formula = preface + this.r1c1_formula;
-    this.print_formula = preface + this.formula;
-  }
-}
-
-class FixAnalysis {
-  fix: ProposedFix;
-  classifcation: Colorize.BinCategory[];
-  analysis: RectInfo[];
-  direction_is_vert: boolean;
-
-  constructor(
-    fix: ProposedFix,
-    classification: Colorize.BinCategory[],
-    analysis: RectInfo[],
-    direction_is_vert: boolean
-  ) {
-    this.fix = fix;
-    this.classifcation = classification;
-    this.analysis = analysis;
-    this.direction_is_vert = direction_is_vert;
-  }
-
-  // Compute the difference in constant sums
-  public totalNumericDifference(): number {
-    return Math.abs(this.analysis[0].sum - this.analysis[1].sum);
-  }
-
-  // Compute the magnitude of the difference in constant sums
-  public magnitudeNumericDifference(): number {
-    const n = this.totalNumericDifference();
-    return n === 0 ? 0 : Math.log10(n);
-  }
-}
-
-export class WorkbookAnalysis {
-  private sheets: WorksheetAnalysis[] = [];
-
-  public getSheet(n: number) {
-    return this.sheets[n];
-  }
-
-  public appendSheet(s: WorksheetAnalysis) {
-    this.sheets.push(s);
-  }
-}
-
-export class WorksheetAnalysis {
-  private readonly sheet: WorksheetOutput;
-  private readonly pf: ProposedFix[];
-  private readonly foundBugs: ExceLintVector[];
-
-  constructor(sheet: WorksheetOutput, pf: ProposedFix[]) {
-    this.sheet = sheet;
-    this.pf = pf;
-    this.foundBugs = WorksheetAnalysis.createBugList(pf);
-  }
-
-  // Get the sheet name
-  get name(): string {
-    return this.sheet.sheetName;
-  }
-
-  // Get all of the proposed fixes.
-  get proposedFixes(): ProposedFix[] {
-    return this.pf;
-  }
-
-  // Compute number of cells containing formulas.
-  get numFormulaCells(): number {
-    return this.sheet.formulas.flat().filter((x) => x.length > 0).length;
-  }
-
-  // Count the number of non-empty cells.
-  get numValueCells(): number {
-    return this.sheet.values.flat().filter((x) => x.length > 0).length;
-  }
-
-  // Compute number of columns
-  get columns(): number {
-    return this.sheet.values[0].length;
-  }
-
-  // Compute number of rows
-  get rows(): number {
-    return this.sheet.values.length;
-  }
-
-  // Compute total number of cells
-  get totalCells(): number {
-    return this.rows * this.columns;
-  }
-
-  // Produce a sum total of all of the entropy scores for use as a weight
-  get weightedAnomalousRanges(): number {
-    return this.pf.map((x) => x[0]).reduce((x, y) => x + y, 0);
-  }
-
-  // Get the total number of anomalous cells
-  get numAnomalousCells(): number {
-    return this.foundBugs.length;
-  }
-
-  // For every proposed fix, if it is above the score threshold, keep it,
-  // and return the unique set of all vectors contained in any kept fix.
-  private static createBugList(pf: ProposedFix[]): ExceLintVector[] {
-    const keep: ExceLintVector[][] = flatMap(([score, rect1, rect2]) => {
-      if (score >= Colorize.reportingThreshold / 100) {
-        const rect1cells = Colorize.expand(upperleft(rect1), bottomright(rect1));
-        const rect2cells = Colorize.expand(upperleft(rect2), bottomright(rect2));
-        return new Some(rect1cells.concat(rect2cells));
-      } else {
-        return None;
-      }
-    }, pf);
-    let flattened = keep.flat(1);
-    return ExceLintVector.toSet(flattened);
-  }
-}
+import { Config } from "./config";
+import { Classification } from "./classification";
 
 export class Colorize {
-  public static maxCategories = 2; // Maximum number of categories for reported errors
-  public static minFixSize = 3; // Minimum size of a fix in number of cells
-  public static maxEntropy = 1.0; // Maximum entropy of a proposed fix
-
-  // Suppressing certain categories of errors.
-  public static suppressFatFix = true;
-  public static suppressDifferentReferentCount = false;
-  public static suppressRecurrentFormula = false; // true;
-  public static suppressOneExtraConstant = false; // true;
-  public static suppressNumberOfConstantsMismatch = false; // = true;
-  public static suppressBothConstants = false; // true;
-  public static suppressOneIsAllConstants = false; // true;
-  public static suppressR1C1Mismatch = false;
-  public static suppressAbsoluteRefMismatch = false;
-  public static suppressOffAxisReference = false; // true;
-  public static noElapsedTime = false; // if true, don't report elapsed time
-  public static reportingThreshold = 0; // 35; // Percent of anomalousness
-  public static suspiciousCellsReportingThreshold = 85; //  percent of bar
-  public static formattingDiscount = 50; // percent of discount: 100% means different formats = not suspicious at all
-
-  // Limits on how many formulas or values to attempt to process.
-  private static formulasThreshold = 10000;
-  private static valuesThreshold = 10000;
-
-  public static setReportingThreshold(value: number) {
-    Colorize.reportingThreshold = value;
-  }
-
-  public static getReportingThreshold(): number {
-    return Colorize.reportingThreshold;
-  }
-
-  public static setFormattingDiscount(value: number) {
-    Colorize.formattingDiscount = value;
-  }
-
-  public static getFormattingDiscount(): number {
-    return Colorize.formattingDiscount;
-  }
-
   // Color-blind friendly color palette.
   public static palette = [
     "#ecaaae",
@@ -294,248 +116,21 @@ export class Colorize {
   }
 
   private static fixCellCount(fix: ProposedFix): number {
-    const fixRange = Colorize.expand(upperleft(rect1(fix)), bottomright(rect1(fix))).concat(
-      Colorize.expand(upperleft(rect2(fix)), bottomright(rect2(fix)))
+    const fixRange = expand(upperleft(rect1(fix)), bottomright(rect1(fix))).concat(
+      expand(upperleft(rect2(fix)), bottomright(rect2(fix)))
     );
     return fixRange.length;
   }
 
   private static fixEntropy(fix: ProposedFix): number {
-    const leftFixSize = Colorize.expand(upperleft(rect1(fix)), bottomright(rect1(fix))).length;
-    const rightFixSize = Colorize.expand(upperleft(rect2(fix)), bottomright(rect2(fix))).length;
+    const leftFixSize = expand(upperleft(rect1(fix)), bottomright(rect1(fix))).length;
+    const rightFixSize = expand(upperleft(rect2(fix)), bottomright(rect2(fix))).length;
     const totalSize = leftFixSize + rightFixSize;
     const fixEntropy = -(
       (leftFixSize / totalSize) * Math.log2(leftFixSize / totalSize) +
       (rightFixSize / totalSize) * Math.log2(rightFixSize / totalSize)
     );
     return fixEntropy;
-  }
-
-  // Checks for "fat" fixes (that result in more than a single row or single column).
-  private static isFatFix(fix: ProposedFix): boolean {
-    let sameRow = false;
-    let sameColumn = false;
-    {
-      const fixColumn = upperleft(rect1(fix)).x;
-      if (
-        bottomright(rect1(fix)).x === fixColumn &&
-        upperleft(rect2(fix)).x === fixColumn &&
-        bottomright(rect2(fix)).x === fixColumn
-      ) {
-        sameColumn = true;
-      }
-      const fixRow = upperleft(rect1(fix)).y;
-      if (
-        bottomright(rect1(fix)).y === fixRow &&
-        upperleft(rect2(fix)).y === fixRow &&
-        bottomright(rect2(fix)).y === fixRow
-      ) {
-        sameRow = true;
-      }
-      return !sameColumn && !sameRow;
-    }
-  }
-
-  // Checks for recurrent formula fixes
-  // NOTE: not sure if this is working currently
-  private static isRecurrentFormula(rect_info: RectInfo[], direction_is_vert: boolean): boolean {
-    const rect_dependencies = rect_info.map((ri) => ri.dependencies);
-    for (let rect = 0; rect < rect_dependencies.length; rect++) {
-      // get the dependencies for this fix rectangle
-      const dependencies = rect_dependencies[rect];
-      // If any part of any of a rectangle's dependence vectors "points backward," the formula
-      // is recurrent.
-      for (let i = 0; i < dependencies.length; i++) {
-        if (direction_is_vert && dependencies[i].x === 0 && dependencies[i].y === -1) {
-          return true;
-        }
-        if (!direction_is_vert && dependencies[i].x === -1 && dependencies[i].y === 0) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  // Checks whether rectangles in fix have different refcounts
-  private static hasDifferingRefcounts(rect_info: RectInfo[]): boolean {
-    const dependence_count = rect_info.map((ri) => ri.dependence_count);
-    // Different number of referents (dependencies).
-    return dependence_count[0] !== dependence_count[1];
-  }
-
-  // Checks whether one formula has one more constant than the other
-  private static hasOneExtraConstant(rect_info: RectInfo[]): boolean {
-    const constants = rect_info.map((ri) => ri.constants);
-    return (
-      constants[0].length !== constants[1].length &&
-      Math.abs(constants[0].length - constants[1].length) === 1
-    );
-  }
-
-  // Checks whether one formula has one more constant than the other
-  private static numberOfConstantsMismatch(rect_info: RectInfo[]): boolean {
-    const constants = rect_info.map((ri) => ri.constants);
-    return (
-      constants[0].length !== constants[1].length &&
-      !(Math.abs(constants[0].length - constants[1].length) === 1)
-    );
-  }
-
-  // Checks whether both rectangles in a fix are constant-only
-  private static bothConstantOnly(rect_info: RectInfo[]): boolean {
-    const rect1 = rect_info[0];
-    const rect2 = rect_info[1];
-
-    // both have constants and neither have any other dependencies
-    return (
-      rect1.constants.length > 0 &&
-      rect2.constants.length > 0 &&
-      rect1.dependence_count + rect2.dependence_count === 0
-    );
-  }
-
-  // Checks whether only one rectangle is constant-only
-  private static onlyOneIsConstantOnly(rect_info: RectInfo[]): boolean {
-    const rect1 = rect_info[0];
-    const rect2 = rect_info[1];
-
-    // exactly one has constants and no other dependencies
-    return (
-      (rect1.constants.length > 0 && rect1.dependence_count === 0) ||
-      (rect2.constants.length > 0 && rect2.dependence_count === 0)
-    );
-  }
-
-  // Checks whether formulas have different R1C1 representations but
-  // induce the same set of dependencies.
-  private static hasR1C1Mismatch(rect_info: RectInfo[]): boolean {
-    const rect1 = rect_info[0];
-    const rect2 = rect_info[1];
-
-    // If the formulas don't match, it could
-    // be because of the presence of (possibly
-    // different) constants instead of the
-    // dependencies being different, so augment
-    // with a deep comparison.
-    return (
-      rect1.r1c1_formula !== rect2.r1c1_formula &&
-      !ExceLintVector.vectorSetEquals(rect1.dependencies, rect2.dependencies)
-    );
-  }
-
-  // Checks that the number of absolute references is the same.
-  private static absoluteRefMismatch(rect_info: RectInfo[]) {
-    return rect_info[0].absolute_refcount !== rect_info[1].absolute_refcount;
-  }
-
-  // Checks for off-axis reference
-  private static offAxisReference(rect_info: RectInfo[]) {
-    const all_dependencies = rect_info.map((ri) => ri.dependencies);
-
-    for (let rect = 0; rect < all_dependencies.length; rect++) {
-      // if both x and y offsets are not zero, their product will not be zero;
-      // this is an "off-axis" reference.
-      if (
-        all_dependencies[rect].length > 0 &&
-        all_dependencies[rect][0].x * all_dependencies[rect][0].y !== 0
-      ) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  // Apply some labels to fixes based on their structural properties.
-  private static classifyFixes(
-    fix: ProposedFix,
-    direction_is_vert: boolean,
-    rect_info: RectInfo[]
-  ): Colorize.BinCategory[] {
-    // Binning.
-    let bin: Colorize.BinCategory[] = [];
-
-    // Check for "fat" fix.
-    if (Colorize.isFatFix(fix)) bin.push(Colorize.BinCategory.FatFix);
-
-    // Check for recurrent formulas.
-    if (Colorize.isRecurrentFormula(rect_info, direction_is_vert))
-      bin.push(Colorize.BinCategory.RecurrentFormula);
-
-    // Check for differing refcounts.
-    if (Colorize.hasDifferingRefcounts(rect_info))
-      bin.push(Colorize.BinCategory.DifferentReferentCount);
-
-    // Check for one extra constant.
-    if (Colorize.hasOneExtraConstant(rect_info)) bin.push(Colorize.BinCategory.OneExtraConstant);
-
-    // Check that there isn't a mismatch in constant counts
-    // (excluding "one extra constant").
-    if (Colorize.numberOfConstantsMismatch(rect_info))
-      bin.push(Colorize.BinCategory.NumberOfConstantsMismatch);
-
-    // Check whether both formulas are constants-only.
-    if (Colorize.bothConstantOnly(rect_info)) bin.push(Colorize.BinCategory.BothConstants);
-
-    // Check whether exactly one formula is constant-only.
-    if (Colorize.onlyOneIsConstantOnly(rect_info)) bin.push(Colorize.BinCategory.OneIsAllConstants);
-
-    // Check for mismatched R1C1 representation.
-    if (Colorize.hasR1C1Mismatch(rect_info)) bin.push(Colorize.BinCategory.R1C1Mismatch);
-
-    // Different number of absolute ($, a.k.a. "anchor") references.
-    if (Colorize.absoluteRefMismatch(rect_info)) bin.push(Colorize.BinCategory.AbsoluteRefMismatch);
-
-    // Dependencies that are neither vertical or horizontal
-    // (likely errors if there is also an absolute-ref-mismatch).
-    if (Colorize.offAxisReference(rect_info)) bin.push(Colorize.BinCategory.OffAxisReference);
-
-    // If no predicates were triggered, classify this as "unclassified"
-    if (bin.length == 0) bin.push(Colorize.BinCategory.Unclassified);
-
-    return bin;
-  }
-
-  // In case there's more than one classification, prune some by priority (best explanation).
-  private static pruneFixes(bin: Colorize.BinCategory[]): Colorize.BinCategory[] {
-    if (bin.includes(Colorize.BinCategory.OneIsAllConstants)) {
-      return [Colorize.BinCategory.OneIsAllConstants];
-    }
-    return bin;
-  }
-
-  // Should we omit some fixes depending on the user configuration?
-  private static omitFixes(bin: Colorize.BinCategory[], rect_info: RectInfo[]): boolean {
-    const print_formulas = rect_info.map((ri) => ri.print_formula);
-
-    if (
-      bin.length > Colorize.maxCategories || // Too many categories
-      (bin.indexOf(Colorize.BinCategory.FatFix) !== -1 && Colorize.suppressFatFix) ||
-      (bin.indexOf(Colorize.BinCategory.DifferentReferentCount) !== -1 &&
-        Colorize.suppressDifferentReferentCount) ||
-      (bin.indexOf(Colorize.BinCategory.RecurrentFormula) !== -1 &&
-        Colorize.suppressRecurrentFormula) ||
-      (bin.indexOf(Colorize.BinCategory.OneExtraConstant) !== -1 &&
-        Colorize.suppressOneExtraConstant) ||
-      (bin.indexOf(Colorize.BinCategory.NumberOfConstantsMismatch) != -1 &&
-        Colorize.suppressNumberOfConstantsMismatch) ||
-      (bin.indexOf(Colorize.BinCategory.BothConstants) !== -1 && Colorize.suppressBothConstants) ||
-      (bin.indexOf(Colorize.BinCategory.OneIsAllConstants) !== -1 &&
-        Colorize.suppressOneIsAllConstants) ||
-      (bin.indexOf(Colorize.BinCategory.R1C1Mismatch) !== -1 && Colorize.suppressR1C1Mismatch) ||
-      (bin.indexOf(Colorize.BinCategory.AbsoluteRefMismatch) !== -1 &&
-        Colorize.suppressAbsoluteRefMismatch) ||
-      (bin.indexOf(Colorize.BinCategory.OffAxisReference) !== -1 &&
-        Colorize.suppressOffAxisReference)
-    ) {
-      console.warn("Omitted " + JSON.stringify(print_formulas) + "(" + JSON.stringify(bin) + ")");
-      return true;
-    } else {
-      console.warn(
-        "NOT omitted " + JSON.stringify(print_formulas) + "(" + JSON.stringify(bin) + ")"
-      );
-      return false;
-    }
   }
 
   // Performs an analysis on an entire workbook
@@ -564,7 +159,7 @@ export class Colorize {
       const final_adjusted_fixes: ProposedFix[] = []; // We will eventually trim these.
       a.proposed_fixes = Colorize.filterFixesByUserThreshold(
         a.proposed_fixes,
-        Colorize.reportingThreshold
+        Config.reportingThreshold
       );
 
       // Remove fixes that require fixing both a formula AND formatting.
@@ -590,25 +185,27 @@ export class Colorize {
         const rect_info = rectangles(fix).map((rect) => new RectInfo(rect, sheet));
 
         // Omit fixes that are too small (too few cells).
-        if (Colorize.fixCellCount(fix) < Colorize.minFixSize) {
+        if (Colorize.fixCellCount(fix) < Config.minFixSize) {
           const print_formulas = JSON.stringify(rect_info.map((fi) => fi.print_formula));
           console.warn("Omitted " + print_formulas + "(too small)");
           continue;
         }
 
         // Omit fixes with entropy change over threshold
-        if (Colorize.fixEntropy(fix) > Colorize.maxEntropy) {
+        if (Colorize.fixEntropy(fix) > Config.maxEntropy) {
           const print_formulas = JSON.stringify(rect_info.map((fi) => fi.print_formula));
           console.warn("Omitted " + JSON.stringify(print_formulas) + "(too high entropy)");
           continue;
         }
 
         // Classify fixes & prune based on the best explanation
-        const bin = Colorize.pruneFixes(Colorize.classifyFixes(fix, is_vert, rect_info));
+        const bin = Classification.pruneFixes(
+          Classification.classifyFixes(fix, is_vert, rect_info)
+        );
 
         // IMPORTANT:
         // Exclude reported bugs subject to certain conditions.
-        if (Colorize.omitFixes(bin, rect_info)) continue;
+        if (Classification.omitFixes(bin, rect_info)) continue;
 
         // If we're still here, accept this fix
         final_adjusted_fixes.push(fix);
@@ -618,7 +215,7 @@ export class Colorize {
       }
 
       let elapsed = myTimer.elapsedTime();
-      if (Colorize.noElapsedTime) {
+      if (Config.noElapsedTime) {
         elapsed = 0; // Dummy value, used for regression testing.
       }
 
@@ -626,17 +223,6 @@ export class Colorize {
       wba.appendSheet(new WorksheetAnalysis(sheet, final_adjusted_fixes));
     }
     return wba;
-  }
-
-  // Convert a rectangle into a list of indices.
-  public static expand(first: ExceLintVector, second: ExceLintVector): ExceLintVector[] {
-    const expanded: ExceLintVector[] = [];
-    for (let i = first.x; i <= second.x; i++) {
-      for (let j = first.y; j <= second.y; j++) {
-        expanded.push(new ExceLintVector(i, j, 0));
-      }
-    }
-    return expanded;
   }
 
   // Generate dependence vectors and their hash for all formulas.
@@ -954,7 +540,7 @@ export class Colorize {
     // Filter out non-empty items from whole matrix.
     const totalFormulas = (formulas as any).flat().filter(Boolean).length;
 
-    if (totalFormulas > this.formulasThreshold) {
+    if (totalFormulas > Config.formulasThreshold) {
       console.warn("Too many formulas to perform formula analysis.");
     } else {
       processed_formulas = Colorize.process_formulas(formulas, origin.x - 1, origin.y - 1);
@@ -967,7 +553,7 @@ export class Colorize {
 
     // Filter out non-empty items from whole matrix.
     const totalValues = (values as any).flat().filter(Boolean).length;
-    if (totalValues > this.valuesThreshold) {
+    if (totalValues > Config.valuesThreshold) {
       console.warn("Too many values to perform reference analysis.");
     } else {
       // Compute references (to color referenced data).
@@ -1092,7 +678,7 @@ export class Colorize {
     // tslint:disable-next-line: forin
     for (const k in fixes) {
       const original_score = fixes[k][0];
-      if (-original_score < Colorize.reportingThreshold / 100) {
+      if (-original_score < Config.reportingThreshold / 100) {
         continue;
       }
       const this_front_str = JSON.stringify(fixes[k][1]);
@@ -1309,25 +895,5 @@ export class Colorize {
       }
     }
     return suspiciousCells;
-  }
-}
-
-export namespace Colorize {
-  export enum BinCategory {
-    FatFix = "Inconsistent multiple columns/rows", // fix is not a single column or single row
-    RecurrentFormula = "Formula(s) refer to each other", // formulas refer to each other
-    OneExtraConstant = "Formula(s) with an extra constant", // one has no constant and the other has one constant
-    NumberOfConstantsMismatch = "Formulas have different number of constants", // both have constants but not the same number of constants
-    BothConstants = "All constants, but different values", // both have only constants but differ in numeric value
-    OneIsAllConstants = "Mix of constants and formulas", // one is entirely constants and other is formula
-    AbsoluteRefMismatch = "Mix of absolute ($) and regular references", // relative vs. absolute mismatch
-    OffAxisReference = "References refer to different rows/columns", // references refer to different columns or rows
-    R1C1Mismatch = "Refers to different ranges", // different R1C1 representations
-    DifferentReferentCount = "Formula ranges are of different sizes", // ranges have different number of referents
-    // Not yet implemented.
-    RefersToEmptyCells = "Formulas refer to empty cells",
-    UsesDifferentOperations = "Formulas use different functions", // e.g. SUM vs. AVERAGE
-    // Fall-through category
-    Unclassified = "unclassified",
   }
 }

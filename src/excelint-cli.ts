@@ -6,14 +6,16 @@
 import fs = require("fs");
 import path = require("path");
 import { ExcelJSON } from "./exceljson";
-import { WorkbookAnalysis, Colorize } from "./colorize";
+import { Colorize } from "./colorize";
+import { WorkbookAnalysis } from "./ExceLintTypes";
+import { Config } from "./config";
 
 const usageString = "Usage: $0 <command> [options]";
-const defaultFormattingDiscount = Colorize.getFormattingDiscount();
-const defaultReportingThreshold = Colorize.getReportingThreshold();
-const defaultMaxCategories = Colorize.maxCategories; // FIXME should be an accessor
-const defaultMinFixSize = Colorize.minFixSize;
-const defaultMaxEntropy = Colorize.maxEntropy;
+const defaultFormattingDiscount = Config.getFormattingDiscount();
+const defaultReportingThreshold = Config.getReportingThreshold();
+const defaultMaxCategories = Config.maxCategories; // FIXME should be an accessor
+const defaultMinFixSize = Config.minFixSize;
+const defaultMaxEntropy = Config.maxEntropy;
 
 let numWorkbooks = 0;
 let numWorkbooksWithFormulas = 0;
@@ -105,37 +107,37 @@ if (formattingDiscount < 0) {
 if (formattingDiscount > 100) {
   formattingDiscount = 100;
 }
-Colorize.setFormattingDiscount(formattingDiscount);
+Config.setFormattingDiscount(formattingDiscount);
 
 if (args.suppressFatFix) {
-  Colorize.suppressFatFix = true;
+  Config.suppressFatFix = true;
 }
 if (args.suppressDifferentReferentCount) {
-  Colorize.suppressDifferentReferentCount = true;
+  Config.suppressDifferentReferentCount = true;
 }
 if (args.suppressRecurrentFormula) {
-  Colorize.suppressRecurrentFormula = true;
+  Config.suppressRecurrentFormula = true;
 }
 if (args.suppressOneExtraConstant) {
-  Colorize.suppressOneExtraConstant = true;
+  Config.suppressOneExtraConstant = true;
 }
 if (args.suppressNumberOfConstantsMismatch) {
-  Colorize.suppressNumberOfConstantsMismatch = true;
+  Config.suppressNumberOfConstantsMismatch = true;
 }
 if (args.suppressBothConstants) {
-  Colorize.suppressBothConstants = true;
+  Config.suppressBothConstants = true;
 }
 if (args.suppressOneIsAllConstants) {
-  Colorize.suppressOneIsAllConstants = true;
+  Config.suppressOneIsAllConstants = true;
 }
 if (args.suppressR1C1Mismatch) {
-  Colorize.suppressR1C1Mismatch = true;
+  Config.suppressR1C1Mismatch = true;
 }
 if (args.suppressAbsoluteRefMismatch) {
-  Colorize.suppressAbsoluteRefMismatch = true;
+  Config.suppressAbsoluteRefMismatch = true;
 }
 if (args.suppressOffAxisReference) {
-  Colorize.suppressOffAxisReference = true;
+  Config.suppressOffAxisReference = true;
 }
 
 // As above, but for reporting threshold.
@@ -150,14 +152,14 @@ if (reportingThreshold < 0) {
 if (reportingThreshold > 100) {
   reportingThreshold = 100;
 }
-Colorize.setReportingThreshold(reportingThreshold);
+Config.setReportingThreshold(reportingThreshold);
 
 if ("maxCategories" in args) {
-  Colorize.maxCategories = args.maxCategories;
+  Config.maxCategories = args.maxCategories;
 }
 
 if ("minFixSize" in args) {
-  Colorize.minFixSize = args.minFixSize;
+  Config.minFixSize = args.minFixSize;
 }
 
 let maxEntropy = defaultMaxEntropy;
@@ -205,9 +207,9 @@ const outputs: WorkbookAnalysis[] = [];
 
 for (const parms of parameters) {
   formattingDiscount = parms[0];
-  Colorize.setFormattingDiscount(formattingDiscount);
+  Config.setFormattingDiscount(formattingDiscount);
   reportingThreshold = parms[1];
-  Colorize.setReportingThreshold(reportingThreshold);
+  Config.setReportingThreshold(reportingThreshold);
 
   const scores = [];
 
