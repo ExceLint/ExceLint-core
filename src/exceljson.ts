@@ -1,5 +1,6 @@
 "use strict";
 
+import path = require("path");
 import * as XLSX from "xlsx";
 import * as sha224 from "crypto-js/sha224";
 import * as base64 from "crypto-js/enc-base64";
@@ -36,13 +37,19 @@ export class WorkbookOutput {
     this.worksheets = [];
   }
 
+  // Tracks a worksheet object in this workbook object
   public addWorksheet(ws: WorksheetOutput): void {
     this.worksheets.push(ws);
   }
 
+  // Returns the filename of the workbook, independently of the path
+  public workbookBaseName(): string {
+    return path.basename(this.workbookName);
+  }
+
   // Makes a copy of a WorkbookOutput object, replacing the name
-  public static AdjustWorkbookName(wb: WorkbookOutput, workbookName: string) {
-    const wbnew = new WorkbookOutput(workbookName);
+  public static AdjustWorkbookName(wb: WorkbookOutput) {
+    const wbnew = new WorkbookOutput(wb.workbookBaseName());
     wbnew.worksheets = wb.worksheets;
     return wbnew;
   }

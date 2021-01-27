@@ -3,13 +3,10 @@
 // www.emeryberger.com
 
 "use strict";
-const fs = require("fs");
-const path = require("path");
+import fs = require("fs");
+import path = require("path");
 import { ExcelJSON } from "./exceljson";
-import { ExcelUtils } from "./excelutils";
-import { Colorize } from "./colorize";
-import { Timer } from "./timer";
-import { string } from "prop-types";
+import { WorkbookAnalysis, Colorize } from "./colorize";
 
 const usageString = "Usage: $0 <command> [options]";
 const defaultFormattingDiscount = Colorize.getFormattingDiscount();
@@ -179,12 +176,12 @@ if ("maxEntropy" in args) {
 // Ready to start processing.
 //
 
-let annotated_bugs = "{}";
+let annotated_bugs: Buffer;
 try {
   annotated_bugs = fs.readFileSync("annotations-processed.json");
 } catch (e) {}
 
-const theBugs = JSON.parse(annotated_bugs);
+const theBugs = JSON.parse(annotated_bugs.toString());
 
 let base = "";
 if (args.directory) {
@@ -204,7 +201,7 @@ if (args.sweep) {
 }
 
 const f1scores = [];
-const outputs = [];
+const outputs: WorkbookAnalysis[] = [];
 
 for (const parms of parameters) {
   formattingDiscount = parms[0];

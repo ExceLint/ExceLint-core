@@ -1,5 +1,3 @@
-const path = require("path");
-
 // Polyfill for flat (IE & Edge)
 const flat = require("array.prototype.flat");
 flat.shim();
@@ -27,8 +25,9 @@ import {
   bottomright,
 } from "./ExceLintTypes";
 import { WorkbookOutput, WorksheetOutput } from "./exceljson";
+import { flatMap, Some, None } from "./option";
 
-class RectInfo {
+export class RectInfo {
   formula: string; // actual formulas
   constants: number[] = []; // all the numeric constants in each formula
   sum: number; // the sum of all the numeric constants in each formula
@@ -84,6 +83,91 @@ class FixAnalysis {
   public magnitudeNumericDifference(): number {
     const n = this.totalNumericDifference();
     return n === 0 ? 0 : Math.log10(n);
+  }
+}
+
+export class WorkbookAnalysis {
+  private sheets: WorksheetAnalysis[];
+
+  public getSheet(n: number) {
+    return this.sheets[n];
+  }
+
+  public appendSheet(s: WorksheetAnalysis) {
+    this.sheets.push(s);
+  }
+}
+
+export class WorksheetAnalysis {
+  private readonly sheet: WorksheetOutput;
+  private readonly pf: ProposedFix[];
+  private readonly foundBugs: ExceLintVector[];
+
+  constructor(sheet: WorksheetOutput, pf: ProposedFix[]) {
+    this.sheet = sheet;
+    this.pf = pf;
+    this.foundBugs = WorksheetAnalysis.createBugList(pf);
+  }
+
+  // Get the sheet name
+  get name(): string {
+    return this.sheet.sheetName;
+  }
+
+  // Get all of the proposed fixes.
+  get proposedFixes(): ProposedFix[] {
+    return this.pf;
+  }
+
+  // Compute number of cells containing formulas.
+  get numFormulaCells(): number {
+    return this.sheet.formulas.flat().filter((x) => x.length > 0).length;
+  }
+
+  // Count the number of non-empty cells.
+  get numValueCells(): number {
+    return this.sheet.values.flat().filter((x) => x.length > 0).length;
+  }
+
+  // Compute number of columns
+  get columns(): number {
+    return this.sheet.values[0].length;
+  }
+
+  // Compute number of rows
+  get rows(): number {
+    return this.sheet.values.length;
+  }
+
+  // Compute total number of cells
+  get totalCells(): number {
+    return this.rows * this.columns;
+  }
+
+  // Produce a sum total of all of the entropy scores for use as a weight
+  get weightedAnomalousRanges(): number {
+    return this.pf.map((x) => x[0]).reduce((x, y) => x + y, 0);
+  }
+
+  // Get the total number of anomalous cells
+  get numAnomalousCells(): number {
+    return this.foundBugs.length;
+  }
+
+  // For every proposed fix, if it is above the score threshold, keep it,
+  // and return the unique set of all vectors contained in any kept fix.
+  private static createBugList(pf: ProposedFix[]): ExceLintVector[] {
+    const keep: ExceLintVector[][] = flatMap(([score, rect1, rect2]) => {
+      if (score >= Colorize.reportingThreshold / 100) {
+        const rect1cells = Colorize.expand(upperleft(rect1), bottomright(rect1));
+        const rect2cells = Colorize.expand(upperleft(rect2), bottomright(rect2));
+        return new Some(rect1cells.concat(rect2cells));
+      } else {
+        return None;
+      }
+    }, pf);
+    let flattened = keep.flat(1);
+    return ExceLintVector.toSet(flattened);
   }
 }
 
@@ -454,9 +538,8 @@ export class Colorize {
     }
   }
 
-  public static process_workbook(inp: WorkbookOutput, sheetName: string): any {
-    // this object gets mangled along the way... don't expect a WorkbookOutput at the end
-    const output = WorkbookOutput.AdjustWorkbookName(inp, path.basename(inp["workbookName"]));
+  public static process_workbook(inp: WorkbookOutput, sheetName: string): WorkbookAnalysis {
+    const wba = new WorkbookAnalysis();
 
     // look for the requested sheet
     for (let i = 0; i < inp.worksheets.length; i++) {
@@ -537,55 +620,11 @@ export class Colorize {
       if (Colorize.noElapsedTime) {
         elapsed = 0; // Dummy value, used for regression testing.
       }
-      // Compute number of cells containing formulas.
-      const numFormulaCells = sheet.formulas.flat().filter((x) => x.length > 0).length;
 
-      // Count the number of non-empty cells.
-      const numValueCells = sheet.values.flat().filter((x) => x.length > 0).length;
-
-      // Compute total number of cells in the sheet (rows * columns).
-      const columns = sheet.values[0].length;
-      const rows = sheet.values.length;
-      const totalCells = rows * columns;
-
-      const out = {
-        anomalousnessThreshold: Colorize.reportingThreshold,
-        formattingDiscount: Colorize.formattingDiscount,
-        // 'proposedFixes': final_adjusted_fixes,
-        exampleFixes: example_fixes_r1c1,
-        //		'exampleFixesR1C1' : example_fixes_r1c1,
-        anomalousRanges: final_adjusted_fixes.length,
-        weightedAnomalousRanges: 0, // actually calculated below.
-        anomalousCells: 0, // actually calculated below.
-        elapsedTimeSeconds: elapsed / 1e6,
-        columns: columns,
-        rows: rows,
-        totalCells: totalCells,
-        numFormulaCells: numFormulaCells,
-        numValueCells: numValueCells,
-      };
-
-      // Compute precision and recall of proposed fixes, if we have annotated ground truth.
-      const workbookBasename = path.basename(inp["workbookName"]);
-      // Build list of bugs.
-      let foundBugs: any = final_adjusted_fixes.map((x) => {
-        if (x[0] >= Colorize.reportingThreshold / 100) {
-          return Colorize.expand(x[1][0], x[1][1]).concat(Colorize.expand(x[2][0], x[2][1]));
-        } else {
-          return [];
-        }
-      });
-      const foundBugsArray: any = Array.from(new Set(foundBugs.flat(1).map(JSON.stringify)));
-      foundBugs = foundBugsArray.map(JSON.parse);
-      out["anomalousCells"] = foundBugs.length;
-      const weightedAnomalousRanges = final_adjusted_fixes
-        .map((x) => x[0])
-        .reduce((x, y) => x + y, 0);
-      out["weightedAnomalousRanges"] = weightedAnomalousRanges;
-      out["proposedFixes"] = final_adjusted_fixes;
-      output.worksheets[sheet.sheetName] = out;
+      // gather all statistics about the sheet
+      wba.appendSheet(new WorksheetAnalysis(sheet, final_adjusted_fixes));
     }
-    return output; // , scores, sheetTruePositiveSet, sheetTruePositives, sheetFalsePositiveSet, sheetFalsePositives };
+    return wba;
   }
 
   // Convert a rectangle into a list of indices.

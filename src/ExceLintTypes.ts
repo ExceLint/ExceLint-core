@@ -2,7 +2,8 @@ export interface Dict<V> {
   [key: string]: V;
 }
 
-export type Spreadsheet = Array<Array<string>>;
+// all users of Spreadsheet store their data in row-major format (i.e., indexed by y first, then x).
+export type Spreadsheet = string[][];
 
 export type Fingerprint = string;
 
@@ -98,28 +99,47 @@ export class ExceLintVector {
   public static vectorSetEquals(set1: ExceLintVector[], set2: ExceLintVector[]): boolean {
     // create a hashs et with elements from set1,
     // and then check that set2 induces the same set
-    const hset1: Set<number> = new Set();
-    set1.forEach((v) => hset1.add(v.hash()));
+    const hset: Set<number> = new Set();
+    set1.forEach((v) => hset.add(v.hash()));
 
     // check hset1 for hashes of elements in set2.
     // if there is a match, remove the element from hset1.
     // if there isn't a match, return early.
     for (let i = 0; i < set2.length; i++) {
       const h = set2[i].hash();
-      if (hset1.has(h)) {
-        hset1.delete(h);
+      if (hset.has(h)) {
+        hset.delete(h);
       } else {
         // sets are definitely not equal
         return false;
       }
     }
 
-    // sets are equal iff hset1 has no remaining elements
-    return hset1.size === 0;
+    // sets are equal iff hset has no remaining elements
+    return hset.size === 0;
   }
 
   // A multiplier for the hash function.
   public static readonly Multiplier = 1; // 103037;
+
+  // Given an array of ExceLintVectors, returns an array of unique
+  // ExceLintVectors.  This explicitly does not return Javascript's Set
+  // datatype, which is inherently dangerous for UDTs, since it curiously
+  // provides no mechanism for specifying membership based on user-defined
+  // object equality.
+  public static toSet(vs: ExceLintVector[]): ExceLintVector[] {
+    const out: ExceLintVector[] = [];
+    const hset: Set<number> = new Set();
+    for (const i in vs) {
+      const v = vs[i];
+      const h = v.hash();
+      if (!hset.has(h)) {
+        out.push(v);
+        hset.add(h);
+      }
+    }
+    return out;
+  }
 }
 
 export class Analysis {
