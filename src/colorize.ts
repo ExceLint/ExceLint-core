@@ -538,6 +538,7 @@ export class Colorize {
     }
   }
 
+  // Performs an analysis on an entire workbook
   public static process_workbook(inp: WorkbookOutput, sheetName: string): WorkbookAnalysis {
     const wba = new WorkbookAnalysis();
 
@@ -944,13 +945,6 @@ export class Colorize {
     formulas: Spreadsheet,
     values: Spreadsheet
   ): Analysis {
-    if (false) {
-      console.log("process_suspicious:");
-      console.log(JSON.stringify(usedRangeAddress));
-      console.log(JSON.stringify(formulas));
-      console.log(JSON.stringify(values));
-    }
-
     const t = new Timer("process_suspicious");
 
     const [sheetName, startCell] = ExcelUtils.extract_sheet_cell(usedRangeAddress);
@@ -999,14 +993,6 @@ export class Colorize {
     // find proposed fixes
     const proposed_fixes = Colorize.generate_proposed_fixes(grouped_formulas);
 
-    if (false) {
-      console.log("results:");
-      console.log(JSON.stringify(suspicious_cells));
-      console.log(JSON.stringify(grouped_formulas));
-      console.log(JSON.stringify(grouped_data));
-      console.log(JSON.stringify(proposed_fixes));
-    }
-
     return new Analysis(suspicious_cells, grouped_formulas, grouped_data, proposed_fixes);
   }
 
@@ -1052,9 +1038,8 @@ export class Colorize {
       fix_distance = 1.0;
     }
     const entropy_drop = this.entropydiff(n_min, n_max); // negative
-    let ranking = (1.0 + entropy_drop) / (fix_distance * n_min); // ENTROPY WEIGHTED BY FIX DISTANCE
-    ranking = -ranking; // negating to sort in reverse order.
-    return ranking;
+    const ranking = (1.0 + entropy_drop) / (fix_distance * n_min); // ENTROPY WEIGHTED BY FIX DISTANCE
+    return -ranking; // negating to sort in reverse order.
   }
 
   // Iterate through the size of proposed fixes.
