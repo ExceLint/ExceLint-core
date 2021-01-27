@@ -87,7 +87,7 @@ class FixAnalysis {
 }
 
 export class WorkbookAnalysis {
-  private sheets: WorksheetAnalysis[];
+  private sheets: WorksheetAnalysis[] = [];
 
   public getSheet(n: number) {
     return this.sheets[n];
