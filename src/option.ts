@@ -19,7 +19,7 @@ class NoneType implements IOption {
 }
 export const None = new NoneType(); // singleton None
 
-type Option<T> = Some<T> | NoneType;
+export type Option<T> = Some<T> | NoneType;
 
 // Given a list of elements of type U and a function that maps elements to
 // Option<T>, return only elements of type T.  In other words, filter out
