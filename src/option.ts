@@ -10,7 +10,7 @@ export class Some<T> implements Option {
     this.t = t;
   }
 
-  public get(): T {
+  public get value(): T {
     return this.t;
   }
 }
@@ -29,7 +29,7 @@ export function flatMap<U, T>(f: (u: U) => Option, us: U[]): T[] {
     const t = f(u);
     // only keep element if it evaluated to Some<T>
     if (t.hasValue) {
-      ts.push((t as Some<T>).get());
+      ts.push((t as Some<T>).value);
     }
   }
   return ts;
