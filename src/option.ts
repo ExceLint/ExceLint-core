@@ -1,10 +1,7 @@
 // I basically cannot live without this
-export interface IOption {
-  hasValue: boolean;
-}
-export class Some<T> implements IOption {
+export class Some<T> {
   private t: T;
-  public hasValue: boolean = true;
+  public hasValue: true;
 
   constructor(t: T) {
     this.t = t;
@@ -14,8 +11,8 @@ export class Some<T> implements IOption {
     return this.t;
   }
 }
-class NoneType implements IOption {
-  public hasValue: boolean = true;
+class NoneType {
+  public hasValue: false;
 }
 export const None = new NoneType(); // singleton None
 
