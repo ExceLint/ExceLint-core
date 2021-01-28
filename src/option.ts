@@ -1,8 +1,8 @@
 // I basically cannot live without this
-export interface Option {
+export interface IOption {
   hasValue: boolean;
 }
-export class Some<T> implements Option {
+export class Some<T> implements IOption {
   private t: T;
   public hasValue: boolean = true;
 
@@ -14,15 +14,17 @@ export class Some<T> implements Option {
     return this.t;
   }
 }
-class NoneType implements Option {
+class NoneType implements IOption {
   public hasValue: boolean = true;
 }
 export const None = new NoneType(); // singleton None
 
+type Option<T> = Some<T> | NoneType;
+
 // Given a list of elements of type U and a function that maps elements to
 // Option<T>, return only elements of type T.  In other words, filter out
 // all NoneType elements, and unwrap Some<T> elements.
-export function flatMap<U, T>(f: (u: U) => Option, us: U[]): T[] {
+export function flatMap<U, T>(f: (u: U) => Option<T>, us: U[]): T[] {
   const ts: T[] = [];
   for (const i in us) {
     const u = us[i];
