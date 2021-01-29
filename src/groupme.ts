@@ -1,6 +1,15 @@
 import { binsearch, strict_binsearch } from "./binsearch";
 import { Colorize } from "./colorize";
-import { ExceLintVector, Dict, ProposedFix, Rectangle, Fingerprint, Metric } from "./ExceLintTypes";
+import {
+  ExceLintVector,
+  Dict,
+  ProposedFix,
+  Rectangle,
+  Fingerprint,
+  Metric,
+  upperleft,
+  bottomright,
+} from "./ExceLintTypes";
 import { ExcelJSON } from "./exceljson";
 
 // A comparison function to sort by x-coordinate.
@@ -267,15 +276,14 @@ function find_all_matching_rectangles(
         // compute the fix metric for every potential merge and
         // concatenate them into the match_list
         match_list = match_list.concat(
-          matches.map((item: Rectangle, _1, _2) => {
+          matches.map((item: Rectangle) => {
             const metric = Colorize.compute_fix_metric(
               parseFloat(thisfp),
               rect,
               parseFloat(fp),
               item
             );
-            const pf: ProposedFix = [metric, rect, item];
-            return pf;
+            return new ProposedFix(metric, rect, item);
           })
         );
       }
@@ -365,11 +373,11 @@ export function find_all_proposed_fixes(grouped_formulas: Dict<Rectangle[]>): Pr
   // reorganize proposed fixes so that the rectangle
   // with the lowest column number comes first
   all_matches = all_matches.map((pf: ProposedFix, _1, _2) => {
-    const [score, rect1, rect2] = pf;
-    const rect1_ul = rect1[0];
-    const rect2_ul = rect2[0];
+    const rect1_ul = upperleft(pf.rect1);
+    const rect2_ul = upperleft(pf.rect2);
     // swap rect1 and rect2 depending on the outcome of the comparison
-    const newpf: ProposedFix = numComparator(rect1_ul, rect2_ul) < 0 ? [score, rect2, rect1] : pf;
+    const newpf: ProposedFix =
+      numComparator(rect1_ul, rect2_ul) < 0 ? new ProposedFix(pf.score, pf.rect2, pf.rect1) : pf;
     return newpf;
   });
 

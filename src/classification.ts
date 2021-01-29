@@ -7,19 +7,19 @@ export class Classification {
     let sameRow = false;
     let sameColumn = false;
     {
-      const fixColumn = XLNT.upperleft(XLNT.rect1(fix)).x;
+      const fixColumn = XLNT.upperleft(fix.rect1).x;
       if (
-        XLNT.bottomright(XLNT.rect1(fix)).x === fixColumn &&
-        XLNT.upperleft(XLNT.rect2(fix)).x === fixColumn &&
-        XLNT.bottomright(XLNT.rect2(fix)).x === fixColumn
+        XLNT.bottomright(fix.rect1).x === fixColumn &&
+        XLNT.upperleft(fix.rect2).x === fixColumn &&
+        XLNT.bottomright(fix.rect2).x === fixColumn
       ) {
         sameColumn = true;
       }
-      const fixRow = XLNT.upperleft(XLNT.rect1(fix)).y;
+      const fixRow = XLNT.upperleft(fix.rect1).y;
       if (
-        XLNT.bottomright(XLNT.rect1(fix)).y === fixRow &&
-        XLNT.upperleft(XLNT.rect2(fix)).y === fixRow &&
-        XLNT.bottomright(XLNT.rect2(fix)).y === fixRow
+        XLNT.bottomright(fix.rect1).y === fixRow &&
+        XLNT.upperleft(fix.rect2).y === fixRow &&
+        XLNT.bottomright(fix.rect2).y === fixRow
       ) {
         sameRow = true;
       }

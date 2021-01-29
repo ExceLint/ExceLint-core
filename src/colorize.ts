@@ -83,10 +83,10 @@ export class Colorize {
   ): XLNT.ProposedFix[] {
     const fixes2: XLNT.ProposedFix[] = [];
     for (let ind = 0; ind < fixes.length; ind++) {
-      const [score, first, second] = fixes[ind];
-      let adjusted_score = -score;
+      const pf = fixes[ind];
+      let adjusted_score = -pf.score;
       if (adjusted_score * 100 >= thresh) {
-        fixes2.push([adjusted_score, first, second]);
+        fixes2.push(new XLNT.ProposedFix(adjusted_score, pf.rect1, pf.rect2));
       }
     }
     return fixes2;
@@ -94,28 +94,21 @@ export class Colorize {
 
   // Returns true if the "direction" of a fix is vertical
   private static fixIsVertical(fix: XLNT.ProposedFix): boolean {
-    const rect1_ul_x = XLNT.upperleft(XLNT.rect1(fix)).x;
-    const rect2_ul_x = XLNT.upperleft(XLNT.rect2(fix)).x;
+    const rect1_ul_x = XLNT.upperleft(fix.rect1).x;
+    const rect2_ul_x = XLNT.upperleft(fix.rect2).x;
     return rect1_ul_x === rect2_ul_x;
   }
 
   private static fixCellCount(fix: XLNT.ProposedFix): number {
-    const fixRange = XLNT.expand(
-      XLNT.upperleft(XLNT.rect1(fix)),
-      XLNT.bottomright(XLNT.rect1(fix))
-    ).concat(XLNT.expand(XLNT.upperleft(XLNT.rect2(fix)), XLNT.bottomright(XLNT.rect2(fix))));
+    const fixRange = XLNT.expand(XLNT.upperleft(fix.rect1), XLNT.bottomright(fix.rect1)).concat(
+      XLNT.expand(XLNT.upperleft(fix.rect2), XLNT.bottomright(fix.rect2))
+    );
     return fixRange.length;
   }
 
   private static fixEntropy(fix: XLNT.ProposedFix): number {
-    const leftFixSize = XLNT.expand(
-      XLNT.upperleft(XLNT.rect1(fix)),
-      XLNT.bottomright(XLNT.rect1(fix))
-    ).length;
-    const rightFixSize = XLNT.expand(
-      XLNT.upperleft(XLNT.rect2(fix)),
-      XLNT.bottomright(XLNT.rect2(fix))
-    ).length;
+    const leftFixSize = XLNT.expand(XLNT.upperleft(fix.rect1), XLNT.bottomright(fix.rect1)).length;
+    const rightFixSize = XLNT.expand(XLNT.upperleft(fix.rect2), XLNT.bottomright(fix.rect2)).length;
     const totalSize = leftFixSize + rightFixSize;
     const fixEntropy = -(
       (leftFixSize / totalSize) * Math.log2(leftFixSize / totalSize) +
@@ -163,8 +156,6 @@ export class Colorize {
       );
 
       // Process all the fixes, classifying and optionally pruning them.
-      const example_fixes_r1c1: XLNT.FixAnalysis[] = []; // TODO DAN: this really needs a type
-
       for (let ind = 0; ind < initial_adjusted_fixes.length; ind++) {
         // Get this fix
         const fix = initial_adjusted_fixes[ind];
@@ -173,7 +164,7 @@ export class Colorize {
         const is_vert: boolean = Colorize.fixIsVertical(fix);
 
         // Formula info for each rectangle
-        const rect_info = XLNT.rectangles(fix).map((rect) => new XLNT.RectInfo(rect, sheet));
+        const rect_info = fix.rectangles.map((rect) => new XLNT.RectInfo(rect, sheet));
 
         // Omit fixes that are too small (too few cells).
         if (Colorize.fixCellCount(fix) < Config.minFixSize) {
@@ -201,8 +192,8 @@ export class Colorize {
         // If we're still here, accept this fix
         final_adjusted_fixes.push(fix);
 
-        // Package everything up and append to array
-        example_fixes_r1c1.push(new XLNT.FixAnalysis(fix, bin, rect_info, is_vert));
+        // Package everything up with the fix
+        fix.analysis = new XLNT.FixAnalysis(fix, bin, rect_info, is_vert);
       }
 
       let elapsed = myTimer.elapsedTime();
@@ -211,7 +202,7 @@ export class Colorize {
       }
 
       // gather all statistics about the sheet
-      wba.appendSheet(new XLNT.WorksheetAnalysis(sheet, final_adjusted_fixes));
+      wba.addSheet(new XLNT.WorksheetAnalysis(sheet, final_adjusted_fixes, a));
     }
     return wba;
   }
@@ -326,8 +317,9 @@ export class Colorize {
     // Separate into groups based on their XLNT.Fingerprint value.
     const groups = {};
     for (const r of list) {
-      groups[r[1]] = groups[r[1]] || [];
-      groups[r[1]].push(r[0]);
+      const [vec, fp] = r;
+      groups[fp] = groups[fp] || []; // initialize array if necessary
+      groups[fp].push(vec);
     }
     // Now sort them all.
     for (const k of Object.keys(groups)) {
@@ -648,85 +640,11 @@ export class Colorize {
     return count;
   }
 
-  // Try to merge fixes into larger groups.
-  public static fix_proposed_fixes(
-    fixes: Array<
-      [
-        number,
-        [XLNT.ExceLintVector, XLNT.ExceLintVector],
-        [XLNT.ExceLintVector, XLNT.ExceLintVector]
-      ]
-    >
-  ): Array<
-    [number, [XLNT.ExceLintVector, XLNT.ExceLintVector], [XLNT.ExceLintVector, XLNT.ExceLintVector]]
-  > {
-    // example: [[-0.8729568798082977,[[4,23],[13,23]],[[3,23,0],[3,23,0]]],[-0.6890824929174288,[[4,6],[7,6]],[[3,6,0],[3,6,0]]],[-0.5943609377704335,[[4,10],[6,10]],[[3,10,0],[3,10,0]]],[-0.42061983571430495,[[3,27],[4,27]],[[5,27,0],[5,27,0]]],[-0.42061983571430495,[[4,14],[5,14]],[[3,14,0],[3,14,0]]],[-0.42061983571430495,[[6,27],[7,27]],[[5,27,0],[5,27,0]]]]
-    const count = 0;
-    // Search for fixes where the same coordinate pair appears in the front and in the back.
-    const front = {};
-    const back = {};
-    // Build up the front and back dictionaries.
-    // tslint:disable-next-line: forin
-    for (const k in fixes) {
-      // Sort the fixes so the smaller array (further up and
-      // to the left) always comes first.
-      if (fixes[k][1] > fixes[k][2]) {
-        const tmp = fixes[k][1];
-        fixes[k][1] = fixes[k][2];
-        fixes[k][2] = tmp;
-      }
-      // Now add them.
-      front[JSON.stringify(fixes[k][1])] = fixes[k];
-      back[JSON.stringify(fixes[k][2])] = fixes[k];
-    }
-    // Now iterate through one, looking for hits on the other.
-    const new_fixes = [];
-    const merged = {};
-    // tslint:disable-next-line: forin
-    for (const k in fixes) {
-      const original_score = fixes[k][0];
-      if (-original_score < Config.reportingThreshold / 100) {
-        continue;
-      }
-      const this_front_str = JSON.stringify(fixes[k][1]);
-      const this_back_str = JSON.stringify(fixes[k][2]);
-      if (!(this_front_str in back) && !(this_back_str in front)) {
-        // No match. Just merge them.
-        new_fixes.push(fixes[k]);
-      } else {
-        if (!merged[this_front_str] && this_front_str in back) {
-          // FIXME: does this score make sense? Verify mathematically.
-          const newscore = -original_score * JSON.parse(back[this_front_str][0]);
-          const new_fix = [newscore, fixes[k][1], back[this_front_str][1]];
-          new_fixes.push(new_fix);
-          merged[this_front_str] = true;
-          // FIXME? testing below. The idea is to not keep merging things (for now).
-          merged[this_back_str] = true;
-          continue;
-        }
-        if (!merged[this_back_str] && this_back_str in front) {
-          // this_back_str in front
-          //			console.log('**** (2) merging ' + this_back_str + ' with ' + JSON.stringify(front[this_back_str]));
-          // FIXME. This calculation may not make sense.
-          const newscore = -original_score * JSON.parse(front[this_back_str][0]);
-          //			console.log('pushing ' + JSON.stringify(fixes[k][1]) + ' with ' + JSON.stringify(front[this_back_str][1]));
-          const new_fix = [newscore, fixes[k][1], front[this_back_str][2]];
-          //			console.log('pushing ' + JSON.stringify(new_fix));
-          new_fixes.push(new_fix);
-          merged[this_back_str] = true;
-          // FIXME? testing below.
-          merged[this_front_str] = true;
-        }
-      }
-    }
-    return new_fixes;
-  }
-
   public static generate_proposed_fixes(groups: Dict<XLNT.Rectangle[]>): XLNT.ProposedFix[] {
     const proposed_fixes_new = find_all_proposed_fixes(groups);
     // sort by fix metric
     proposed_fixes_new.sort((a, b) => {
-      return a[0] - b[0];
+      return a.score - b.score;
     });
     return proposed_fixes_new;
   }
@@ -793,11 +711,9 @@ export class Colorize {
     const proposed_fixes: XLNT.ProposedFix[] = [];
     // tslint:disable-next-line: forin
     for (const k in fixes) {
-      // Format of proposed fixes =, e.g., [-3.016844756293869, [[5,7],[5,11]],[[6,7],[6,11]]]
-      // entropy, and two ranges:
-      //    upper-left corner of range (column, row), lower-right corner of range (column, row)
-
-      const [score, rect1, rect2] = fixes[k];
+      const score = fixes[k].score;
+      const rect1 = fixes[k].rect1;
+      const rect2 = fixes[k].rect2;
 
       // Find out which range is "first," i.e., sort by x and then by y.
       const [first, second] =
@@ -831,7 +747,7 @@ export class Colorize {
           }
         }
       }
-      proposed_fixes.push([score, first, second]);
+      proposed_fixes.push(new XLNT.ProposedFix(score, first, second));
     }
     return proposed_fixes;
   }
@@ -840,7 +756,7 @@ export class Colorize {
     cols: number,
     rows: number,
     origin: XLNT.ExceLintVector,
-    formulas: any[][],
+    formulas: XLNT.Spreadsheet,
     processed_formulas: [XLNT.ExceLintVector, string][],
     data_values: [XLNT.ExceLintVector, string][],
     threshold: number
@@ -877,14 +793,14 @@ export class Colorize {
         let totalFormulaWeight = 0;
         let totalWeight = 0;
         suspiciousCells = candidateSuspiciousCells.filter((c) => {
-          const theFormula = formulas[c[1] - origin[1]][c[0] - origin[0]];
+          const theFormula = formulas[c.y - origin.y][c.x - origin.x];
           if (theFormula.length < 1 || theFormula[0] !== "=") {
-            totalWeight += c[2];
+            totalWeight += c.c;
             return true;
           } else {
             // It's a formula: we will remove it, but also track how much it contributed to the probability distribution.
-            totalFormulaWeight += c[2];
-            totalWeight += c[2];
+            totalFormulaWeight += c.c;
+            totalWeight += c.c;
             return false;
           }
         });
@@ -893,9 +809,9 @@ export class Colorize {
         // Now we need to correct all the non-formulas to give them weight proportional to the case when the formulas are removed.
         const multiplier = totalFormulaWeight / totalWeight;
         console.log("after processing 1, suspiciousCells = " + JSON.stringify(suspiciousCells));
-        suspiciousCells = suspiciousCells.map((c) => [c[0], c[1], c[2] * multiplier]);
+        suspiciousCells = suspiciousCells.map((c) => [c.x, c.y, c.c * multiplier]);
         console.log("after processing 2, suspiciousCells = " + JSON.stringify(suspiciousCells));
-        suspiciousCells = suspiciousCells.filter((c) => c[2] <= threshold);
+        suspiciousCells = suspiciousCells.filter((c) => c.c <= threshold);
         console.log("after processing 3, suspiciousCells = " + JSON.stringify(suspiciousCells));
       } else {
         suspiciousCells = candidateSuspiciousCells;

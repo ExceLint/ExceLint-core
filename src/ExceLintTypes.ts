@@ -2,7 +2,7 @@ import { WorksheetOutput, WorkbookOutput } from "./exceljson";
 import { ExcelUtils } from "./excelutils";
 import { Classification } from "./classification";
 import { Config } from "./config";
-import { Some, None, flatMap } from "./option";
+import { Option, Some, None, flatMap } from "./option";
 
 export interface Dict<V> {
   [key: string]: V;
@@ -18,24 +18,52 @@ export type Metric = number;
 // a rectangle is defined by its start and end vectors
 export type Rectangle = [ExceLintVector, ExceLintVector];
 
-/* a tuple where:
-   - Metric is a "fix distance",
-   - the first Rectangle is the suspected buggy rectangle, and
-   - the second Rectangle is the merge candidate.
-*/
-export type ProposedFix = [Metric, Rectangle, Rectangle];
+export class ProposedFix {
+  // This comment no longer holds, since there is a data type for ProposedFix,
+  // but it is informative, since it explains the meaning of the fields:
+  // ## old comment ##
+  //   Format of proposed fixes =, e.g., [-3.016844756293869, [[5,7],[5,11]],[[6,7],[6,11]]]
+  //   entropy, and two ranges:
+  //      upper-left corner of range (column, row), lower-right corner of range (column, row)
+  // ## end old comment ##
+  private s: number; // fix distance (entropy)
+  private r1: Rectangle; // suspected bug
+  private r2: Rectangle; // merge candidate
+  private fa: Option<FixAnalysis> = None; // we add this later, after we analyze the fix
 
-export function rectangles(pf: ProposedFix): Rectangle[] {
-  const [_, rect1, rect2] = pf;
-  return [rect1, rect2];
-}
+  constructor(score: number, rect1: Rectangle, rect2: Rectangle) {
+    this.s = score;
+    this.r1 = rect1;
+    this.r2 = rect2;
+  }
 
-export function rect1(pf: ProposedFix): Rectangle {
-  return pf[1];
-}
+  public get rectangles(): [Rectangle, Rectangle] {
+    return [this.r1, this.rect2];
+  }
 
-export function rect2(pf: ProposedFix): Rectangle {
-  return pf[2];
+  public get score(): number {
+    return this.s;
+  }
+
+  public get rect1(): Rectangle {
+    return this.r1;
+  }
+
+  public get rect2(): Rectangle {
+    return this.r2;
+  }
+
+  public get analysis(): FixAnalysis {
+    if (this.fa.hasValue) {
+      return this.fa.value;
+    } else {
+      throw new Error("Cannot obtain analysis about unanalyzed fix.");
+    }
+  }
+
+  public set analysis(fix_analysis: FixAnalysis) {
+    this.fa = new Some(fix_analysis);
+  }
 }
 
 export function upperleft(r: Rectangle): ExceLintVector {
@@ -286,11 +314,23 @@ export class WorksheetAnalysis {
   private readonly sheet: WorksheetOutput;
   private readonly pf: ProposedFix[];
   private readonly foundBugs: ExceLintVector[];
+  private readonly analysis: Analysis;
 
-  constructor(sheet: WorksheetOutput, pf: ProposedFix[]) {
+  constructor(sheet: WorksheetOutput, pf: ProposedFix[], a: Analysis) {
     this.sheet = sheet;
     this.pf = pf;
     this.foundBugs = WorksheetAnalysis.createBugList(pf);
+    this.analysis = a;
+  }
+
+  // Get the grouped data
+  get groupedData(): Dict<Rectangle[]> {
+    return this.analysis.grouped_data;
+  }
+
+  // Get the grouped formulas
+  get groupedFormulas(): Dict<Rectangle[]> {
+    return this.analysis.grouped_formulas;
   }
 
   // Get the sheet name
@@ -341,10 +381,10 @@ export class WorksheetAnalysis {
   // For every proposed fix, if it is above the score threshold, keep it,
   // and return the unique set of all vectors contained in any kept fix.
   private static createBugList(pf: ProposedFix[]): ExceLintVector[] {
-    const keep: ExceLintVector[][] = flatMap(([score, rect1, rect2]) => {
-      if (score >= Config.reportingThreshold / 100) {
-        const rect1cells = expand(upperleft(rect1), bottomright(rect1));
-        const rect2cells = expand(upperleft(rect2), bottomright(rect2));
+    const keep: ExceLintVector[][] = flatMap((pf) => {
+      if (pf.score >= Config.reportingThreshold / 100) {
+        const rect1cells = expand(upperleft(pf.rect1), bottomright(pf.rect1));
+        const rect2cells = expand(upperleft(pf.rect2), bottomright(pf.rect2));
         return new Some(rect1cells.concat(rect2cells));
       } else {
         return None;
