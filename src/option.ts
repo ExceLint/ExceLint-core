@@ -1,7 +1,10 @@
 // I basically cannot live without this
 export class Some<T> {
   private t: T;
-  public hasValue: true;
+  // The person who decided that the default
+  // value of the 'true' datatype should be
+  // 'undefined' is an ASSHOLE.
+  public hasValue: true = true;
 
   constructor(t: T) {
     this.t = t;
@@ -12,7 +15,7 @@ export class Some<T> {
   }
 }
 class NoneType {
-  public hasValue: false;
+  public hasValue: false = false;
 }
 export const None = new NoneType(); // singleton None
 
