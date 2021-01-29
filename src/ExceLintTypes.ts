@@ -271,14 +271,14 @@ export class FixAnalysis {
 }
 
 export class WorkbookAnalysis {
-  private sheets: WorksheetAnalysis[] = [];
+  private sheets: Dict<WorksheetAnalysis> = {};
 
-  public getSheet(n: number) {
-    return this.sheets[n];
+  public getSheet(name: string) {
+    return this.sheets[name];
   }
 
-  public appendSheet(s: WorksheetAnalysis) {
-    this.sheets.push(s);
+  public addSheet(s: WorksheetAnalysis) {
+    this.sheets[s.name] = s;
   }
 }
 
