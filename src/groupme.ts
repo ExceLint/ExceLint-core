@@ -188,7 +188,7 @@ function find_all_matching_rectangles(
   thisfp: string,
   rect: Rectangle,
   fingerprintsX: string[],
-  fingerpritnsY: string[],
+  fingerprintsY: string[],
   x_ul: Dict<ExceLintVector[]>,
   x_lr: Dict<ExceLintVector[]>,
   bb: Dict<Rectangle>,
@@ -202,17 +202,13 @@ function find_all_matching_rectangles(
   let match_list: ProposedFix[] = [];
 
   // find the index of the given rectangle in the list of rects sorted by X
-  const ind1 = binsearch(bbsX, rect, (a: Rectangle, b: Rectangle) => {
-    return a[0].x - b[0].x;
-  });
+  const ind1 = binsearch(bbsX, rect, (a: Rectangle, b: Rectangle) => a[0].x - b[0].x);
 
   // find the index of the given rectangle in the list of rects sorted by Y
-  const ind2 = binsearch(bbsY, rect, (a: Rectangle, b: Rectangle) => {
-    return a[0].y - b[0].y;
-  });
+  const ind2 = binsearch(bbsY, rect, (a: Rectangle, b: Rectangle) => a[0].y - b[0].y);
 
   // Pick the coordinate axis that takes us the furthest in the fingerprint list.
-  const [fps, itmp, axis] = ind1 > ind2 ? [fingerprintsX, ind1, 0] : [fingerpritnsY, ind2, 1];
+  const [fps, itmp, axis] = ind1 > ind2 ? [fingerprintsX, ind1, 0] : [fingerprintsY, ind2, 1];
   const ind = itmp > 0 ? itmp - 1 : itmp;
   for (let i = ind; i < fps.length; i++) {
     const fp = fps[i];
@@ -309,14 +305,8 @@ export function find_all_proposed_fixes(grouped_formulas: Dict<Rectangle[]>): Pr
   const x_ul: Dict<ExceLintVector[]> = {}; // upper-left
   const x_lr: Dict<ExceLintVector[]> = {}; // lower-right
   for (const fp of Object.keys(grouped_formulas)) {
-    x_ul[fp] = aNum[fp].map((rect, _1, _2) => {
-      const [v1, _] = rect;
-      return v1;
-    });
-    x_lr[fp] = aNum[fp].map((rect, _1, _2) => {
-      const [_, v2] = rect;
-      return v2;
-    });
+    x_ul[fp] = aNum[fp].map((rect) => upperleft(rect));
+    x_lr[fp] = aNum[fp].map((rect) => bottomright(rect));
   }
 
   // find the bounding box for each group
@@ -326,27 +316,19 @@ export function find_all_proposed_fixes(grouped_formulas: Dict<Rectangle[]>): Pr
   const fingerprintsX: Fingerprint[] = Object.keys(grouped_formulas);
 
   // sort fingerprints by the x-coordinate of the upper-left corner of their bounding box.
-  fingerprintsX.sort((a: Fingerprint, b: Fingerprint) => {
-    return bb[a][0].x - bb[b][0].x;
-  });
+  fingerprintsX.sort((a: Fingerprint, b: Fingerprint) => bb[a][0].x - bb[b][0].x);
 
   // generate a sorted list of rectangles
-  const bbsX: Rectangle[] = fingerprintsX.map((fp, _1, _2) => {
-    return bb[fp];
-  });
+  const bbsX: Rectangle[] = fingerprintsX.map((fp) => bb[fp]);
 
   // extract fingerprints again
   const fingerprintsY = Object.keys(grouped_formulas);
 
   // sort fingerprints by the x-coordinate of the upper-left corner of their bounding box.
-  fingerprintsY.sort((a: Fingerprint, b: Fingerprint) => {
-    return bb[a][0].y - bb[b][0].y;
-  });
+  fingerprintsY.sort((a: Fingerprint, b: Fingerprint) => bb[a][0].y - bb[b][0].y);
 
   // generate a sorted list of rectangles
-  const bbsY: Rectangle[] = fingerprintsY.map((fp, _1, _2) => {
-    return bb[fp];
-  });
+  const bbsY: Rectangle[] = fingerprintsY.map((fp) => bb[fp]);
 
   // for every group
   for (const fp of Object.keys(grouped_formulas)) {
