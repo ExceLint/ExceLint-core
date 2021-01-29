@@ -240,7 +240,7 @@ export function rectangleComparator(r1: Rectangle, r2: Rectangle): number {
 }
 
 export class RectInfo {
-  formula: string; // actual formulas
+  formula: string; // actual formula
   constants: number[] = []; // all the numeric constants in each formula
   sum: number; // the sum of all the numeric constants in each formula
   dependencies: ExceLintVector[] = []; // the set of no-constant dependence vectors in the formula
