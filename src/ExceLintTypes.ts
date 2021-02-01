@@ -26,43 +26,43 @@ export class ProposedFix {
   //   entropy, and two ranges:
   //      upper-left corner of range (column, row), lower-right corner of range (column, row)
   // ## end old comment ##
-  private s: number; // fix distance (entropy)
-  private r1: Rectangle; // suspected bug
-  private r2: Rectangle; // merge candidate
-  private fa: Option<FixAnalysis> = None; // we add this later, after we analyze the fix
+  private _score: number; // fix distance (entropy)
+  private _rect1: Rectangle; // suspected bug
+  private _rect2: Rectangle; // merge candidate
+  private _analysis: Option<FixAnalysis> = None; // we add this later, after we analyze the fix
 
   constructor(score: number, rect1: Rectangle, rect2: Rectangle) {
-    this.s = score;
-    this.r1 = rect1;
-    this.r2 = rect2;
+    this._score = score;
+    this._rect1 = rect1;
+    this._rect2 = rect2;
   }
 
   public get rectangles(): [Rectangle, Rectangle] {
-    return [this.r1, this.rect2];
+    return [this._rect1, this.rect2];
   }
 
   public get score(): number {
-    return this.s;
+    return this._score;
   }
 
   public get rect1(): Rectangle {
-    return this.r1;
+    return this._rect1;
   }
 
   public get rect2(): Rectangle {
-    return this.r2;
+    return this._rect2;
   }
 
   public get analysis(): FixAnalysis {
-    if (this.fa.hasValue) {
-      return this.fa.value;
+    if (this._analysis.hasValue) {
+      return this._analysis.value;
     } else {
       throw new Error("Cannot obtain analysis about unanalyzed fix.");
     }
   }
 
   public set analysis(fix_analysis: FixAnalysis) {
-    this.fa = new Some(fix_analysis);
+    this._analysis = new Some(fix_analysis);
   }
 }
 
