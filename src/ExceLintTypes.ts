@@ -64,6 +64,22 @@ export class ProposedFix {
   public set analysis(fix_analysis: FixAnalysis) {
     this._analysis = new Some(fix_analysis);
   }
+
+  public equals(other: ProposedFix): boolean {
+    const [this_r1_ul, this_r1_br] = this.rect1;
+    const [this_r2_ul, this_r2_br] = this.rect2;
+
+    const [other_r1_ul, other_r1_br] = other.rect1;
+    const [other_r2_ul, other_r2_br] = other.rect2;
+
+    return (
+      this_r1_ul.equals(other_r1_ul) &&
+      this_r1_br.equals(other_r1_br) &&
+      this_r2_ul.equals(other_r2_ul) &&
+      this_r2_br.equals(other_r2_br) &&
+      this.score === other.score
+    );
+  }
 }
 
 export function upperleft(r: Rectangle): ExceLintVector {

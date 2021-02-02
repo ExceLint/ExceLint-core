@@ -288,10 +288,27 @@ function find_all_matching_rectangles(
   return match_list;
 }
 
-// Returns an array with all duplicated entries removed.
-function dedup(arr) {
-  const t = {};
-  return arr.filter((e) => !(t[e] = e in t));
+// Returns an array with all duplicate proposed fixes removed.
+function dedup_fixes(pfs: ProposedFix[]): ProposedFix[] {
+  // filtered array
+  const rv: ProposedFix[] = [];
+
+  // this is pretty brute force
+  for (const i in pfs) {
+    const my_pf = pfs[i];
+    let found = false;
+    for (const j in rv) {
+      const oth_pf = rv[j];
+      if (my_pf.equals(oth_pf)) {
+        found = true;
+        break; // my_pf is already in the list
+      }
+    }
+    // add to the list if it was never encountered
+    if (!found) rv.push(my_pf);
+  }
+
+  return rv;
 }
 
 export function find_all_proposed_fixes(grouped_formulas: Dict<Rectangle[]>): ProposedFix[] {
@@ -364,5 +381,5 @@ export function find_all_proposed_fixes(grouped_formulas: Dict<Rectangle[]>): Pr
   });
 
   // remove duplicate entries
-  return dedup(all_matches);
+  return dedup_fixes(all_matches);
 }
