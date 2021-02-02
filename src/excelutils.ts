@@ -4,7 +4,14 @@
 
 import * as sjcl from "sjcl";
 import { RectangleUtils } from "./rectangleutils";
-import { ExceLintVector, Dict, Spreadsheet } from "./ExceLintTypes";
+import {
+  ProposedFix,
+  ExceLintVector,
+  Dict,
+  Spreadsheet,
+  upperleft,
+  bottomright,
+} from "./ExceLintTypes";
 
 export class ExcelUtils {
   // sort routine
@@ -81,7 +88,7 @@ export class ExcelUtils {
   }
 
   public static get_rectangle(
-    proposed_fixes: any,
+    proposed_fixes: ProposedFix[],
     current_fix: number
   ): [string, string, string, string] {
     if (!proposed_fixes) {
@@ -89,14 +96,14 @@ export class ExcelUtils {
     }
     if (proposed_fixes.length > 0) {
       const r = RectangleUtils.bounding_box(
-        proposed_fixes[current_fix][1],
-        proposed_fixes[current_fix][2]
+        proposed_fixes[current_fix].rect1,
+        proposed_fixes[current_fix].rect2
       );
       // convert to sheet notation
-      const col0 = ExcelUtils.column_index_to_name(r[0].x);
-      const row0 = r[0].y.toString();
-      const col1 = ExcelUtils.column_index_to_name(r[1].x);
-      const row1 = r[1].y.toString();
+      const col0 = ExcelUtils.column_index_to_name(upperleft(r).x);
+      const row0 = upperleft(r).y.toString();
+      const col1 = ExcelUtils.column_index_to_name(bottomright(r).x);
+      const row1 = bottomright(r).y.toString();
       return [col0, row0, col1, row1];
     } else {
       return null;
