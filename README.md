@@ -35,7 +35,7 @@ To install an up-to-date version of `node` on Mac OS X with Homebrew:
 
 ExceLint comes with a range of test inputs. The simplest sanity check is to run on a single spreadsheet included in the distribution.
 
-    node dist/excelint-cli.js --input test/act3_lab23_posey.xlsx
+    node build/src/excelint-cli.js --input test/act3_lab23_posey.xlsx
 
 We manually audited a number of spreadsheets (from the "CUSTODES"
 suite); this annotations file is included in the `test`
@@ -43,7 +43,7 @@ directory. When it is present in the current directory,
 `excelint-cli.js` will automatically use it.
 
     cd test
-    node ../dist/excelint-cli.js --directory subjects_xlsx
+    node ../build/src/excelint-cli.js --directory subjects_xlsx
     
 ## Technical Details
 
