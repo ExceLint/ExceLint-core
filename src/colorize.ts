@@ -140,7 +140,6 @@ export class Colorize {
       const a = Colorize.process_suspicious(usedRangeAddress, sheet.formulas, sheet.values);
 
       // Eliminate fixes below user threshold
-      const final_adjusted_fixes: XLNT.ProposedFix[] = []; // We will eventually trim these.
       a.proposed_fixes = Colorize.filterFixesByUserThreshold(
         a.proposed_fixes,
         Config.reportingThreshold
@@ -148,7 +147,7 @@ export class Colorize {
 
       // Remove fixes that require fixing both a formula AND formatting.
       // NB: origin_col and origin_row currently hard-coded at 0,0.
-      const initial_adjusted_fixes = Colorize.adjust_proposed_fixes(
+      Colorize.adjust_proposed_fixes(
         a.proposed_fixes,
         sheet.styles,
         0,
@@ -156,9 +155,10 @@ export class Colorize {
       );
 
       // Process all the fixes, classifying and optionally pruning them.
-      for (let ind = 0; ind < initial_adjusted_fixes.length; ind++) {
+      const final_adjusted_fixes: XLNT.ProposedFix[] = []; // We will eventually trim these.
+      for (let ind = 0; ind < a.proposed_fixes.length; ind++) {
         // Get this fix
-        const fix = initial_adjusted_fixes[ind];
+        const fix = a.proposed_fixes[ind];
 
         // Determine the direction of the range (vertical or horizontal) by looking at the axes.
         const is_vert: boolean = Colorize.fixIsVertical(fix);
@@ -701,19 +701,20 @@ export class Colorize {
     }
   }
 
-  // Filter out any proposed fixes that do not have the same format.
+  // Mark proposed fixes that do not have the same format.
+  // Modifies ProposedFix objects, including their scores.
   public static adjust_proposed_fixes(
     fixes: XLNT.ProposedFix[],
     propertiesToGet: XLNT.Spreadsheet,
     origin_col: number,
     origin_row: number
-  ): XLNT.ProposedFix[] {
+  ): void {
     const proposed_fixes: XLNT.ProposedFix[] = [];
     // tslint:disable-next-line: forin
     for (const k in fixes) {
-      const score = fixes[k].score;
-      const rect1 = fixes[k].rect1;
-      const rect2 = fixes[k].rect2;
+      const fix = fixes[k];
+      const rect1 = fix.rect1;
+      const rect2 = fix.rect2;
 
       // Find out which range is "first," i.e., sort by x and then by y.
       const [first, second] =
@@ -735,21 +736,25 @@ export class Colorize {
       // We can iterate over the combination of both ranges at the same
       // time because all proposed fixes must be "merge compatible," i.e.,
       // adjacent XLNT.rectangles that, when merged, form a new rectangle.
-      let sameFormats = true;
       const prop = propertiesToGet[ul_row][ul_col];
       const firstFormat = JSON.stringify(prop);
       for (let i = ul_row; i <= br_row; i++) {
+        // if we've already determined that the formats are different
+        // stop looking for differences
+        if (!fix.sameFormat) {
+          break;
+        }
         for (let j = ul_col; j <= br_col; j++) {
-          const str = JSON.stringify(propertiesToGet[i][j]);
-          if (str !== firstFormat) {
-            sameFormats = false;
+          const secondFormat = JSON.stringify(propertiesToGet[i][j]);
+          if (secondFormat !== firstFormat) {
+            // stop looking for differences and modify fix
+            fix.sameFormat = false;
+            fix.score *= (100 - Config.getFormattingDiscount()) / 100;
             break;
           }
         }
-      }
-      proposed_fixes.push(new XLNT.ProposedFix(score, first, second));
+      }      
     }
-    return proposed_fixes;
   }
 
   public static find_suspicious_cells(

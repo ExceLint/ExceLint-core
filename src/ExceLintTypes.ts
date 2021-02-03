@@ -29,6 +29,7 @@ export class ProposedFix {
   private _score: number; // fix distance (entropy)
   private _rect1: Rectangle; // suspected bug
   private _rect2: Rectangle; // merge candidate
+  private _sameFormat: boolean = true; // the two rectangles have the same format
   private _analysis: Option<FixAnalysis> = None; // we add this later, after we analyze the fix
 
   constructor(score: number, rect1: Rectangle, rect2: Rectangle) {
@@ -43,6 +44,10 @@ export class ProposedFix {
 
   public get score(): number {
     return this._score;
+  }
+
+  public set score(s: number) {
+    this._score = s;
   }
 
   public get rect1(): Rectangle {
@@ -63,6 +68,14 @@ export class ProposedFix {
 
   public set analysis(fix_analysis: FixAnalysis) {
     this._analysis = new Some(fix_analysis);
+  }
+
+  public get sameFormat(): boolean {
+    return this._sameFormat;
+  }
+
+  public set sameFormat(is_same: boolean) {
+    this._sameFormat = is_same;
   }
 
   public equals(other: ProposedFix): boolean {
