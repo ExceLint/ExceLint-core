@@ -43,7 +43,7 @@ directory. When ExceLint can find it, `excelint-cli.js` will automatically use t
 
     cd test
     node ../build/src/cli/excelint-cli.js --directory subjects_xlsx
-    
+
 ## Technical Details
 
 The following technical paper describes how ExceLint works and includes
