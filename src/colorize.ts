@@ -193,7 +193,7 @@ export class Colorize {
         final_adjusted_fixes.push(fix);
 
         // Package everything up with the fix
-        fix.analysis = new XLNT.FixAnalysis(fix, bin, rect_info, is_vert);
+        fix.analysis = new XLNT.FixAnalysis(bin, rect_info, is_vert);
       }
 
       let elapsed = myTimer.elapsedTime();

@@ -298,18 +298,15 @@ export class RectInfo {
 }
 
 export class FixAnalysis {
-  fix: ProposedFix;
   classification: Classification.BinCategory[];
   analysis: RectInfo[];
   direction_is_vert: boolean;
 
   constructor(
-    fix: ProposedFix,
     classification: Classification.BinCategory[],
     analysis: RectInfo[],
     direction_is_vert: boolean
   ) {
-    this.fix = fix;
     this.classification = classification;
     this.analysis = analysis;
     this.direction_is_vert = direction_is_vert;
