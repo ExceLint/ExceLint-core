@@ -115,10 +115,10 @@ export class Colorize {
   /**
    * Performs an incremental ExceLint analysis.
    * @param a The previous analysis result, including last observed workbook state.
-   * @param edit The update to the formula string.
+   * @param edits The sequence of updates to the formula string.
    * @param addr The location of the formula.
    */
-  public static update_analysis(a: XLNT.WorkbookAnalysis, edit: XLNT.Edit, addr: string): XLNT.WorkbookAnalysis {
+  public static update_analysis(a: XLNT.WorkbookAnalysis, edits: XLNT.Edit[], addr: string): XLNT.WorkbookAnalysis {
     return a;
   }
 
