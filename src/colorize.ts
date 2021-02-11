@@ -112,6 +112,16 @@ export class Colorize {
     return fixEntropy;
   }
 
+  /**
+   * Performs an incremental ExceLint analysis.
+   * @param a The previous analysis result, including last observed workbook state.
+   * @param edit The update to the formula string.
+   * @param addr The location of the formula.
+   */
+  public static update_analysis(a: XLNT.WorkbookAnalysis, edit: XLNT.Edit, addr: string): XLNT.WorkbookAnalysis {
+    return a;
+  }
+
   // Performs an analysis on an entire workbook
   public static process_workbook(inp: WorkbookOutput, sheetName: string): XLNT.WorkbookAnalysis {
     const wba = new XLNT.WorkbookAnalysis();

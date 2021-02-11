@@ -3,6 +3,8 @@ import { ExcelUtils } from "./excelutils";
 import { Classification } from "./classification";
 import { Config } from "./config";
 import { Option, Some, None, flatMap } from "./option";
+import { DeleteExpression } from "typescript";
+import { number } from "yargs";
 
 export interface Dict<V> {
   [key: string]: V;
@@ -174,7 +176,7 @@ export class ExceLintVector {
     // create a hashs et with elements from set1,
     // and then check that set2 induces the same set
     const hset: Set<number> = new Set();
-    set1.forEach(v => hset.add(v.hash()));
+    set1.forEach((v) => hset.add(v.hash()));
 
     // check hset1 for hashes of elements in set2.
     // if there is a match, remove the element from hset1.
@@ -367,12 +369,12 @@ export class WorksheetAnalysis {
 
   // Compute number of cells containing formulas.
   get numFormulaCells(): number {
-    return this.sheet.formulas.flat().filter(x => x.length > 0).length;
+    return this.sheet.formulas.flat().filter((x) => x.length > 0).length;
   }
 
   // Count the number of non-empty cells.
   get numValueCells(): number {
-    return this.sheet.values.flat().filter(x => x.length > 0).length;
+    return this.sheet.values.flat().filter((x) => x.length > 0).length;
   }
 
   // Compute number of columns
@@ -392,7 +394,7 @@ export class WorksheetAnalysis {
 
   // Produce a sum total of all of the entropy scores for use as a weight
   get weightedAnomalousRanges(): number {
-    return this.pf.map(x => x[0]).reduce((x, y) => x + y, 0);
+    return this.pf.map((x) => x[0]).reduce((x, y) => x + y, 0);
   }
 
   // Get the total number of anomalous cells
@@ -403,7 +405,7 @@ export class WorksheetAnalysis {
   // For every proposed fix, if it is above the score threshold, keep it,
   // and return the unique set of all vectors contained in any kept fix.
   private static createBugList(pf: ProposedFix[]): ExceLintVector[] {
-    const keep: ExceLintVector[][] = flatMap(pf => {
+    const keep: ExceLintVector[][] = flatMap((pf) => {
       if (pf.score >= Config.reportingThreshold / 100) {
         const rect1cells = expand(upperleft(pf.rect1), bottomright(pf.rect1));
         const rect2cells = expand(upperleft(pf.rect2), bottomright(pf.rect2));
@@ -416,3 +418,31 @@ export class WorksheetAnalysis {
     return ExceLintVector.toSet(flattened);
   }
 }
+
+/**
+ * Represents an insertion edit.
+ */
+export class Insertion {
+  startpos: number; // the index into the associated string where the edit occurred
+  str: string; // the inserted text
+
+  constructor(startpos: number, ins: string) {
+    this.startpos = startpos;
+    this.str = ins;
+  }
+}
+
+/**
+ * Represents a deletion edit.
+ */
+export class Deletion {
+  startpos: number; // the index into the associated string where the deletion starts (incl.)
+  endpos: number; // the index into the associated string where the deletion ends (incl.)
+
+  constructor(pos: number, str: number) {
+    this.startpos = pos;
+    this.endpos = str;
+  }
+}
+
+export type Edit = Insertion | Deletion;
