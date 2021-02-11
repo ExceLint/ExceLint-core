@@ -1,36 +1,15 @@
 import { binsearch, strict_binsearch } from "./binsearch";
 import { Colorize } from "./colorize";
-import {
-  ExceLintVector,
-  Dict,
-  ProposedFix,
-  Rectangle,
-  Fingerprint,
-  Metric,
-  upperleft,
-  bottomright,
-} from "./ExceLintTypes";
-import { ExcelJSON } from "./exceljson";
+import { ExceLintVector, Dict, ProposedFix, Rectangle, Fingerprint, upperleft, bottomright } from "./ExceLintTypes";
 
 // A comparison function to sort by x-coordinate.
 function sort_x_coord(a: Rectangle, b: Rectangle): number {
-  const [a1, a2] = a;
-  const [b1, b2] = b;
+  const [a1] = a;
+  const [b1] = b;
   if (a1.x !== b1.x) {
     return a1.x - b1.x;
   } else {
     return a1.y - b1.y;
-  }
-}
-
-// A comparison function to sort by y-coordinate.
-function sort_y_coord(a: Rectangle, b: Rectangle): number {
-  const [a1, a2] = a;
-  const [b1, b2] = b;
-  if (a1.y !== b1.y) {
-    return a1.y - b1.y;
-  } else {
-    return a1.x - b1.x;
   }
 }
 
@@ -78,22 +57,6 @@ function sort_grouped_formulas(grouped_formulas: Dict<Rectangle[]>): Dict<Rectan
   return newGnum;
 }
 
-// Knuth-Fisher-Yates shuffle (not currently used).
-function shuffle<T>(a: Array<T>): Array<T> {
-  let j, x, i;
-  for (i = a.length - 1; i > 0; i--) {
-    j = Math.floor(Math.random() * (i + 1));
-    x = a[i];
-    a[i] = a[j];
-    a[j] = x;
-  }
-  return a;
-}
-
-//test_binsearch();
-
-let comparisons = 0;
-
 function numComparator(a_val: ExceLintVector, b_val: ExceLintVector): number {
   if (a_val.x < b_val.x) {
     return -1;
@@ -130,14 +93,15 @@ function matching_rectangles(
   const x2 = rect_lr.x;
   const y2 = rect_lr.y;
 
-  // Try to find something adjacent to A = [[x1, y1, 0], [x2, y2, 0]]
-  // options are:
-  //   [x1-1, y2] left (lower-right)   [ ] [A] --> [ (?, y1) ... (x1-1, y2) ]
-  //   [x2, y1-1] up (lower-right)     [ ]
-  //                                   [A] --> [ (x1, ?) ... (x2, y1-1) ]
-  //   [x2+1, y1] right (upper-left)   [A] [ ] --> [ (x2 + 1, y1) ... (?, y2) ]
-  //   [x1, y2+1] down (upper-left)    [A]
-  //                                   [ ] --> [ (x1, y2+1) ... (x2, ?) ]
+  /* Try to find something adjacent to A = [[x1, y1, 0], [x2, y2, 0]]
+   * options are:
+   *   [x1-1, y2] left (lower-right)   [ ] [A] --> [ (?, y1) ... (x1-1, y2) ]
+   *   [x2, y1-1] up (lower-right)     [ ]
+   *                                   [A] --> [ (x1, ?) ... (x2, y1-1) ]
+   *   [x2+1, y1] right (upper-left)   [A] [ ] --> [ (x2 + 1, y1) ... (?, y2) ]
+   *   [x1, y2+1] down (upper-left)    [A]
+   *                                   [ ] --> [ (x1, y2+1) ... (x2, ?) ]
+   */
 
   // left (lr) = ul_x, lr_y
   const left = new ExceLintVector(x1 - 1, y2, 0);
@@ -180,8 +144,6 @@ function matching_rectangles(
   return matches;
 }
 
-let rectangles_count = 0;
-
 // find all merge-compatible rectangles for the given rectangle including their
 // fix metrics.
 function find_all_matching_rectangles(
@@ -215,7 +177,7 @@ function find_all_matching_rectangles(
     if (fp === thisfp) {
       continue;
     }
-    rectangles_count++;
+
     // Check bounding box.
     const box = bb[fp];
 
@@ -273,12 +235,7 @@ function find_all_matching_rectangles(
         // concatenate them into the match_list
         match_list = match_list.concat(
           matches.map((item: Rectangle) => {
-            const metric = Colorize.compute_fix_metric(
-              parseFloat(thisfp),
-              rect,
-              parseFloat(fp),
-              item
-            );
+            const metric = Colorize.compute_fix_metric(parseFloat(thisfp), rect, parseFloat(fp), item);
             return new ProposedFix(metric, rect, item);
           })
         );
@@ -313,7 +270,6 @@ function dedup_fixes(pfs: ProposedFix[]): ProposedFix[] {
 
 export function find_all_proposed_fixes(grouped_formulas: Dict<Rectangle[]>): ProposedFix[] {
   let all_matches: ProposedFix[] = [];
-  rectangles_count = 0;
 
   // sort each group of rectangles by their x coordinates
   const aNum = sort_grouped_formulas(grouped_formulas);

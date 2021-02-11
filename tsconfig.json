@@ -18,7 +18,10 @@
     ],
     "rootDir": ".",
     "outDir": "build",
-    "target": "ES2019"
+    "target": "ES2019",
+    "lib": [
+      "ES2019"
+    ]
   },
   "exclude": [
     "node_modules"

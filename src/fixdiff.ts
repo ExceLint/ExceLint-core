@@ -7,19 +7,12 @@ import { ExcelUtils } from "./excelutils";
 class CellEncoder {
   private static maxRows = 64; // -32..32
   private static maxColumns = 32; // -16..16
-  private static absoluteRowMultiplier: number =
-    2 * CellEncoder.maxRows * CellEncoder.maxColumns; // if bit set, absolute row
-  public static absoluteColumnMultiplier: number =
-    2 * CellEncoder.absoluteRowMultiplier; // if bit set, absolute column
+  private static absoluteRowMultiplier: number = 2 * CellEncoder.maxRows * CellEncoder.maxColumns; // if bit set, absolute row
+  public static absoluteColumnMultiplier: number = 2 * CellEncoder.absoluteRowMultiplier; // if bit set, absolute column
 
   public static startPoint = 2048; // Start the encoding of the cell at this Unicode value
 
-  public static encode(
-    col: number,
-    row: number,
-    absoluteColumn = false,
-    absoluteRow = false
-  ): number {
+  public static encode(col: number, row: number, absoluteColumn = false, absoluteRow = false): number {
     const addAbsolutes =
       Number(absoluteRow) * CellEncoder.absoluteRowMultiplier +
       Number(absoluteColumn) * CellEncoder.absoluteColumnMultiplier;
@@ -31,23 +24,14 @@ class CellEncoder {
     );
   }
 
-  public static encodeToChar(
-    col: number,
-    row: number,
-    absoluteColumn = false,
-    absoluteRow = false
-  ): string {
-    const chr = String.fromCodePoint(
-      CellEncoder.encode(col, row, absoluteColumn, absoluteRow)
-    );
+  public static encodeToChar(col: number, row: number, absoluteColumn = false, absoluteRow = false): string {
+    const chr = String.fromCodePoint(CellEncoder.encode(col, row, absoluteColumn, absoluteRow));
     return chr;
   }
 
   private static decodeColumn(encoded: number): number {
     encoded -= CellEncoder.startPoint;
-    return (
-      Math.floor(encoded / CellEncoder.maxRows) - CellEncoder.maxColumns / 2
-    );
+    return Math.floor(encoded / CellEncoder.maxRows) - CellEncoder.maxColumns / 2;
   }
 
   private static decodeRow(encoded: number): number {
@@ -55,9 +39,7 @@ class CellEncoder {
     return (encoded % CellEncoder.maxRows) - CellEncoder.maxRows / 2;
   }
 
-  public static decodeFromChar(
-    chr: string
-  ): [number, number, boolean, boolean] {
+  public static decodeFromChar(chr: string): [number, number, boolean, boolean] {
     let decodedNum = chr.codePointAt(0);
     let absoluteColumn = false;
     let absoluteRow = false;
@@ -81,19 +63,12 @@ class CellEncoder {
   public static maxEncodedSize(): number {
     return (
       CellEncoder.encode(CellEncoder.maxColumns - 1, CellEncoder.maxRows - 1) -
-      CellEncoder.encode(
-        -(CellEncoder.maxColumns - 1),
-        -(CellEncoder.maxRows - 1)
-      )
+      CellEncoder.encode(-(CellEncoder.maxColumns - 1), -(CellEncoder.maxRows - 1))
     );
   }
 
   public static test(): void {
-    for (
-      let col = -CellEncoder.maxColumns;
-      col < CellEncoder.maxColumns;
-      col++
-    ) {
+    for (let col = -CellEncoder.maxColumns; col < CellEncoder.maxColumns; col++) {
       for (let row = -CellEncoder.maxRows; row < CellEncoder.maxRows; row++) {
         const encoded = CellEncoder.encode(col, row);
         const decodedCol = CellEncoder.decodeColumn(encoded);
@@ -180,35 +155,22 @@ export class FixDiff {
     } else {
       // Common case, both relative.
       console.log("both relative");
-      resultStr = CellEncoder.encodeToChar(
-        resultVec[0],
-        resultVec[1],
-        false,
-        false
-      );
+      resultStr = CellEncoder.encodeToChar(resultVec[0], resultVec[1], false, false);
     }
     console.log("to pseudo r1c1: " + resultStr);
     return resultStr;
   }
 
-  public static formulaToPseudoR1C1(
-    formula: string,
-    origin_col: number,
-    origin_row: number
-  ): string {
+  public static formulaToPseudoR1C1(formula: string, origin_col: number, origin_row: number): string {
     let range = formula.slice();
     const origin = ExcelUtils.column_index_to_name(origin_col) + origin_row;
     // First, get all the range pairs out.
     let found_pair;
     while ((found_pair = ExcelUtils.range_pair.exec(range))) {
       if (found_pair) {
-        const first_cell = found_pair[1];
-        const last_cell = found_pair[2];
         range = range.replace(
           found_pair[0],
-          FixDiff.toPseudoR1C1(origin, found_pair[1]) +
-            ":" +
-            FixDiff.toPseudoR1C1(origin, found_pair[2])
+          FixDiff.toPseudoR1C1(origin, found_pair[1]) + ":" + FixDiff.toPseudoR1C1(origin, found_pair[2])
         );
       }
     }
@@ -218,10 +180,7 @@ export class FixDiff {
     while ((singleton = ExcelUtils.single_dep.exec(range))) {
       if (singleton) {
         const first_cell = singleton[1];
-        range = range.replace(
-          singleton[0],
-          FixDiff.toPseudoR1C1(origin, first_cell)
-        );
+        range = range.replace(singleton[0], FixDiff.toPseudoR1C1(origin, first_cell));
       }
     }
     return range;
@@ -233,9 +192,7 @@ export class FixDiff {
     }
     formula = formula.replace(/(\-?\d+)/g, (_, num) => {
       // Make sure the unicode characters are far away from the encoded cell values.
-      const replacement = String.fromCodePoint(
-        CellEncoder.absoluteColumnMultiplier * 2 + parseInt(num)
-      );
+      const replacement = String.fromCodePoint(CellEncoder.absoluteColumnMultiplier * 2 + parseInt(num));
       return replacement;
     });
     return formula;
@@ -285,11 +242,7 @@ export class FixDiff {
     return theDiff;
   }
 
-  public fromPseudoR1C1(
-    r1c1_formula: string,
-    origin_col: number,
-    origin_row: number
-  ): string {
+  public fromPseudoR1C1(r1c1_formula: string, origin_col: number, origin_row: number): string {
     // We assume that formulas have already been 'tokenized'.
     // console.log("fromPseudoR1C1 = " + r1c1_formula + ", origin_col = " + origin_col + ", origin_row = " + origin_row);
     let r1c1 = r1c1_formula.slice();
@@ -303,8 +256,7 @@ export class FixDiff {
       if (!absCo && !absRo) {
         // Both relative (R[..]C[...])
         // console.log("both relative");
-        result =
-          ExcelUtils.column_index_to_name(origin_col + co) + (origin_row + ro);
+        result = ExcelUtils.column_index_to_name(origin_col + co) + (origin_row + ro);
       }
       if (absCo && !absRo) {
         // Row relative, column absolute (R[..]C...)
@@ -331,11 +283,7 @@ export class FixDiff {
   private static greentext = "\u001b[32m";
   private static whitetext = "\u001b[37m";
   private static resettext = "\u001b[0m";
-  private static textcolor = [
-    FixDiff.redtext,
-    FixDiff.yellowtext,
-    FixDiff.greentext,
-  ];
+  private static textcolor = [FixDiff.redtext, FixDiff.yellowtext, FixDiff.greentext];
 
   public pretty_diffs(diffs): string[] {
     const strList = [];
@@ -359,14 +307,7 @@ export class FixDiff {
 
 function showDiffs(str1, row1, col1, str2, row2, col2) {
   const nd = new FixDiff();
-  const [diff0, diff1] = nd.compute_fix_diff(
-    str1,
-    str2,
-    col1 - 1,
-    row1 - 1,
-    col2 - 1,
-    row2 - 1
-  );
+  const [diff0, diff1] = nd.compute_fix_diff(str1, str2, col1 - 1, row1 - 1, col2 - 1, row2 - 1);
   console.log(diff0);
   console.log(diff1);
   // console.log(JSON.stringify(diffs));
@@ -389,12 +330,12 @@ showDiffs("=ROUND(B9:E10)", 1, 2, "=ROUND(C9:E$10)", 1, 3);
 showDiffs("=ROUND(B9:E10)", 1, 2, "=ROUND(C9:E10)", 1, 3);
 showDiffs("=ROUND($B$9:E10)", 1, 2, "=ROUND(C9:E10)", 1, 3);
 
-// Now try a diff.
-const [row1, col1] = [1, 3];
-const [row2, col2] = [1, 2];
-//let [row1, col1] = [11, 2];
-//let [row2, col2] = [11, 3];
-//let str1 = '=ROUND(B7:B9)'; // 'ROUND(A1)+12';
-//let str2 = '=ROUND(C7:C10)'; // 'ROUNDUP(B2)+12';
-const str1 = "=ROUND(E$10:C9)"; // 'ROUNDUP(B2)+12';
-const str2 = "=ROUND(E10:B9)"; // 'ROUND(A1)+12';
+// // Now try a diff.
+// const [row1, col1] = [1, 3];
+// const [row2, col2] = [1, 2];
+// //let [row1, col1] = [11, 2];
+// //let [row2, col2] = [11, 3];
+// //let str1 = '=ROUND(B7:B9)'; // 'ROUND(A1)+12';
+// //let str2 = '=ROUND(C7:C10)'; // 'ROUNDUP(B2)+12';
+// const str1 = "=ROUND(E$10:C9)"; // 'ROUNDUP(B2)+12';
+// const str2 = "=ROUND(E10:B9)"; // 'ROUND(A1)+12';

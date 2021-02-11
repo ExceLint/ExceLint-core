@@ -57,10 +57,7 @@ export class WorkbookOutput {
 
 export class ExcelJSON {
   private static general_re = "\\$?[A-Z][A-Z]?\\$?\\d+"; // column and row number, optionally with $
-  private static pair_re = new RegExp(
-    "(" + ExcelJSON.general_re + "):(" + ExcelJSON.general_re + ")"
-  );
-  private static singleton_re = new RegExp(ExcelJSON.general_re);
+  private static pair_re = new RegExp("(" + ExcelJSON.general_re + "):(" + ExcelJSON.general_re + ")");
 
   public static processWorksheet(sheet, selection: ExcelJSON.selections) {
     let ref = "A1:A1"; // for empty sheets.
@@ -153,13 +150,7 @@ export class ExcelJSON {
       const sheet_formulas = ExcelJSON.processWorksheet(sheet, ExcelJSON.selections.FORMULAS);
       const sheet_values = ExcelJSON.processWorksheet(sheet, ExcelJSON.selections.VALUES);
       const sheet_styles = ExcelJSON.processWorksheet(sheet, ExcelJSON.selections.STYLES);
-      const wso = new WorksheetOutput(
-        sheetName,
-        sheetRange,
-        sheet_formulas,
-        sheet_values,
-        sheet_styles
-      );
+      const wso = new WorksheetOutput(sheetName, sheetRange, sheet_formulas, sheet_values, sheet_styles);
       output.addWorksheet(wso);
     }
     return output;
@@ -175,6 +166,6 @@ export namespace ExcelJSON {
   export enum selections {
     FORMULAS,
     VALUES,
-    STYLES,
+    STYLES
   }
 }

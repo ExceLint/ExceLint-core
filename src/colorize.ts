@@ -4,13 +4,11 @@ flat.shim();
 
 import { ExcelUtils } from "./excelutils";
 import { RectangleUtils } from "./rectangleutils";
-import { Timer } from "./timer";
 import { JSONclone } from "./jsonclone";
 import { find_all_proposed_fixes } from "./groupme";
-import { Stencil } from "./infogain";
 import * as XLNT from "./ExceLintTypes";
 import { Dict } from "./ExceLintTypes";
-import { WorkbookOutput, WorksheetOutput } from "./exceljson";
+import { WorkbookOutput } from "./exceljson";
 import { Config } from "./config";
 import { Classification } from "./classification";
 
@@ -30,7 +28,7 @@ export class Colorize {
     "#91c7a8",
     "#b4efd3",
     "#80b6aa",
-    "#9bd1c6",
+    "#9bd1c6"
   ]; // removed '#73dad1'
 
   // True iff this class been initialized.
@@ -77,10 +75,7 @@ export class Colorize {
   }
 
   // Filter fixes by entropy score threshold
-  private static filterFixesByUserThreshold(
-    fixes: XLNT.ProposedFix[],
-    thresh: number
-  ): XLNT.ProposedFix[] {
+  private static filterFixesByUserThreshold(fixes: XLNT.ProposedFix[], thresh: number): XLNT.ProposedFix[] {
     const fixes2: XLNT.ProposedFix[] = [];
     for (let ind = 0; ind < fixes.length; ind++) {
       const pf = fixes[ind];
@@ -133,26 +128,15 @@ export class Colorize {
       // get the used range
       const usedRangeAddress = Colorize.normalizeAddress(sheet.usedRangeAddress);
 
-      // start timer
-      const myTimer = new Timer("excelint");
-
       // Get anomalous cells and proposed fixes, among others.
       const a = Colorize.process_suspicious(usedRangeAddress, sheet.formulas, sheet.values);
 
       // Eliminate fixes below user threshold
-      a.proposed_fixes = Colorize.filterFixesByUserThreshold(
-        a.proposed_fixes,
-        Config.reportingThreshold
-      );
+      a.proposed_fixes = Colorize.filterFixesByUserThreshold(a.proposed_fixes, Config.reportingThreshold);
 
       // Remove fixes that require fixing both a formula AND formatting.
       // NB: origin_col and origin_row currently hard-coded at 0,0.
-      Colorize.adjust_proposed_fixes(
-        a.proposed_fixes,
-        sheet.styles,
-        0,
-        0
-      );
+      Colorize.adjust_proposed_fixes(a.proposed_fixes, sheet.styles, 0, 0);
 
       // Process all the fixes, classifying and optionally pruning them.
       const final_adjusted_fixes: XLNT.ProposedFix[] = []; // We will eventually trim these.
@@ -164,26 +148,24 @@ export class Colorize {
         const is_vert: boolean = Colorize.fixIsVertical(fix);
 
         // Formula info for each rectangle
-        const rect_info = fix.rectangles.map((rect) => new XLNT.RectInfo(rect, sheet));
+        const rect_info = fix.rectangles.map(rect => new XLNT.RectInfo(rect, sheet));
 
         // Omit fixes that are too small (too few cells).
         if (Colorize.fixCellCount(fix) < Config.minFixSize) {
-          const print_formulas = JSON.stringify(rect_info.map((fi) => fi.print_formula));
+          const print_formulas = JSON.stringify(rect_info.map(fi => fi.print_formula));
           console.warn("Omitted " + print_formulas + "(too small)");
           continue;
         }
 
         // Omit fixes with entropy change over threshold
         if (Colorize.fixEntropy(fix) > Config.maxEntropy) {
-          const print_formulas = JSON.stringify(rect_info.map((fi) => fi.print_formula));
+          const print_formulas = JSON.stringify(rect_info.map(fi => fi.print_formula));
           console.warn("Omitted " + JSON.stringify(print_formulas) + "(too high entropy)");
           continue;
         }
 
         // Classify fixes & prune based on the best explanation
-        const bin = Classification.pruneFixes(
-          Classification.classifyFixes(fix, is_vert, rect_info)
-        );
+        const bin = Classification.pruneFixes(Classification.classifyFixes(fix, is_vert, rect_info));
 
         // IMPORTANT:
         // Exclude reported bugs subject to certain conditions.
@@ -194,11 +176,6 @@ export class Colorize {
 
         // Package everything up with the fix
         fix.analysis = new XLNT.FixAnalysis(bin, rect_info, is_vert);
-      }
-
-      let elapsed = myTimer.elapsedTime();
-      if (Config.noElapsedTime) {
-        elapsed = 0; // Dummy value, used for regression testing.
       }
 
       // gather all statistics about the sheet
@@ -236,10 +213,7 @@ export class Colorize {
           if (vec_array.length === 0) {
             if (cell[0] === "=") {
               // It's a formula but it has no dependencies (i.e., it just has constants). Use a distinguished value.
-              output.push([
-                new XLNT.ExceLintVector(adjustedX, adjustedY, 0),
-                Colorize.noDependenciesHash,
-              ]);
+              output.push([new XLNT.ExceLintVector(adjustedX, adjustedY, 0), Colorize.noDependenciesHash]);
             }
           } else {
             const vec = vec_array.reduce(XLNT.ExceLintVector.VectorSum);
@@ -247,10 +221,7 @@ export class Colorize {
               // No dependencies! Use a distinguished value.
               // Emery's FIXME: RESTORE THIS output.push([[adjustedX, adjustedY, 0], Colorize.distinguishedZeroHash]);
               // DAN TODO: I don't understand this case.
-              output.push([
-                new XLNT.ExceLintVector(adjustedX, adjustedY, 0),
-                Colorize.noDependenciesHash,
-              ]);
+              output.push([new XLNT.ExceLintVector(adjustedX, adjustedY, 0), Colorize.noDependenciesHash]);
             } else {
               const hash = vec.hash();
               output.push([new XLNT.ExceLintVector(adjustedX, adjustedY, 0), hash.toString()]);
@@ -296,10 +267,7 @@ export class Colorize {
             const adjustedX = j + origin_col + 1;
             const adjustedY = i + origin_row + 1;
             // See comment at top of function declaration for DistinguishedZeroHash
-            value_array.push([
-              new XLNT.ExceLintVector(adjustedX, adjustedY, 1),
-              Colorize.noDependenciesHash,
-            ]);
+            value_array.push([new XLNT.ExceLintVector(adjustedX, adjustedY, 1), Colorize.noDependenciesHash]);
           }
         }
       }
@@ -329,9 +297,7 @@ export class Colorize {
   }
 
   // Collect all ranges of cells that share a XLNT.Fingerprint
-  private static find_contiguous_regions(
-    groups: Dict<XLNT.ExceLintVector[]>
-  ): Dict<XLNT.Rectangle[]> {
+  private static find_contiguous_regions(groups: Dict<XLNT.ExceLintVector[]>): Dict<XLNT.Rectangle[]> {
     const output: Dict<XLNT.Rectangle[]> = {};
 
     for (const key of Object.keys(groups)) {
@@ -410,9 +376,7 @@ export class Colorize {
     formulas: XLNT.Spreadsheet,
     values: XLNT.Spreadsheet
   ): XLNT.Analysis {
-    const t = new Timer("process_suspicious");
-
-    const [sheetName, startCell] = ExcelUtils.extract_sheet_cell(usedRangeAddress);
+    const [, startCell] = ExcelUtils.extract_sheet_cell(usedRangeAddress);
     const origin = ExcelUtils.cell_dependency(startCell, 0, 0);
 
     let processed_formulas: [XLNT.ExceLintVector, string][] = [];
@@ -426,9 +390,6 @@ export class Colorize {
     }
 
     let referenced_data: [XLNT.ExceLintVector, XLNT.Fingerprint][] = [];
-    let data_values: [XLNT.ExceLintVector, XLNT.Fingerprint][] = [];
-    const cols = values.length;
-    const rows = values[0].length;
 
     // Filter out non-empty items from whole matrix.
     const totalValues = (values as any).flat().filter(Boolean).length;
@@ -436,14 +397,9 @@ export class Colorize {
       console.warn("Too many values to perform reference analysis.");
     } else {
       // Compute references (to color referenced data).
-      const refs: Dict<boolean> = ExcelUtils.generate_all_references(
-        formulas,
-        origin.x - 1,
-        origin.y - 1
-      );
+      const refs: Dict<boolean> = ExcelUtils.generate_all_references(formulas, origin.x - 1, origin.y - 1);
 
       referenced_data = Colorize.color_all_data(refs);
-      data_values = Colorize.process_values(values, formulas, origin.x - 1, origin.y - 1);
     }
 
     // find regions for data
@@ -486,11 +442,11 @@ export class Colorize {
     const [m1, m2] = merge_with;
     const n_target = RectangleUtils.area([
       new XLNT.ExceLintVector(t1.x, t1.y, 0),
-      new XLNT.ExceLintVector(t2.x, t2.y, 0),
+      new XLNT.ExceLintVector(t2.x, t2.y, 0)
     ]);
     const n_merge_with = RectangleUtils.area([
       new XLNT.ExceLintVector(m1.x, m1.y, 0),
-      new XLNT.ExceLintVector(m2.x, m2.y, 0),
+      new XLNT.ExceLintVector(m2.x, m2.y, 0)
     ]);
     const n_min = Math.min(n_target, n_merge_with);
     const n_max = Math.max(n_target, n_merge_with);
@@ -509,13 +465,7 @@ export class Colorize {
 
   // Iterate through the size of proposed fixes.
   public static count_proposed_fixes(
-    fixes: Array<
-      [
-        number,
-        [XLNT.ExceLintVector, XLNT.ExceLintVector],
-        [XLNT.ExceLintVector, XLNT.ExceLintVector]
-      ]
-    >
+    fixes: Array<[number, [XLNT.ExceLintVector, XLNT.ExceLintVector], [XLNT.ExceLintVector, XLNT.ExceLintVector]]>
   ): number {
     let count = 0;
     // tslint:disable-next-line: forin
@@ -524,11 +474,11 @@ export class Colorize {
       const [f21, f22] = fixes[k][2];
       count += RectangleUtils.diagonal([
         new XLNT.ExceLintVector(f11.x, f11.y, 0),
-        new XLNT.ExceLintVector(f12.x, f12.y, 0),
+        new XLNT.ExceLintVector(f12.x, f12.y, 0)
       ]);
       count += RectangleUtils.diagonal([
         new XLNT.ExceLintVector(f21.x, f21.y, 0),
-        new XLNT.ExceLintVector(f22.x, f22.y, 0),
+        new XLNT.ExceLintVector(f22.x, f22.y, 0)
       ]);
     }
     return count;
@@ -603,20 +553,17 @@ export class Colorize {
     origin_col: number,
     origin_row: number
   ): void {
-    const proposed_fixes: XLNT.ProposedFix[] = [];
-    // tslint:disable-next-line: forin
     for (const k in fixes) {
       const fix = fixes[k];
       const rect1 = fix.rect1;
       const rect2 = fix.rect2;
 
       // Find out which range is "first," i.e., sort by x and then by y.
-      const [first, second] =
-        XLNT.rectangleComparator(rect1, rect2) <= 0 ? [rect1, rect2] : [rect2, rect1];
+      const [first, second] = XLNT.rectangleComparator(rect1, rect2) <= 0 ? [rect1, rect2] : [rect2, rect1];
 
       // get the upper-left and bottom-right vectors for the two XLNT.rectangles
-      const [ul, _a] = first;
-      const [_b, br] = second;
+      const [ul] = first;
+      const [, br] = second;
 
       // get the column and row for the upper-left and bottom-right vectors
       const ul_col = ul.x - origin_col - 1;

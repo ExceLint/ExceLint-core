@@ -4,14 +4,7 @@
 
 import * as sjcl from "sjcl";
 import { RectangleUtils } from "./rectangleutils";
-import {
-  ProposedFix,
-  ExceLintVector,
-  Dict,
-  Spreadsheet,
-  upperleft,
-  bottomright,
-} from "./ExceLintTypes";
+import { ProposedFix, ExceLintVector, Dict, Spreadsheet, upperleft, bottomright } from "./ExceLintTypes";
 
 export class ExcelUtils {
   // sort routine
@@ -26,23 +19,12 @@ export class ExcelUtils {
   // Matchers for all kinds of Excel expressions.
   private static general_re = "\\$?[A-Z][A-Z]?\\$?[\\d\\u2000-\\u6000]+"; // column and row number, optionally with $
   private static sheet_re = "[^\\!]+";
-  private static sheet_plus_cell = new RegExp(
-    "(" + ExcelUtils.sheet_re + ")\\!(" + ExcelUtils.general_re + ")"
-  );
+  private static sheet_plus_cell = new RegExp("(" + ExcelUtils.sheet_re + ")\\!(" + ExcelUtils.general_re + ")");
   private static sheet_plus_range = new RegExp(
-    "(" +
-      ExcelUtils.sheet_re +
-      ")\\!(" +
-      ExcelUtils.general_re +
-      "):(" +
-      ExcelUtils.general_re +
-      ")"
+    "(" + ExcelUtils.sheet_re + ")\\!(" + ExcelUtils.general_re + "):(" + ExcelUtils.general_re + ")"
   );
   public static single_dep = new RegExp("(" + ExcelUtils.general_re + ")");
-  public static range_pair = new RegExp(
-    "(" + ExcelUtils.general_re + "):(" + ExcelUtils.general_re + ")",
-    "g"
-  );
+  public static range_pair = new RegExp("(" + ExcelUtils.general_re + "):(" + ExcelUtils.general_re + ")", "g");
   private static number_dep = new RegExp("([0-9]+\\.?[0-9]*)");
   public static cell_both_relative = new RegExp("[^\\$A-Z]?([A-Z][A-Z]?)([\\d\\u2000-\\u6000]+)");
   public static cell_col_absolute = new RegExp("\\$([A-Z][A-Z]?)([\\d\\u2000-\\u6000]+)");
@@ -56,18 +38,12 @@ export class ExcelUtils {
     "g"
   );
   // Same with sheet name references.
-  private static formulas_with_quoted_sheetnames_1 = new RegExp(
-    "'[^']*'!" + "\\$?[A-Z][A-Z]?\\$?\\d+",
-    "g"
-  );
+  private static formulas_with_quoted_sheetnames_1 = new RegExp("'[^']*'!" + "\\$?[A-Z][A-Z]?\\$?\\d+", "g");
   private static formulas_with_quoted_sheetnames_2 = new RegExp(
     "'[^']*'!" + "\\$?[A-Z][A-Z]?\\$?\\d+" + ":" + "\\$?[A-Z][A-Z]?\\$?\\d+",
     "g"
   );
-  private static formulas_with_unquoted_sheetnames_1 = new RegExp(
-    "[A-Za-z0-9]+!" + "\\$?[A-Z][A-Z]?\\$?\\d+",
-    "g"
-  );
+  private static formulas_with_unquoted_sheetnames_1 = new RegExp("[A-Za-z0-9]+!" + "\\$?[A-Z][A-Z]?\\$?\\d+", "g");
   private static formulas_with_unquoted_sheetnames_2 = new RegExp(
     "[A-Za-z0-9]+!" + "\\$?[A-Z][A-Z]?\\$?\\d+" + ":" + "\\$?[A-Z][A-Z]?\\$?\\d+",
     "g"
@@ -87,18 +63,12 @@ export class ExcelUtils {
     return sjcl.codec.base32.fromBits(sjcl.hash.sha256.hash(uid)).slice(0, maxlen);
   }
 
-  public static get_rectangle(
-    proposed_fixes: ProposedFix[],
-    current_fix: number
-  ): [string, string, string, string] {
+  public static get_rectangle(proposed_fixes: ProposedFix[], current_fix: number): [string, string, string, string] {
     if (!proposed_fixes) {
       return null;
     }
     if (proposed_fixes.length > 0) {
-      const r = RectangleUtils.bounding_box(
-        proposed_fixes[current_fix].rect1,
-        proposed_fixes[current_fix].rect2
-      );
+      const r = RectangleUtils.bounding_box(proposed_fixes[current_fix].rect1, proposed_fixes[current_fix].rect2);
       // convert to sheet notation
       const col0 = ExcelUtils.column_index_to_name(upperleft(r).x);
       const row0 = upperleft(r).y.toString();
@@ -146,11 +116,7 @@ export class ExcelUtils {
   }
 
   // Returns a vector (x, y) corresponding to the column and row of the computed dependency.
-  public static cell_dependency(
-    cell: string,
-    origin_col: number,
-    origin_row: number
-  ): ExceLintVector {
+  public static cell_dependency(cell: string, origin_col: number, origin_row: number): ExceLintVector {
     const alwaysReturnAdjustedColRow = false;
     {
       const r = ExcelUtils.cell_both_absolute.exec(cell);
@@ -216,9 +182,7 @@ export class ExcelUtils {
       }
     }
 
-    console.log(
-      "cell is " + cell + ", origin_col = " + origin_col + ", origin_row = " + origin_row
-    );
+    console.log("cell is " + cell + ", origin_col = " + origin_col + ", origin_row = " + origin_row);
     throw new Error("We should never get here.");
     return ExceLintVector.Zero();
   }
@@ -278,13 +242,9 @@ export class ExcelUtils {
     let found_pair: RegExpExecArray;
     while ((found_pair = ExcelUtils.range_pair.exec(range))) {
       if (found_pair) {
-        const first_cell = found_pair[1];
-        const last_cell = found_pair[2];
         range = range.replace(
           found_pair[0],
-          ExcelUtils.toR1C1(origin, found_pair[1], true) +
-            ":" +
-            ExcelUtils.toR1C1(origin, found_pair[2], true)
+          ExcelUtils.toR1C1(origin, found_pair[1], true) + ":" + ExcelUtils.toR1C1(origin, found_pair[2], true)
         );
       }
     }
@@ -356,10 +316,6 @@ export class ExcelUtils {
     origin_row: number,
     include_numbers = true
   ): ExceLintVector[] {
-    //	console.log("looking for dependencies in " + range);
-
-    const originalRange = range;
-
     let found_pair: RegExpExecArray;
     const all_vectors: ExceLintVector[] = [];
 
@@ -507,11 +463,7 @@ export class ExcelUtils {
   // This function returns a dictionary (Dict<boolean>)) of all of the addresses
   // that are referenced by some formula, where the key is the address and the
   // value is always the boolean true.
-  public static generate_all_references(
-    formulas: Spreadsheet,
-    origin_col: number,
-    origin_row: number
-  ): Dict<boolean> {
+  public static generate_all_references(formulas: Spreadsheet, origin_col: number, origin_row: number): Dict<boolean> {
     // initialize dictionary
     const refs: Dict<boolean> = {};
 
@@ -537,10 +489,7 @@ export class ExcelUtils {
               const rowIndex = dep.x - origin_col - 1;
               const colIndex = dep.y - origin_row - 1;
               const outsideFormulaRange =
-                colIndex >= formulas.length ||
-                rowIndex >= formulas[0].length ||
-                rowIndex < 0 ||
-                colIndex < 0;
+                colIndex >= formulas.length || rowIndex >= formulas[0].length || rowIndex < 0 || colIndex < 0;
               let addReference = false;
               if (outsideFormulaRange) {
                 addReference = true;

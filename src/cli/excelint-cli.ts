@@ -3,7 +3,6 @@
 // www.emeryberger.com
 
 "use strict";
-import path = require("path");
 import { ExcelJSON } from "../exceljson";
 import { Colorize } from "../colorize";
 import { WorkbookAnalysis } from "../ExceLintTypes";
