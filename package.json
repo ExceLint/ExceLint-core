@@ -1,8 +1,15 @@
 {
   "name": "excelint-core",
   "description": "",
-  "author": "Emery Berger",
-  "version": "1.0.0",
+  "contributors": [
+    {"name": "Emery Berger",
+      "url": "https://emeryberger.com"},
+    {"name": "Daniel W. Barowy",
+     "email": "dbarowy@cs.williams.edu",
+     "url": "https://www.cs.williams.edu/~dbarowy/"
+    }  
+  ],
+  "version": "1.1.0",
   "preinstall": "npm install npx tsc",
   "scripts": {
     "lint": "tslint --project tsconfig.json",

@@ -1,3 +1,6 @@
+declare var window: any;
+declare var performance: any;
+
 export class Timer {
   private name: string;
   private perf: any;
@@ -7,7 +10,7 @@ export class Timer {
   constructor(name: string) {
     this.name = name;
     this.perf = null;
-    if (typeof window === 'undefined') {
+    if (typeof window === "undefined") {
       this.perf = {
         now: function () {
           const [secs, nanosecs] = process.hrtime();
@@ -30,15 +33,15 @@ export class Timer {
     const curr = this.perf.now();
     const elapsed = curr - this.splitTimeMS;
     console.warn(
-      'timer: ' +
+      "timer: " +
         this.name +
-        ' @ ' +
+        " @ " +
         location +
-        ' : = ' +
+        " : = " +
         this.roundMe(elapsed) +
-        ' (total = ' +
+        " (total = " +
         this.roundMe(curr - this.startTimeMS) +
-        ')'
+        ")"
     );
     this.splitTimeMS = curr;
   }
