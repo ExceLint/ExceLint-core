@@ -113,12 +113,21 @@ export class Colorize {
   }
 
   /**
+   * This is a convenience method for computing an Edit.  Clients utilizing the
+   * Language Service Protocol should instead convert updates into ExceLint
+   * Edit objects.  This is essentially an implementation of the classic
+   * @param original The previously observed string
+   * @param updated The most recently observed string
+   */
+  public static computeEdit(original: string, updated: string): Edit {}
+
+  /**
    * Performs an incremental ExceLint analysis.
    * @param a The previous analysis result, including last observed workbook state.
    * @param edits The sequence of updates to the formula string.
    * @param addr The location of the formula.
    */
-  public static update_analysis(a: XLNT.WorkbookAnalysis, edits: XLNT.Edit[], addr: string): XLNT.WorkbookAnalysis {
+  public static update_analysis(a: XLNT.WorkbookAnalysis, edit: XLNT.Edit, addr: string): XLNT.WorkbookAnalysis {
     return a;
   }
 

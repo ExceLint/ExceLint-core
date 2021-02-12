@@ -10,6 +10,32 @@ export interface Dict<V> {
   [key: string]: V;
 }
 
+export class Dictionary<V> {
+  private _d: Dict<V> = {};
+  public contains(key: string): boolean {
+    return this._d[key] !== undefined;
+  }
+  public get(key: string): V {
+    if (this.contains(key)) {
+      return this._d[key];
+    } else {
+      throw new Error("Cannot get unknown key '" + key + "' in dictionary.");
+    }
+  }
+  public put(key: string, value: V): void {
+    this._d[key] = value;
+  }
+  public del(key: string): V {
+    if (this.contains(key)) {
+      const v = this._d[key];
+      this._d[key] = undefined;
+      return v;
+    } else {
+      throw new Error("Cannot delete unknown key '" + key + "' in dictionary.");
+    }
+  }
+}
+
 // all users of Spreadsheet store their data in row-major format (i.e., indexed by y first, then x).
 export type Spreadsheet = string[][];
 
@@ -420,29 +446,72 @@ export class WorksheetAnalysis {
 }
 
 /**
- * Represents an insertion edit.
+ * Represents an edit.  Intentionally designed to be similar to a TextDocumentContentChangeEvent
+ * in the Microsoft Language Server Protocol, replacing line numbers with formula addresses.
+ * (https://github.com/Microsoft/language-server-protocol/blob/master/versions/protocol-2-x.md)
  */
-export class Insertion {
-  startpos: number; // the index into the associated string where the edit occurred
-  str: string; // the inserted text
+export class Address {
+  /**
+   * The column (i.e., one-based x-coordinate of the cell).
+   */
+  col: number;
+  /**
+   * The row (i.e., one-based y-coordinate of the cell).
+   */
+  row: number;
+  /**
+   * The worksheet name.  If omitted, assumed to be the current sheet.
+   */
+  sheet: string;
+  /**
+   * The workbook name.  If omitted, assumed to be the current workbook.
+   */
+  workbook: string;
 
-  constructor(startpos: number, ins: string) {
-    this.startpos = startpos;
-    this.str = ins;
+  constructor(col: number, row: number, sheet?: string, workbook?: string) {
+    this.col = col;
+    this.row = row;
+    this.sheet = sheet;
+    this.workbook = workbook;
   }
 }
 
 /**
- * Represents a deletion edit.
+ * Represents the start and end positions of an edit.
  */
-export class Deletion {
-  startpos: number; // the index into the associated string where the deletion starts (incl.)
-  endpos: number; // the index into the associated string where the deletion ends (incl.)
+export class Range {
+  /**
+   * The range's start position in a formula string.
+   */
+  startpos: number;
 
-  constructor(pos: number, str: number) {
-    this.startpos = pos;
-    this.endpos = str;
-  }
+  /**
+   * The range's end position.
+   */
+  endpos: number;
 }
 
-export type Edit = Insertion | Deletion;
+export class Edit {
+  /**
+   * The starting and ending positions of the edit in the cell.
+   */
+  range: Range;
+  /**
+   * The length of the replacement text.
+   */
+  rangeLength: number;
+  /**
+   * The replacement text.
+   */
+  text: string;
+  /**
+   * The address of the cell where the edit occurred.
+   */
+  addr: Address;
+
+  constructor(range: Range, text: string, addr: Address) {
+    this.range = range;
+    this.text = ins;
+    this.addr = addr;
+  }
+}
