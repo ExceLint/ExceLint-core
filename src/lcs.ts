@@ -5,6 +5,25 @@
  * by D. Barowy (2021-02-12)
  */
 
+import { IComparable, CSet } from "./ExceLintTypes";
+
+class NumPair implements IComparable<NumPair> {
+  private fst: number;
+  private snd: number;
+
+  public equals(v: NumPair): boolean {
+    return this.first === v.first && this.second === v.second;
+  }
+
+  public get first(): number {
+    return this.fst;
+  }
+
+  public get second(): number {
+    return this.second;
+  }
+}
+
 /**
  * Initialize a 2D array and fill it with a value;
  * @param value A value of type T.
@@ -110,6 +129,45 @@ function backtrackAll(C: number[][], x: string, i: number, y: string, j: number)
     }
     return R;
   }
+}
+
+/**
+ * // like backtrackAll except that it returns a set of character pair
+    // sequences instead of a set of strings
+    // for each character pair: (X pos, Y pos)
+    let rec getCharPairs(C: int[,], X: string, Y: string, i: int, j: int, sw: Stopwatch, timeout: TimeSpan) : Set<(int*int) list> =
+        if sw.Elapsed > timeout then
+            raise (TimeoutException())
+        if i = 0 || j = 0 then
+            set[[]]
+        else if X.[i-1] = Y.[j-1] then
+            let mutable ZS = Set.map (fun (Z: (int*int) list) -> Z @ [(i-1,j-1)] ) (getCharPairs(C, X, Y, i-1, j-1, sw, timeout))
+            if (C.[i,j] = C.[i,j-1]) then 
+                ZS <- Set.union ZS (getCharPairs(C, X, Y, i, j-1, sw, timeout))
+            ZS
+        else
+            let mutable R = Set.empty
+            if C.[i,j-1] >= C.[i-1,j] then
+                R <- getCharPairs(C, X, Y, i, j-1, sw, timeout)
+            if C.[i-1,j] >= C.[i,j-1] then
+                R <- Set.union R (getCharPairs(C, X, Y, i-1, j, sw, timeout))
+            R
+ */
+
+function getCharPairs(C: number[][], x: string, i: number, y: string, j: number): CSet<CSet<NumPair>> {
+  if (i === 0 || j === 0) {
+    const outer: CSet<CSet<NumPair>> = CSet.empty();
+    outer.add(CSet.empty());
+    return outer;
+  } else if (x.charAt(i - 1) === y.charAt(j - 1)) {
+    const Z = getCharPairs(C, x, i - 1, y, j - 1);
+    let ZS = Z.map((z: Pair<number, number>[]) => z.concat([[i - 1, j - 1]]));
+    if (C[i][j] === C[i][j - 1]) {
+      const W = getCharPairs(C, x, i, y, j - 1);
+      ZS = union(ZS, W);
+    }
+  }
+  return [];
 }
 
 console.log(lcs("hello", "helwordslo"));

@@ -36,6 +36,70 @@ export class Dictionary<V> {
   }
 }
 
+export interface IComparable<V> {
+  equals(v: IComparable<V>): boolean;
+}
+
+export class CSet<V extends IComparable<V>> implements IComparable<CSet<V>> {
+  private _vs: V[];
+
+  constructor(values: V[]) {
+    for (let i = 0; i < values.length; i++) {
+      this.add(values[i]);
+    }
+  }
+
+  public add(v: V): boolean {
+    let keep = true;
+    for (let i = 0; i < this._vs.length; i++) {
+      if (v.equals(this._vs[i])) {
+        keep = false;
+        break;
+      }
+    }
+    if (keep) this._vs.push(v);
+    return keep;
+  }
+
+  public get size() {
+    return this._vs.length;
+  }
+
+  public get values() {
+    return this._vs;
+  }
+
+  private clone(): CSet<V> {
+    return new CSet(this.values);
+  }
+
+  public equals(vs: CSet<V>) {
+    if (this.size !== vs.size) {
+      return false;
+    }
+    const copy = this.clone();
+    const values = vs.values;
+    for (let i = 0; i < values.length; i++) {
+      copy.add(values[i]);
+      if (this.size !== copy.size) return false;
+    }
+    return true;
+  }
+
+  public map<X extends IComparable<X>>(f: (V) => X): CSet<X> {
+    const output = CSet.empty<X>();
+    for (let i = 0; i < this._vs.length; i++) {
+      const fi = f(this._vs[i]);
+      output.add(fi);
+    }
+    return output;
+  }
+
+  public static empty<T extends IComparable<T>>(): CSet<T> {
+    return new CSet<T>([]);
+  }
+}
+
 // all users of Spreadsheet store their data in row-major format (i.e., indexed by y first, then x).
 export type Spreadsheet = string[][];
 
