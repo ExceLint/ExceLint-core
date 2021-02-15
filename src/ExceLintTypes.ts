@@ -3,8 +3,7 @@ import { ExcelUtils } from "./excelutils";
 import { Classification } from "./classification";
 import { Config } from "./config";
 import { Option, Some, None, flatMap } from "./option";
-import { DeleteExpression } from "typescript";
-import { number } from "yargs";
+import { MAX_COLOR_SATURATION } from "office-ui-fabric-react";
 
 export interface Dict<V> {
   [key: string]: V;
@@ -28,7 +27,7 @@ export class Dictionary<V> {
   public del(key: string): V {
     if (this.contains(key)) {
       const v = this._d[key];
-      this._d[key] = undefined;
+      delete this._d[key];
       return v;
     } else {
       throw new Error("Cannot delete unknown key '" + key + "' in dictionary.");
@@ -41,7 +40,7 @@ export interface IComparable<V> {
 }
 
 export class CSet<V extends IComparable<V>> implements IComparable<CSet<V>> {
-  private _vs: V[];
+  private _vs: V[] = [];
 
   constructor(values: V[]) {
     for (let i = 0; i < values.length; i++) {
@@ -86,7 +85,7 @@ export class CSet<V extends IComparable<V>> implements IComparable<CSet<V>> {
     return true;
   }
 
-  public map<X extends IComparable<X>>(f: (V) => X): CSet<X> {
+  public map<X extends IComparable<X>>(f: (v: V) => X): CSet<X> {
     const output = CSet.empty<X>();
     for (let i = 0; i < this._vs.length; i++) {
       const fi = f(this._vs[i]);
@@ -95,8 +94,24 @@ export class CSet<V extends IComparable<V>> implements IComparable<CSet<V>> {
     return output;
   }
 
+  /**
+   * Returns a new set object which is the union
+   * @param set
+   */
+  public union(set: CSet<V>): CSet<V> {
+    const output = this.clone();
+    for (let i = 0; i < set.values.length; i++) {
+      output.add(set.values[i]);
+    }
+    return output;
+  }
+
   public static empty<T extends IComparable<T>>(): CSet<T> {
     return new CSet<T>([]);
+  }
+
+  public toString(): string {
+    return "{" + this._vs.join(",") + "}";
   }
 }
 
@@ -575,7 +590,42 @@ export class Edit {
 
   constructor(range: Range, text: string, addr: Address) {
     this.range = range;
-    this.text = ins;
+    this.text = text;
     this.addr = addr;
+  }
+}
+
+/**
+ * A generic, comparable array.
+ */
+export class CArray<V extends IComparable<V>> extends Array<V> implements IComparable<CArray<V>> {
+  private data: V[];
+  constructor(arr: V[]) {
+    super();
+    this.data = arr;
+  }
+  public equals(arr: CArray<V>): boolean {
+    if (this.data.length != arr.data.length) {
+      return false;
+    }
+    for (let i = 0; i < this.data.length; i++) {
+      if (!this.data[i].equals(arr.data[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Returns a new CArray formed by concatenating this CArray with
+   * the given CArray.  Does not modify given CArrays.
+   * @param arr A CArray.
+   */
+  public concat(arr: CArray<V>): CArray<V> {
+    return new CArray(this.data.concat(arr.data));
+  }
+
+  public toString(): string {
+    return this.data.toString();
   }
 }

@@ -5,11 +5,16 @@
  * by D. Barowy (2021-02-12)
  */
 
-import { IComparable, CSet } from "./ExceLintTypes";
+import { IComparable, CSet, CArray } from "./ExceLintTypes";
 
 class NumPair implements IComparable<NumPair> {
   private fst: number;
   private snd: number;
+
+  constructor(first: number, second: number) {
+    this.fst = first;
+    this.snd = second;
+  }
 
   public equals(v: NumPair): boolean {
     return this.first === v.first && this.second === v.second;
@@ -20,7 +25,11 @@ class NumPair implements IComparable<NumPair> {
   }
 
   public get second(): number {
-    return this.second;
+    return this.snd;
+  }
+
+  public toString(): string {
+    return "(" + this.fst + "," + this.snd + ")";
   }
 }
 
@@ -49,8 +58,21 @@ export function fill2D<T>(value: T, m: number, n: number): T[][] {
 export function lcs(x: string, y: string): string[] {
   const m = x.length;
   const n = y.length;
-  const C = lcsLength(x, m, y, n);
+  const C = makeTable(x, m, y, n);
   return backtrackAll(C, x, m, y, n);
+}
+
+/**
+ * Computes the set of longest strings.
+ * @param x One string.
+ * @param y Another string.
+ */
+export function lcs2(x: string, y: string): CSet<CArray<NumPair>> {
+  const m = x.length;
+  const n = y.length;
+  const C = makeTable(x, m, y, n);
+  const R = getCharPairs(C, x, m, y, n);
+  return R;
 }
 
 /**
@@ -60,11 +82,10 @@ export function lcs(x: string, y: string): string[] {
  * @param y String y.
  * @param n The length of string y.
  */
-function lcsLength(x: string, m: number, y: string, n: number): number[][] {
+function makeTable(x: string, m: number, y: string, n: number): number[][] {
   const C = fill2D(0, m + 1, n + 1);
   for (let i = 1; i < m + 1; i++) {
     for (let j = 1; j < n + 1; j++) {
-      console.log("Processing: i = " + i.toString() + ", j = " + j.toString());
       // are the characters the same at this position?
       if (x.charAt(i - 1) === y.charAt(j - 1)) {
         // then the length of this edit is the length of
@@ -104,7 +125,13 @@ function union(a: string[], b: string[]): string[] {
  * @param y String y.
  * @param j Length of string y.
  */
-function backtrackAll(C: number[][], x: string, i: number, y: string, j: number): string[] {
+function backtrackAll(
+  C: number[][],
+  x: string,
+  i: number,
+  y: string,
+  j: number
+): string[] {
   if (i === 0 || j === 0) {
     // if both indices are zero, we're just starting
     return [""];
@@ -132,42 +159,55 @@ function backtrackAll(C: number[][], x: string, i: number, y: string, j: number)
 }
 
 /**
- * // like backtrackAll except that it returns a set of character pair
-    // sequences instead of a set of strings
-    // for each character pair: (X pos, Y pos)
-    let rec getCharPairs(C: int[,], X: string, Y: string, i: int, j: int, sw: Stopwatch, timeout: TimeSpan) : Set<(int*int) list> =
-        if sw.Elapsed > timeout then
-            raise (TimeoutException())
-        if i = 0 || j = 0 then
-            set[[]]
-        else if X.[i-1] = Y.[j-1] then
-            let mutable ZS = Set.map (fun (Z: (int*int) list) -> Z @ [(i-1,j-1)] ) (getCharPairs(C, X, Y, i-1, j-1, sw, timeout))
-            if (C.[i,j] = C.[i,j-1]) then 
-                ZS <- Set.union ZS (getCharPairs(C, X, Y, i, j-1, sw, timeout))
-            ZS
-        else
-            let mutable R = Set.empty
-            if C.[i,j-1] >= C.[i-1,j] then
-                R <- getCharPairs(C, X, Y, i, j-1, sw, timeout)
-            if C.[i-1,j] >= C.[i,j-1] then
-                R <- Set.union R (getCharPairs(C, X, Y, i-1, j, sw, timeout))
-            R
+ * A LCS can be represented as a sequence of pairs of string indices.  Each pair represents an alignment
+ * between the two strings.  Since there can be more than one LCS for two strings, the function
+ * returns the set of such sequences.
+ * @param C The dynamic programming table representing the LCS.
+ * @param x A string x.
+ * @param i The length of x.
+ * @param y A string y.
+ * @param j The length of y.
  */
-
-function getCharPairs(C: number[][], x: string, i: number, y: string, j: number): CSet<CSet<NumPair>> {
+function getCharPairs(
+  C: number[][],
+  x: string,
+  i: number,
+  y: string,
+  j: number
+): CSet<CArray<NumPair>> {
   if (i === 0 || j === 0) {
-    const outer: CSet<CSet<NumPair>> = CSet.empty();
-    outer.add(CSet.empty());
-    return outer;
+    // base case: if both strings are empty, then clearly the LCS
+    //   is the empty string, so return the set containing the empty
+    //   sequence.  THIS IS NOT THE SAME AS RETURNING THE EMPTY SET!
+    return new CSet<CArray<NumPair>>([new CArray([])]);
   } else if (x.charAt(i - 1) === y.charAt(j - 1)) {
+    // case 1: the last two characters are the same, so recursively
+    //         obtain the LCS(es) of the two strings without the last char
     const Z = getCharPairs(C, x, i - 1, y, j - 1);
-    let ZS = Z.map((z: Pair<number, number>[]) => z.concat([[i - 1, j - 1]]));
+    //         and then concatenate the last char to the result.
+    const singleton = new CArray([new NumPair(i - 1, j - 1)]);
+    let ZS = Z.map((arr: CArray<NumPair>) => arr.concat(singleton));
+    // I can't remember why this is here
     if (C[i][j] === C[i][j - 1]) {
       const W = getCharPairs(C, x, i, y, j - 1);
-      ZS = union(ZS, W);
+      ZS = ZS.union(W);
     }
+    return ZS;
+  } else {
+    // case 2: the last two characters are not the same, so choose the
+    //         longer of the two sub-LCSes (or possibly both if there are
+    //         equally long but difference LCSes).
+    let R = CSet.empty<CArray<NumPair>>();
+    if (C[i][j - 1] >= C[i - 1][i]) {
+      R = getCharPairs(C, x, i, y, j - 1);
+    }
+    if (C[i - 1][j] >= C[i][j - 1]) {
+      R = R.union(getCharPairs(C, x, i - 1, y, j));
+    }
+    return R;
   }
-  return [];
 }
 
-console.log(lcs("hello", "helwordslo"));
+// console.log(lcs("heyo", "mayor"));
+//console.log(lcs("hello", "helwordslo"));
+console.log(lcs2("hello", "helwordslo").toString());
