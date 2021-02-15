@@ -7,6 +7,17 @@
 
 import { IComparable, CSet, CArray } from "./ExceLintTypes";
 
+/**
+ * Throws an error if the condition is false.
+ * @param pred A boolean (usually the result of a conditional expr).
+ * @param msg The error message to throw.
+ */
+function assert(pred: boolean, msg?: string): void {
+  if (!pred) {
+    throw new Error(msg);
+  }
+}
+
 class NumPair implements IComparable<NumPair> {
   private fst: number;
   private snd: number;
@@ -76,10 +87,150 @@ export function lcs_alignments(x: string, y: string): CSet<CArray<NumPair>> {
   return getCharPairs(C, x, m, y, n);
 }
 
-export function diff(x: string, y: string): string[] {
-  const R = lcs_alignments(x, y);
+class LCSInsert {
+  tag: string = "insert";
+  ch: string;
+  constructor(ch: string) {
+    this.ch = ch;
+  }
+  public toString(): string {
+    return "[+" + this.ch + "]";
+  }
+}
+class LCSDelete {
+  tag: string = "delete";
+  ch: string;
+  constructor(ch: string) {
+    this.ch = ch;
+  }
+  public toString(): string {
+    return "[-" + this.ch + "]";
+  }
+}
+class LCSReplace {
+  tag: string = "replace";
+  was: string;
+  nowis: string;
+  constructor(was: string, nowis: string) {
+    this.was = was;
+    this.nowis = nowis;
+  }
+  public toString(): string {
+    return "[" + this.was + "/" + this.nowis + "]";
+  }
+}
+type LCSEdit = LCSInsert | LCSDelete | LCSReplace;
 
-  return [];
+/**
+ * Computes the sequence of edits to transform string x into string y.
+ * @param x String x.
+ * @param y String y.
+ */
+export function findEdits(x: string, y: string): LCSEdit[][] {
+  const R = lcs_alignments(x, y);
+  const editSet: LCSEdit[][] = [];
+  for (let n = 0; n < R.values.length; n++) {
+    const sub = R.values[n]; // the nth LCS
+    editSet[n] = []; // initialize this LCS's edit sequence
+    let i = 0; // index into x
+    let j = 0; // index into y
+    let k = 0; // index into R
+    while (i < x.length && j < y.length) {
+      // is the next character alignment in the subsequence (i,j)?
+      const al = new NumPair(i, j);
+      const next = sub.valueAt(k);
+      if (al.equals(next)) {
+        // we don't need to edit anything
+        i++;
+        j++;
+        k++;
+      } else {
+        // which index in the pair matches?
+        if (al.first === next.first) {
+          // this represents an insertion;
+          // insert the character from y[j].
+          editSet[n].push(new LCSInsert(y.charAt(j)));
+          j++;
+        } else if (al.second === next.second) {
+          // this represents a deletion;
+          // delete the character from x[i].
+          editSet[n].push(new LCSDelete(x.charAt(i)));
+          i++;
+        } else {
+          // this is both an insertion and a deletion;
+          // delete the character from x[i] and
+          // insert the character from y[j].
+          editSet[n].push(new LCSReplace(x.charAt(i), y.charAt(j)));
+          i++;
+          j++;
+        }
+      }
+    }
+  }
+
+  return editSet;
+}
+
+/**
+ * Computes the minimum sequence of edits to transform string x into
+ * string y. On length ties, returns the "most consistent" edit, where
+ * one edit is more consistent than another if it switches edit
+ * operations the least. If two or more edits are "most consistent", the
+ * algorithm chooses arbitrarily.
+ * @param x String x.
+ * @param y String y.
+ */
+function findMinEdit(x: string, y: string): LCSEdit[] {
+  const editSet = findEdits(x, y);
+  assert(editSet.length > 0);
+
+  // find the shortest edit sequence
+  let min = 0;
+  for (let i = 0; i < editSet.length; i++) {
+    if (editSet[i].length < editSet[min].length) {
+      min = i;
+    }
+  }
+
+  // find all of the edits of length min
+  const candidateEdits = editSet.filter((ed) => ed.length === editSet[min].length);
+
+  // sort by edit consistency
+  candidateEdits.sort((e1, e2) => editConsistency(e1) - editConsistency(e2));
+
+  // return the first candidate
+  return candidateEdits[0];
+}
+
+/**
+ * Finds the single longest sequence of characters needed to transform
+ * string x into string y.  This is what you might intuitively think of
+ * as a "string diff."
+ * @param x String x.
+ * @param y String y.
+ */
+function diff(x: string, y: string): LCSEdit[] {
+  // compute prefix
+  // compute suffix
+  // compute changes
+}
+
+/**
+ * Counts the number of times an edit changes operations.
+ * @param edit A sequence of edit operations.
+ */
+function editConsistency(edit: LCSEdit[]): number {
+  assert(edit.length > 0);
+  let count = 0;
+  let last = edit[0];
+  for (let i = 0; i < edit.length; i++) {
+    // did the type of edit change?
+    if (edit[i].tag !== last.tag) {
+      last = edit[i];
+      count++;
+    }
+  }
+  return count;
 }
 
 /**
@@ -205,4 +356,13 @@ function getCharPairs(C: number[][], x: string, i: number, y: string, j: number)
 
 // console.log(lcs("heyo", "mayor"));
 //console.log(lcs("hello", "helwordslo"));
-console.log(lcs_alignments("hello", "helwordslo").toString());
+// console.log(lcs_alignments("hello", "helwordslo").toString());
+const edits = findEdits("dowager", "doctor");
+for (let i = 0; i < edits.length; i++) {
+  const edit = edits[i];
+  const strs = edit.map((e) => e.toString());
+  const s = strs.join("");
+  console.log(s);
+}
+const minEdit = findMinEdit("dowager", "doctor");
+console.log("Min edit: " + minEdit);
