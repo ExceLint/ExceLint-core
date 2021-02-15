@@ -628,4 +628,8 @@ export class CArray<V extends IComparable<V>> extends Array<V> implements ICompa
   public toString(): string {
     return this.data.toString();
   }
+
+  public valueAt(index: number): V {
+    return this.data[index];
+  }
 }

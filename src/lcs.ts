@@ -51,7 +51,7 @@ export function fill2D<T>(value: T, m: number, n: number): T[][] {
 }
 
 /**
- * Computes the set of longest strings.
+ * Computes the set of longest subsequences.
  * @param x One string.
  * @param y Another string.
  */
@@ -63,16 +63,23 @@ export function lcs(x: string, y: string): string[] {
 }
 
 /**
- * Computes the set of longest strings.
+ * Computes the set of longest subsequences in the form of string alignments, where
+ * an alignment is a sequence of pairs of matching character indices.  The first element
+ * in the pair is an index into x and the second element is an index into y.
  * @param x One string.
  * @param y Another string.
  */
-export function lcs2(x: string, y: string): CSet<CArray<NumPair>> {
+export function lcs_alignments(x: string, y: string): CSet<CArray<NumPair>> {
   const m = x.length;
   const n = y.length;
   const C = makeTable(x, m, y, n);
-  const R = getCharPairs(C, x, m, y, n);
-  return R;
+  return getCharPairs(C, x, m, y, n);
+}
+
+export function diff(x: string, y: string): string[] {
+  const R = lcs_alignments(x, y);
+
+  return [];
 }
 
 /**
@@ -125,13 +132,7 @@ function union(a: string[], b: string[]): string[] {
  * @param y String y.
  * @param j Length of string y.
  */
-function backtrackAll(
-  C: number[][],
-  x: string,
-  i: number,
-  y: string,
-  j: number
-): string[] {
+function backtrackAll(C: number[][], x: string, i: number, y: string, j: number): string[] {
   if (i === 0 || j === 0) {
     // if both indices are zero, we're just starting
     return [""];
@@ -168,13 +169,7 @@ function backtrackAll(
  * @param y A string y.
  * @param j The length of y.
  */
-function getCharPairs(
-  C: number[][],
-  x: string,
-  i: number,
-  y: string,
-  j: number
-): CSet<CArray<NumPair>> {
+function getCharPairs(C: number[][], x: string, i: number, y: string, j: number): CSet<CArray<NumPair>> {
   if (i === 0 || j === 0) {
     // base case: if both strings are empty, then clearly the LCS
     //   is the empty string, so return the set containing the empty
@@ -210,4 +205,4 @@ function getCharPairs(
 
 // console.log(lcs("heyo", "mayor"));
 //console.log(lcs("hello", "helwordslo"));
-console.log(lcs2("hello", "helwordslo").toString());
+console.log(lcs_alignments("hello", "helwordslo").toString());
