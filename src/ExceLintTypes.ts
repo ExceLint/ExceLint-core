@@ -507,6 +507,11 @@ export class WorksheetAnalysis {
     return this.foundBugs.length;
   }
 
+  // Get the underlying sheet object
+  get worksheet(): WorksheetOutput {
+    return this.sheet;
+  }
+
   // For every proposed fix, if it is above the score threshold, keep it,
   // and return the unique set of all vectors contained in any kept fix.
   private static createBugList(pf: ProposedFix[]): ExceLintVector[] {

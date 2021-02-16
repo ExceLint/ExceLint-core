@@ -510,4 +510,50 @@ export class ExcelUtils {
     }
     return refs;
   }
+
+  /**
+   * Converts an A1 address string into an R1C1 tuple where the first
+   * element is the column number and the second element is the row number.
+   * @param a1addr An address string in A1 format
+   */
+  public static addrA1toR1C1(a1addr: string): [number, number] {
+    // remove absolute reference symbols and ensure address is uppercase
+    const addr = a1addr.replace("$", "").toUpperCase();
+    let processCol = true;
+
+    // accumulated characters go here
+    const x_list: number[] = [];
+    const y_list: number[] = [];
+
+    for (let i = 0; i < addr.length; i++) {
+      const c = addr.charAt(i);
+
+      // process the column
+      if (processCol) {
+        const n = Number(c);
+        if (!isNaN(n)) {
+          // switch to processing y once we see numeric chars
+          processCol = false;
+        } else {
+          // e.g., A = ASCII decimal 65, so A will equal 1, Z will equal 26.
+          const code = c.charCodeAt(0);
+          x_list.push(code - 64);
+        }
+      }
+
+      // process the row
+      if (!processCol) {
+        // the magnitude of _y depends on how many y chars there are,
+        // which we don't yet know.  Keep a count and do the math later.
+        y_list.push(Number(c));
+      }
+    }
+
+    // so that we can process from the least significant digit
+    x_list.reverse();
+    y_list.reverse();
+    const x = x_list.map((t, i) => t * Math.pow(26, i)).reduce((acc, e) => acc + e, 0);
+    const y = y_list.map((t, i) => t * Math.pow(10, i)).reduce((acc, e) => acc + e, 0);
+    return [x, y];
+  }
 }

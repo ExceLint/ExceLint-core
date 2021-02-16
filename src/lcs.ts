@@ -18,7 +18,7 @@ function assert(pred: boolean, msg?: string): void {
   }
 }
 
-class NumPair implements IComparable<NumPair> {
+export class NumPair implements IComparable<NumPair> {
   private fst: number;
   private snd: number;
 
@@ -50,7 +50,7 @@ class NumPair implements IComparable<NumPair> {
  * @param m The size of the first array dimension.
  * @param n The size of the second array dimension.
  */
-export function fill2D<T>(value: T, m: number, n: number): T[][] {
+function fill2D<T>(value: T, m: number, n: number): T[][] {
   const arr: T[][] = [];
   for (let i = 0; i < m; i++) {
     arr[i] = [];
@@ -87,7 +87,7 @@ export function lcs_alignments(x: string, y: string): CSet<CArray<NumPair>> {
   return getCharPairs(C, x, m, y, n);
 }
 
-class LCSInsert {
+export class LCSInsert {
   tag: "insert";
   ch: string;
   aln: NumPair;
@@ -100,7 +100,7 @@ class LCSInsert {
     return "[+" + this.ch + "]";
   }
 }
-class LCSDelete {
+export class LCSDelete {
   tag: "delete";
   ch: string;
   aln: NumPair;
@@ -113,7 +113,7 @@ class LCSDelete {
     return "[-" + this.ch + "]";
   }
 }
-class LCSReplace {
+export class LCSReplace {
   tag: "replace";
   was: string;
   nowis: string;
@@ -128,7 +128,7 @@ class LCSReplace {
     return "[" + this.was + "/" + this.nowis + "]";
   }
 }
-class LCSKeep {
+export class LCSKeep {
   tag: "keep";
   is: string;
   aln: NumPair;
@@ -141,7 +141,7 @@ class LCSKeep {
     return this.is;
   }
 }
-type LCSEdit = LCSInsert | LCSDelete | LCSReplace | LCSKeep;
+export type LCSEdit = LCSInsert | LCSDelete | LCSReplace | LCSKeep;
 
 /**
  * Computes the sequence of edits to transform string x into string y.
@@ -227,7 +227,7 @@ export function findEdits(x: string, y: string): LCSEdit[][] {
  * @param x String x.
  * @param y String y.
  */
-function findMinEdit(x: string, y: string): LCSEdit[] {
+export function findMinEdit(x: string, y: string): LCSEdit[] {
   const editSet = findEdits(x, y);
   assert(editSet.length > 0);
 
@@ -258,7 +258,7 @@ function findMinEdit(x: string, y: string): LCSEdit[] {
  * @param x String x
  * @param y String y
  */
-function suffixUpdate(x: string, y: string): [number, string] {
+export function suffixUpdate(x: string, y: string): [number, string] {
   // find the "most consistent" short edit
   const edit = findMinEdit(x, y);
 
@@ -459,7 +459,7 @@ function getCharPairs(
  * An edit pretty-printer.  Returns a formatted string.
  * @param edit A sequence of LCSEdit objects.
  */
-function editFormatter(edit: LCSEdit[]): string {
+export function editFormatter(edit: LCSEdit[]): string {
   const strs = edit.map((e) => e.toString());
   const s = strs.join("");
   return s;
