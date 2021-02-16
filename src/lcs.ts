@@ -88,38 +88,60 @@ export function lcs_alignments(x: string, y: string): CSet<CArray<NumPair>> {
 }
 
 class LCSInsert {
-  tag: string = "insert";
+  tag: "insert";
   ch: string;
-  constructor(ch: string) {
+  aln: NumPair;
+  constructor(ch: string, alignment: NumPair) {
     this.ch = ch;
+    this.aln = alignment;
+    this.tag = "insert";
   }
   public toString(): string {
     return "[+" + this.ch + "]";
   }
 }
 class LCSDelete {
-  tag: string = "delete";
+  tag: "delete";
   ch: string;
-  constructor(ch: string) {
+  aln: NumPair;
+  constructor(ch: string, alignment: NumPair) {
     this.ch = ch;
+    this.aln = alignment;
+    this.tag = "delete";
   }
   public toString(): string {
     return "[-" + this.ch + "]";
   }
 }
 class LCSReplace {
-  tag: string = "replace";
+  tag: "replace";
   was: string;
   nowis: string;
-  constructor(was: string, nowis: string) {
+  aln: NumPair;
+  constructor(was: string, nowis: string, alignment: NumPair) {
     this.was = was;
     this.nowis = nowis;
+    this.aln = alignment;
+    this.tag = "replace";
   }
   public toString(): string {
     return "[" + this.was + "/" + this.nowis + "]";
   }
 }
-type LCSEdit = LCSInsert | LCSDelete | LCSReplace;
+class LCSKeep {
+  tag: "keep";
+  is: string;
+  aln: NumPair;
+  constructor(is: string, alignment: NumPair) {
+    this.is = is;
+    this.aln = alignment;
+    this.tag = "keep";
+  }
+  public toString(): string {
+    return this.is;
+  }
+}
+type LCSEdit = LCSInsert | LCSDelete | LCSReplace | LCSKeep;
 
 /**
  * Computes the sequence of edits to transform string x into string y.
@@ -141,6 +163,7 @@ export function findEdits(x: string, y: string): LCSEdit[][] {
       const next = sub.valueAt(k);
       if (al.equals(next)) {
         // we don't need to edit anything
+        editSet[n].push(new LCSKeep(x.charAt(i), al));
         i++;
         j++;
         k++;
@@ -149,18 +172,18 @@ export function findEdits(x: string, y: string): LCSEdit[][] {
         if (al.first === next.first) {
           // this represents an insertion;
           // insert the character from y[j].
-          editSet[n].push(new LCSInsert(y.charAt(j)));
+          editSet[n].push(new LCSInsert(y.charAt(j), al));
           j++;
         } else if (al.second === next.second) {
           // this represents a deletion;
           // delete the character from x[i].
-          editSet[n].push(new LCSDelete(x.charAt(i)));
+          editSet[n].push(new LCSDelete(x.charAt(i), al));
           i++;
         } else {
           // this is both an insertion and a deletion;
           // delete the character from x[i] and
           // insert the character from y[j].
-          editSet[n].push(new LCSReplace(x.charAt(i), y.charAt(j)));
+          editSet[n].push(new LCSReplace(x.charAt(i), y.charAt(j), al));
           i++;
           j++;
         }
@@ -193,7 +216,9 @@ function findMinEdit(x: string, y: string): LCSEdit[] {
   }
 
   // find all of the edits of length min
-  const candidateEdits = editSet.filter((ed) => ed.length === editSet[min].length);
+  const candidateEdits = editSet.filter(
+    (ed) => ed.length === editSet[min].length
+  );
 
   // sort by edit consistency
   candidateEdits.sort((e1, e2) => editConsistency(e1) - editConsistency(e2));
@@ -203,16 +228,56 @@ function findMinEdit(x: string, y: string): LCSEdit[] {
 }
 
 /**
- * Finds the single longest sequence of characters needed to transform
- * string x into string y.  This is what you might intuitively think of
- * as a "string diff."
- * @param x String x.
- * @param y String y.
+ * Finds the suffix corresponding to the shortest and most consistent
+ * update from string x to string y.  Returns a tuple representing the
+ * start index of the edit, along with the replacement string.
+ * @param x String x
+ * @param y String y
  */
-function diff(x: string, y: string): LCSEdit[] {
-  // compute prefix
-  // compute suffix
-  // compute changes
+function suffixUpdate(x: string, y: string): [number, string] {
+  // find the "most consistent" short edit
+  const edit = findMinEdit(x, y);
+
+  // compute the replacement string
+  let s = "";
+  let found_start = false;
+  let start_idx = 0;
+  for (let i = 0; i < edit.length; i++) {
+    const editOp = edit[i];
+    switch (editOp.tag) {
+      case "keep":
+        // only add keeps to string if we've
+        // alreay found the end of the prefix
+        if (found_start) {
+          s += editOp.is;
+        }
+        break;
+      case "insert":
+        s += editOp.ch;
+        if (!found_start) {
+          start_idx = editOp.aln.second;
+          found_start = true;
+        }
+        break;
+      case "replace":
+        s += editOp.nowis;
+        if (!found_start) {
+          start_idx = editOp.aln.first;
+          found_start = true;
+        }
+        break;
+      case "delete":
+        if (!found_start) {
+          start_idx = editOp.aln.first;
+          found_start = true;
+        }
+        break;
+      default:
+        throw new Error("Unknown edit type.");
+    }
+  }
+
+  return [start_idx, s];
 }
 
 /**
@@ -283,7 +348,13 @@ function union(a: string[], b: string[]): string[] {
  * @param y String y.
  * @param j Length of string y.
  */
-function backtrackAll(C: number[][], x: string, i: number, y: string, j: number): string[] {
+function backtrackAll(
+  C: number[][],
+  x: string,
+  i: number,
+  y: string,
+  j: number
+): string[] {
   if (i === 0 || j === 0) {
     // if both indices are zero, we're just starting
     return [""];
@@ -320,7 +391,13 @@ function backtrackAll(C: number[][], x: string, i: number, y: string, j: number)
  * @param y A string y.
  * @param j The length of y.
  */
-function getCharPairs(C: number[][], x: string, i: number, y: string, j: number): CSet<CArray<NumPair>> {
+function getCharPairs(
+  C: number[][],
+  x: string,
+  i: number,
+  y: string,
+  j: number
+): CSet<CArray<NumPair>> {
   if (i === 0 || j === 0) {
     // base case: if both strings are empty, then clearly the LCS
     //   is the empty string, so return the set containing the empty
@@ -354,15 +431,32 @@ function getCharPairs(C: number[][], x: string, i: number, y: string, j: number)
   }
 }
 
+/**
+ * An edit pretty-printer.  Returns a formatted string.
+ * @param edit A sequence of LCSEdit objects.
+ */
+function editFormatter(edit: LCSEdit[]): string {
+  const strs = edit.map((e) => e.toString());
+  const s = strs.join("");
+  return s;
+}
+
 // console.log(lcs("heyo", "mayor"));
 //console.log(lcs("hello", "helwordslo"));
 // console.log(lcs_alignments("hello", "helwordslo").toString());
-const edits = findEdits("dowager", "doctor");
+const x = "dowager";
+const y = "doctor";
+console.log("input x: '" + x + "'");
+console.log("input y: '" + y + "'");
+const edits = findEdits(x, y);
 for (let i = 0; i < edits.length; i++) {
-  const edit = edits[i];
-  const strs = edit.map((e) => e.toString());
-  const s = strs.join("");
+  const s = editFormatter(edits[i]);
   console.log(s);
 }
-const minEdit = findMinEdit("dowager", "doctor");
-console.log("Min edit: " + minEdit);
+const minEdit = findMinEdit(x, y);
+console.log("Min edit: " + editFormatter(minEdit));
+const [start_idx, suffix] = suffixUpdate(x, y);
+const prefix = x.slice(0, start_idx);
+console.log("common prefix: '" + prefix + "'");
+console.log("edit starts at idx: '" + start_idx + "'");
+console.log("suffix: '" + suffix + "'");
