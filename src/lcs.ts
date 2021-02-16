@@ -157,9 +157,33 @@ export function findEdits(x: string, y: string): LCSEdit[][] {
     let i = 0; // index into x
     let j = 0; // index into y
     let k = 0; // index into R
-    while (i < x.length && j < y.length) {
-      // is the next character alignment in the subsequence (i,j)?
+    while (i < x.length || j < y.length) {
+      // have we processed all of the alignments?
       const al = new NumPair(i, j);
+
+      // yes, now handle the remainder of the string
+      if (i >= x.length) {
+        // characters remain in y-- these are inserts
+        editSet[n].push(new LCSInsert(y.charAt(j), al));
+        j++;
+        continue;
+      } else if (j >= y.length) {
+        // characters remain in x-- these are keeps
+        editSet[n].push(new LCSInsert(x.charAt(i), al));
+        i++;
+        continue;
+      } else if (k >= sub.size) {
+        // out of alignments, but i and j are not at
+        // the end of x and y, respectively.
+        // i < x.length && j < y.length, so these are replacements
+        editSet[n].push(new LCSReplace(x.charAt(i), y.charAt(j), al));
+        i++;
+        j++;
+        continue;
+      }
+
+      // no, process alignments and things between alignments
+      // is the next character alignment in the subsequence (i,j)?
       const next = sub.valueAt(k);
       if (al.equals(next)) {
         // we don't need to edit anything
@@ -441,17 +465,16 @@ function editFormatter(edit: LCSEdit[]): string {
   return s;
 }
 
-// console.log(lcs("heyo", "mayor"));
-//console.log(lcs("hello", "helwordslo"));
-// console.log(lcs_alignments("hello", "helwordslo").toString());
-const x = "dowager";
-const y = "doctor";
+const x = "=SUM(A1";
+const y = "=SUM(A1:A34, B3:BX10) + 1";
+// const x = "dowager";
+// const y = "doctored";
 console.log("input x: '" + x + "'");
 console.log("input y: '" + y + "'");
 const edits = findEdits(x, y);
 for (let i = 0; i < edits.length; i++) {
   const s = editFormatter(edits[i]);
-  console.log(s);
+  console.log("\t" + s);
 }
 const minEdit = findMinEdit(x, y);
 console.log("Min edit: " + editFormatter(minEdit));
