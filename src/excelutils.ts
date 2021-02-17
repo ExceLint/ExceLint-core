@@ -516,9 +516,13 @@ export class ExcelUtils {
    * element is the column number and the second element is the row number.
    * @param a1addr An address string in A1 format
    */
-  public static addrA1toR1C1(a1addr: string): [number, number] {
-    // remove absolute reference symbols and ensure address is uppercase
-    const addr = a1addr.replace("$", "").toUpperCase();
+  public static addrA1toR1C1(a1addr: string): [string, number, number] {
+    // split sheet name, remove absolute reference symbols, and
+    // ensure address is uppercase
+    const a1normed = a1addr.replace("$", "");
+    const aa = a1normed.split("!");
+    const sheet = aa[0];
+    const addr = aa[1].toUpperCase();
     let processCol = true;
 
     // accumulated characters go here
@@ -554,6 +558,6 @@ export class ExcelUtils {
     y_list.reverse();
     const x = x_list.map((t, i) => t * Math.pow(26, i)).reduce((acc, e) => acc + e, 0);
     const y = y_list.map((t, i) => t * Math.pow(10, i)).reduce((acc, e) => acc + e, 0);
-    return [x, y];
+    return [sheet, x, y];
   }
 }

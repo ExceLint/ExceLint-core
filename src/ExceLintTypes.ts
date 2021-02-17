@@ -3,7 +3,6 @@ import { ExcelUtils } from "./excelutils";
 import { Classification } from "./classification";
 import { Config } from "./config";
 import { Option, Some, None, flatMap } from "./option";
-import { MAX_COLOR_SATURATION } from "office-ui-fabric-react";
 
 export interface Dict<V> {
   [key: string]: V;
