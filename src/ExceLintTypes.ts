@@ -1,4 +1,4 @@
-import { WorksheetOutput } from "./exceljson";
+import { WorkbookOutput, WorksheetOutput } from "./exceljson";
 import { ExcelUtils } from "./excelutils";
 import { Classification } from "./classification";
 import { Config } from "./config";
@@ -116,6 +116,29 @@ export class CSet<V extends IComparable<V>> implements IComparable<CSet<V>> {
 
 // all users of Spreadsheet store their data in row-major format (i.e., indexed by y first, then x).
 export type Spreadsheet = string[][];
+
+export class Address implements IComparable<Address> {
+  private _sheet: string;
+  private _row: number;
+  private _column: number;
+  constructor(sheet: string, row: number, column: number) {
+    this._sheet = sheet;
+    this._row = row;
+    this._column = column;
+  }
+  public get row(): number {
+    return this._row;
+  }
+  public get column(): number {
+    return this._column;
+  }
+  public get worksheet(): string {
+    return this._sheet;
+  }
+  public equals(a: Address): boolean {
+    return this._sheet === a._sheet && this._row === a._row && this._column === a._column;
+  }
+}
 
 export type Fingerprint = string;
 
@@ -428,6 +451,11 @@ export class FixAnalysis {
 
 export class WorkbookAnalysis {
   private sheets: Dict<WorksheetAnalysis> = {};
+  private wb: WorkbookOutput;
+
+  constructor(wb: WorkbookOutput) {
+    this.wb = wb;
+  }
 
   public getSheet(name: string) {
     return this.sheets[name];
@@ -435,6 +463,10 @@ export class WorkbookAnalysis {
 
   public addSheet(s: WorksheetAnalysis) {
     this.sheets[s.name] = s;
+  }
+
+  public get workbook(): WorkbookOutput {
+    return this.wb;
   }
 }
 
@@ -525,37 +557,6 @@ export class WorksheetAnalysis {
     }, pf);
     let flattened = keep.flat(1);
     return ExceLintVector.toSet(flattened);
-  }
-}
-
-/**
- * Represents an edit.  Intentionally designed to be similar to a TextDocumentContentChangeEvent
- * in the Microsoft Language Server Protocol, replacing line numbers with formula addresses.
- * (https://github.com/Microsoft/language-server-protocol/blob/master/versions/protocol-2-x.md)
- */
-export class Address {
-  /**
-   * The column (i.e., one-based x-coordinate of the cell).
-   */
-  col: number;
-  /**
-   * The row (i.e., one-based y-coordinate of the cell).
-   */
-  row: number;
-  /**
-   * The worksheet name.  If omitted, assumed to be the current sheet.
-   */
-  sheet: string;
-  /**
-   * The workbook name.  If omitted, assumed to be the current workbook.
-   */
-  workbook: string;
-
-  constructor(col: number, row: number, sheet?: string, workbook?: string) {
-    this.col = col;
-    this.row = row;
-    this.sheet = sheet;
-    this.workbook = workbook;
   }
 }
 

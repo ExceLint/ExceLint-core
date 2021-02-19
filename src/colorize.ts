@@ -28,7 +28,7 @@ export class Colorize {
     "#91c7a8",
     "#b4efd3",
     "#80b6aa",
-    "#9bd1c6"
+    "#9bd1c6",
   ]; // removed '#73dad1'
 
   // True iff this class been initialized.
@@ -114,23 +114,36 @@ export class Colorize {
 
   /**
    * Performs an incremental ExceLint analysis.
-   * @param a The previous analysis result, including last observed workbook state.
-   * @param edits The sequence of updates to the formula string.
+   * @param inp The workbook to analysis.
+   * @param prev The previous analysis result, including last observed workbook state.
+   * @param edit The sequence of updates to the formula string.
    * @param addr The location of the formula.
    */
   public static update_analysis(
-    a: XLNT.WorkbookAnalysis,
+    inp: WorkbookOutput,
+    prev: XLNT.WorkbookAnalysis,
     edit: [number, string],
-    addr: [string, number, number]
+    addr: XLNT.Address
   ): XLNT.WorkbookAnalysis {
+    // to make TS compiler stop complaining while I develop
+    // TODO REMOVE
     edit = edit;
     addr = addr;
-    return a;
+
+    // run analysis
+    if (false) {
+      // incremental analysis
+      // TODO
+      return prev;
+    } else {
+      // run the entire big analysis
+      return this.process_workbook(inp, addr.worksheet);
+    }
   }
 
   // Performs an analysis on an entire workbook
   public static process_workbook(inp: WorkbookOutput, sheetName: string): XLNT.WorkbookAnalysis {
-    const wba = new XLNT.WorkbookAnalysis();
+    const wba = new XLNT.WorkbookAnalysis(inp);
 
     // look for the requested sheet
     for (let i = 0; i < inp.worksheets.length; i++) {
@@ -164,18 +177,18 @@ export class Colorize {
         const is_vert: boolean = Colorize.fixIsVertical(fix);
 
         // Formula info for each rectangle
-        const rect_info = fix.rectangles.map(rect => new XLNT.RectInfo(rect, sheet));
+        const rect_info = fix.rectangles.map((rect) => new XLNT.RectInfo(rect, sheet));
 
         // Omit fixes that are too small (too few cells).
         if (Colorize.fixCellCount(fix) < Config.minFixSize) {
-          const print_formulas = JSON.stringify(rect_info.map(fi => fi.print_formula));
+          const print_formulas = JSON.stringify(rect_info.map((fi) => fi.print_formula));
           console.warn("Omitted " + print_formulas + "(too small)");
           continue;
         }
 
         // Omit fixes with entropy change over threshold
         if (Colorize.fixEntropy(fix) > Config.maxEntropy) {
-          const print_formulas = JSON.stringify(rect_info.map(fi => fi.print_formula));
+          const print_formulas = JSON.stringify(rect_info.map((fi) => fi.print_formula));
           console.warn("Omitted " + JSON.stringify(print_formulas) + "(too high entropy)");
           continue;
         }
@@ -458,11 +471,11 @@ export class Colorize {
     const [m1, m2] = merge_with;
     const n_target = RectangleUtils.area([
       new XLNT.ExceLintVector(t1.x, t1.y, 0),
-      new XLNT.ExceLintVector(t2.x, t2.y, 0)
+      new XLNT.ExceLintVector(t2.x, t2.y, 0),
     ]);
     const n_merge_with = RectangleUtils.area([
       new XLNT.ExceLintVector(m1.x, m1.y, 0),
-      new XLNT.ExceLintVector(m2.x, m2.y, 0)
+      new XLNT.ExceLintVector(m2.x, m2.y, 0),
     ]);
     const n_min = Math.min(n_target, n_merge_with);
     const n_max = Math.max(n_target, n_merge_with);
@@ -490,11 +503,11 @@ export class Colorize {
       const [f21, f22] = fixes[k][2];
       count += RectangleUtils.diagonal([
         new XLNT.ExceLintVector(f11.x, f11.y, 0),
-        new XLNT.ExceLintVector(f12.x, f12.y, 0)
+        new XLNT.ExceLintVector(f12.x, f12.y, 0),
       ]);
       count += RectangleUtils.diagonal([
         new XLNT.ExceLintVector(f21.x, f21.y, 0),
-        new XLNT.ExceLintVector(f22.x, f22.y, 0)
+        new XLNT.ExceLintVector(f22.x, f22.y, 0),
       ]);
     }
     return count;
