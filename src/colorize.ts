@@ -128,7 +128,6 @@ export class Colorize {
     // to make TS compiler stop complaining while I develop
     // TODO REMOVE
     edit = edit;
-    addr = addr;
 
     // run analysis
     if (false) {

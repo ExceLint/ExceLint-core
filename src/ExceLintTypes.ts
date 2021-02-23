@@ -138,6 +138,9 @@ export class Address implements IComparable<Address> {
   public equals(a: Address): boolean {
     return this._sheet === a._sheet && this._row === a._row && this._column === a._column;
   }
+  public toString(): string {
+    return "R" + this._column + ":C" + this._row;
+  }
 }
 
 export type Fingerprint = string;
@@ -147,7 +150,7 @@ export type Metric = number;
 // a rectangle is defined by its start and end vectors
 export type Rectangle = [ExceLintVector, ExceLintVector];
 
-export class ProposedFix {
+export class ProposedFix implements IComparable<ProposedFix> {
   // This comment no longer holds, since there is a data type for ProposedFix,
   // but it is informative, since it explains the meaning of the fields:
   // ## old comment ##
@@ -221,6 +224,25 @@ export class ProposedFix {
       this_r2_br.equals(other_r2_br) &&
       this.score === other.score
     );
+  }
+
+  public includesCellAt(addr: Address): boolean {
+    // convert addr to an ExceLintVector
+    const v = new ExceLintVector(addr.column, addr.row, 0);
+
+    // check the rectangles
+    const [r1_ul, r1_br] = this.rect1;
+    const [r2_ul, r2_br] = this.rect2;
+    const first_cells = expand(r1_ul, r1_br);
+    const second_cells = expand(r2_ul, r2_br);
+    const all_cells = first_cells.concat(second_cells);
+    for (let i = 0; i < all_cells.length; i++) {
+      const cell = all_cells[i];
+      if (v.equals(cell)) {
+        return true;
+      }
+    }
+    return false;
   }
 }
 
