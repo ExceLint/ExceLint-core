@@ -9,6 +9,7 @@ import { WorkbookAnalysis } from "../ExceLintTypes";
 import { Config } from "../config";
 import { CLIConfig, process_arguments } from "./args";
 import { AnnotationData } from "./bugs";
+import { Timer } from "../timer";
 
 const BUG_DATA_PATH = "test/annotations-processed.json";
 
@@ -29,6 +30,7 @@ const base = args.directory ? args.directory + "/" : "";
 
 // for each parameter setting, run analyses on all files
 const outputs: WorkbookAnalysis[] = [];
+const times: [string, number][] = [];
 for (const parms of args.parameters) {
   const formattingDiscount = parms[0];
   Config.setFormattingDiscount(formattingDiscount);
@@ -52,11 +54,20 @@ for (const parms of args.parameters) {
     if (facts.hasFormula) args.numWorkbooksWithFormulas += 1;
     args.numSheets += facts.numSheets;
 
+    const t = new Timer("full analysis");
     const output = Colorize.process_workbook(inp, ""); // no bug processing for now; just get all sheets
+    const elapsed_us = t.elapsedTime();
     outputs.push(output);
+    times.push([fname, elapsed_us]);
   }
 }
 
 if (!args.suppressOutput) {
   console.log(JSON.stringify(outputs, null, "\t"));
+
+  console.log("Full analysis times:");
+  for (let i = 0; i < times.length; i++) {
+    const [workbook, time_us] = times[i];
+    console.log(workbook + ": " + time_us + " μs");
+  }
 }
