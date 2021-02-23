@@ -139,7 +139,7 @@ export class Address implements IComparable<Address> {
     return this._sheet === a._sheet && this._row === a._row && this._column === a._column;
   }
   public toString(): string {
-    return "R" + this._column + ":C" + this._row;
+    return "R" + this._column + "C" + this._row;
   }
 }
 
