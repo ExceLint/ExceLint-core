@@ -13,6 +13,7 @@ export class Timer {
     if (typeof window === "undefined") {
       this.perf = {
         now: function () {
+          // returns a time in microseconds
           const [secs, nanosecs] = process.hrtime();
           return (secs * 1e9 + nanosecs) / 1e3;
         },
@@ -41,7 +42,7 @@ export class Timer {
         this.roundMe(elapsed) +
         " (total = " +
         this.roundMe(curr - this.startTimeMS) +
-        ")"
+        " μs)"
     );
     this.splitTimeMS = curr;
   }
