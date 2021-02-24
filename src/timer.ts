@@ -39,9 +39,9 @@ export class Timer {
         " @ " +
         location +
         " : = " +
-        this.roundMe(elapsed) +
+        Timer.round(elapsed) +
         " (total = " +
-        this.roundMe(curr - this.startTimeMS) +
+        Timer.round(curr - this.startTimeMS) +
         " μs)"
     );
     this.splitTimeMS = curr;
@@ -51,7 +51,7 @@ export class Timer {
     return this.perf.now() - this.startTimeMS;
   }
 
-  private roundMe(v: number): number {
+  public static round(v: number): number {
     return Math.round(v * 100) / 100;
   }
 }

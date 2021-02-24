@@ -32,6 +32,13 @@ export class Dictionary<V> {
       throw new Error("Cannot delete unknown key '" + key + "' in dictionary.");
     }
   }
+  public get keys(): string[] {
+    const output: string[] = [];
+    for (let key in this._d) {
+      output.push(key);
+    }
+    return output;
+  }
 }
 
 export interface IComparable<V> {

@@ -141,7 +141,11 @@ export class Colorize {
   }
 
   // Performs an analysis on an entire workbook
-  public static process_workbook(inp: WorkbookOutput, sheetName: string): XLNT.WorkbookAnalysis {
+  public static process_workbook(
+    inp: WorkbookOutput,
+    sheetName: string,
+    beVerbose: boolean = false
+  ): XLNT.WorkbookAnalysis {
     const wba = new XLNT.WorkbookAnalysis(inp);
 
     // look for the requested sheet
@@ -157,7 +161,7 @@ export class Colorize {
       const usedRangeAddress = Colorize.normalizeAddress(sheet.usedRangeAddress);
 
       // Get anomalous cells and proposed fixes, among others.
-      const a = Colorize.process_suspicious(usedRangeAddress, sheet.formulas, sheet.values);
+      const a = Colorize.process_suspicious(usedRangeAddress, sheet.formulas, sheet.values, beVerbose);
 
       // Eliminate fixes below user threshold
       a.proposed_fixes = Colorize.filterFixesByUserThreshold(a.proposed_fixes, Config.reportingThreshold);
@@ -181,14 +185,14 @@ export class Colorize {
         // Omit fixes that are too small (too few cells).
         if (Colorize.fixCellCount(fix) < Config.minFixSize) {
           const print_formulas = JSON.stringify(rect_info.map((fi) => fi.print_formula));
-          console.warn("Omitted " + print_formulas + "(too small)");
+          if (beVerbose) console.warn("Omitted " + print_formulas + "(too small)");
           continue;
         }
 
         // Omit fixes with entropy change over threshold
         if (Colorize.fixEntropy(fix) > Config.maxEntropy) {
           const print_formulas = JSON.stringify(rect_info.map((fi) => fi.print_formula));
-          console.warn("Omitted " + JSON.stringify(print_formulas) + "(too high entropy)");
+          if (beVerbose) console.warn("Omitted " + JSON.stringify(print_formulas) + "(too high entropy)");
           continue;
         }
 
@@ -197,7 +201,7 @@ export class Colorize {
 
         // IMPORTANT:
         // Exclude reported bugs subject to certain conditions.
-        if (Classification.omitFixes(bin, rect_info)) continue;
+        if (Classification.omitFixes(bin, rect_info, beVerbose)) continue;
 
         // If we're still here, accept this fix
         final_adjusted_fixes.push(fix);
@@ -376,14 +380,11 @@ export class Colorize {
       for (let j = 0; j < rows; j++) {
         const adjustedX = j + origin_col + 1;
         const adjustedY = i + origin_row + 1;
-        //		    console.log('examining ' + i + ' ' + j + ' = ' + matrix[i][j] + ' (' + adjustedX + ', ' + adjustedY + ')');
         if (probs[i][j] > 0) {
           sumValues += matrix[i][j];
           countValues += 1;
           if (probs[i][j] <= threshold) {
-            // console.log('found one at ' + i + ' ' + j + ' = [' + matrix[i][j] + '] (' + adjustedX + ', ' + adjustedY + '): p = ' + probs[i][j]);
             if (matrix[i][j] !== 0) {
-              // console.log('PUSHED!');
               // Never push an empty cell.
               cells.push([adjustedX, adjustedY, probs[i][j]]);
             }
@@ -395,14 +396,14 @@ export class Colorize {
     cells.sort((a, b) => {
       return Math.abs(b[2] - avgValues) - Math.abs(a[2] - avgValues);
     });
-    //        console.log('cells = ' + JSON.stringify(cells));
     return cells;
   }
 
   public static process_suspicious(
     usedRangeAddress: string,
     formulas: XLNT.Spreadsheet,
-    values: XLNT.Spreadsheet
+    values: XLNT.Spreadsheet,
+    beVerbose: boolean
   ): XLNT.Analysis {
     const [, startCell] = ExcelUtils.extract_sheet_cell(usedRangeAddress);
     const origin = ExcelUtils.cell_dependency(startCell, 0, 0);
@@ -412,7 +413,7 @@ export class Colorize {
     const totalFormulas = (formulas as any).flat().filter(Boolean).length;
 
     if (totalFormulas > Config.formulasThreshold) {
-      console.warn("Too many formulas to perform formula analysis.");
+      if (beVerbose) console.warn("Too many formulas to perform formula analysis.");
     } else {
       processed_formulas = Colorize.process_formulas(formulas, origin.x - 1, origin.y - 1);
     }
@@ -422,7 +423,7 @@ export class Colorize {
     // Filter out non-empty items from whole matrix.
     const totalValues = (values as any).flat().filter(Boolean).length;
     if (totalValues > Config.valuesThreshold) {
-      console.warn("Too many values to perform reference analysis.");
+      if (beVerbose) console.warn("Too many values to perform reference analysis.");
     } else {
       // Compute references (to color referenced data).
       const refs: Dict<boolean> = ExcelUtils.generate_all_references(formulas, origin.x - 1, origin.y - 1);
@@ -465,7 +466,6 @@ export class Colorize {
     merge_with_norm: number,
     merge_with: XLNT.Rectangle
   ): XLNT.Metric {
-    //	console.log('fix_metric: ' + target_norm + ', ' + JSON.stringify(target) + ', ' + merge_with_norm + ', ' + JSON.stringify(merge_with));
     const [t1, t2] = target;
     const [m1, m2] = merge_with;
     const n_target = RectangleUtils.area([
@@ -567,7 +567,6 @@ export class Colorize {
       numIterations++;
       if (numIterations > 2000) {
         // This is a hack to guarantee convergence.
-        console.log("Too many iterations; abandoning this group.");
         return [[new XLNT.ExceLintVector(-1, -1, 0), new XLNT.ExceLintVector(-1, -1, 0)]];
       }
     }

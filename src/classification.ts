@@ -29,10 +29,7 @@ export class Classification {
 
   // Checks for recurrent formula fixes
   // NOTE: not sure if this is working currently
-  private static isRecurrentFormula(
-    rect_info: XLNT.RectInfo[],
-    direction_is_vert: boolean
-  ): boolean {
+  private static isRecurrentFormula(rect_info: XLNT.RectInfo[], direction_is_vert: boolean): boolean {
     const rect_dependencies = rect_info.map((ri) => ri.dependencies);
     for (let rect = 0; rect < rect_dependencies.length; rect++) {
       // get the dependencies for this fix rectangle
@@ -61,19 +58,13 @@ export class Classification {
   // Checks whether one formula has one more constant than the other
   private static hasOneExtraConstant(rect_info: XLNT.RectInfo[]): boolean {
     const constants = rect_info.map((ri) => ri.constants);
-    return (
-      constants[0].length !== constants[1].length &&
-      Math.abs(constants[0].length - constants[1].length) === 1
-    );
+    return constants[0].length !== constants[1].length && Math.abs(constants[0].length - constants[1].length) === 1;
   }
 
   // Checks whether one formula has one more constant than the other
   private static numberOfConstantsMismatch(rect_info: XLNT.RectInfo[]): boolean {
     const constants = rect_info.map((ri) => ri.constants);
-    return (
-      constants[0].length !== constants[1].length &&
-      !(Math.abs(constants[0].length - constants[1].length) === 1)
-    );
+    return constants[0].length !== constants[1].length && !(Math.abs(constants[0].length - constants[1].length) === 1);
   }
 
   // Checks whether both rectangles in a fix are constant-only
@@ -83,9 +74,7 @@ export class Classification {
 
     // both have constants and neither have any other dependencies
     return (
-      rect1.constants.length > 0 &&
-      rect2.constants.length > 0 &&
-      rect1.dependence_count + rect2.dependence_count === 0
+      rect1.constants.length > 0 && rect2.constants.length > 0 && rect1.dependence_count + rect2.dependence_count === 0
     );
   }
 
@@ -130,10 +119,7 @@ export class Classification {
     for (let rect = 0; rect < all_dependencies.length; rect++) {
       // if both x and y offsets are not zero, their product will not be zero;
       // this is an "off-axis" reference.
-      if (
-        all_dependencies[rect].length > 0 &&
-        all_dependencies[rect][0].x * all_dependencies[rect][0].y !== 0
-      ) {
+      if (all_dependencies[rect].length > 0 && all_dependencies[rect][0].x * all_dependencies[rect][0].y !== 0) {
         return true;
       }
     }
@@ -157,12 +143,10 @@ export class Classification {
       bin.push(Classification.BinCategory.RecurrentFormula);
 
     // Check for differing refcounts.
-    if (Classification.hasDifferingRefcounts(rect_info))
-      bin.push(Classification.BinCategory.DifferentReferentCount);
+    if (Classification.hasDifferingRefcounts(rect_info)) bin.push(Classification.BinCategory.DifferentReferentCount);
 
     // Check for one extra constant.
-    if (Classification.hasOneExtraConstant(rect_info))
-      bin.push(Classification.BinCategory.OneExtraConstant);
+    if (Classification.hasOneExtraConstant(rect_info)) bin.push(Classification.BinCategory.OneExtraConstant);
 
     // Check that there isn't a mismatch in constant counts
     // (excluding "one extra constant").
@@ -170,25 +154,20 @@ export class Classification {
       bin.push(Classification.BinCategory.NumberOfConstantsMismatch);
 
     // Check whether both formulas are constants-only.
-    if (Classification.bothConstantOnly(rect_info))
-      bin.push(Classification.BinCategory.BothConstants);
+    if (Classification.bothConstantOnly(rect_info)) bin.push(Classification.BinCategory.BothConstants);
 
     // Check whether exactly one formula is constant-only.
-    if (Classification.onlyOneIsConstantOnly(rect_info))
-      bin.push(Classification.BinCategory.OneIsAllConstants);
+    if (Classification.onlyOneIsConstantOnly(rect_info)) bin.push(Classification.BinCategory.OneIsAllConstants);
 
     // Check for mismatched R1C1 representation.
-    if (Classification.hasR1C1Mismatch(rect_info))
-      bin.push(Classification.BinCategory.R1C1Mismatch);
+    if (Classification.hasR1C1Mismatch(rect_info)) bin.push(Classification.BinCategory.R1C1Mismatch);
 
     // Different number of absolute ($, a.k.a. "anchor") references.
-    if (Classification.absoluteRefMismatch(rect_info))
-      bin.push(Classification.BinCategory.AbsoluteRefMismatch);
+    if (Classification.absoluteRefMismatch(rect_info)) bin.push(Classification.BinCategory.AbsoluteRefMismatch);
 
     // Dependencies that are neither vertical or horizontal
     // (likely errors if there is also an absolute-ref-mismatch).
-    if (Classification.offAxisReference(rect_info))
-      bin.push(Classification.BinCategory.OffAxisReference);
+    if (Classification.offAxisReference(rect_info)) bin.push(Classification.BinCategory.OffAxisReference);
 
     // If no predicates were triggered, classify this as "unclassified"
     if (bin.length == 0) bin.push(Classification.BinCategory.Unclassified);
@@ -205,7 +184,7 @@ export class Classification {
   }
 
   // Should we omit some fixes depending on the user configuration?
-  public static omitFixes(bin: Classification.BinCategory[], rect_info: XLNT.RectInfo[]): boolean {
+  public static omitFixes(bin: Classification.BinCategory[], rect_info: XLNT.RectInfo[], beVerbose: boolean): boolean {
     const print_formulas = rect_info.map((ri) => ri.print_formula);
 
     if (
@@ -213,29 +192,20 @@ export class Classification {
       (bin.indexOf(Classification.BinCategory.FatFix) !== -1 && Config.suppressFatFix) ||
       (bin.indexOf(Classification.BinCategory.DifferentReferentCount) !== -1 &&
         Config.suppressDifferentReferentCount) ||
-      (bin.indexOf(Classification.BinCategory.RecurrentFormula) !== -1 &&
-        Config.suppressRecurrentFormula) ||
-      (bin.indexOf(Classification.BinCategory.OneExtraConstant) !== -1 &&
-        Config.suppressOneExtraConstant) ||
+      (bin.indexOf(Classification.BinCategory.RecurrentFormula) !== -1 && Config.suppressRecurrentFormula) ||
+      (bin.indexOf(Classification.BinCategory.OneExtraConstant) !== -1 && Config.suppressOneExtraConstant) ||
       (bin.indexOf(Classification.BinCategory.NumberOfConstantsMismatch) != -1 &&
         Config.suppressNumberOfConstantsMismatch) ||
-      (bin.indexOf(Classification.BinCategory.BothConstants) !== -1 &&
-        Config.suppressBothConstants) ||
-      (bin.indexOf(Classification.BinCategory.OneIsAllConstants) !== -1 &&
-        Config.suppressOneIsAllConstants) ||
-      (bin.indexOf(Classification.BinCategory.R1C1Mismatch) !== -1 &&
-        Config.suppressR1C1Mismatch) ||
-      (bin.indexOf(Classification.BinCategory.AbsoluteRefMismatch) !== -1 &&
-        Config.suppressAbsoluteRefMismatch) ||
-      (bin.indexOf(Classification.BinCategory.OffAxisReference) !== -1 &&
-        Config.suppressOffAxisReference)
+      (bin.indexOf(Classification.BinCategory.BothConstants) !== -1 && Config.suppressBothConstants) ||
+      (bin.indexOf(Classification.BinCategory.OneIsAllConstants) !== -1 && Config.suppressOneIsAllConstants) ||
+      (bin.indexOf(Classification.BinCategory.R1C1Mismatch) !== -1 && Config.suppressR1C1Mismatch) ||
+      (bin.indexOf(Classification.BinCategory.AbsoluteRefMismatch) !== -1 && Config.suppressAbsoluteRefMismatch) ||
+      (bin.indexOf(Classification.BinCategory.OffAxisReference) !== -1 && Config.suppressOffAxisReference)
     ) {
-      console.warn("Omitted " + JSON.stringify(print_formulas) + "(" + JSON.stringify(bin) + ")");
+      if (beVerbose) console.warn("Omitted " + JSON.stringify(print_formulas) + "(" + JSON.stringify(bin) + ")");
       return true;
     } else {
-      console.warn(
-        "NOT omitted " + JSON.stringify(print_formulas) + "(" + JSON.stringify(bin) + ")"
-      );
+      if (beVerbose) console.warn("NOT omitted " + JSON.stringify(print_formulas) + "(" + JSON.stringify(bin) + ")");
       return false;
     }
   }
