@@ -47,6 +47,11 @@ export class WorkbookOutput {
     return path.basename(this.workbookName);
   }
 
+  // worksheet getter
+  public get sheets(): WorksheetOutput[] {
+    return this.worksheets;
+  }
+
   // Makes a copy of a WorkbookOutput object, replacing the name
   public static AdjustWorkbookName(wb: WorkbookOutput) {
     const wbnew = new WorkbookOutput(wb.workbookBaseName());
@@ -166,6 +171,6 @@ export namespace ExcelJSON {
   export enum selections {
     FORMULAS,
     VALUES,
-    STYLES
+    STYLES,
   }
 }
