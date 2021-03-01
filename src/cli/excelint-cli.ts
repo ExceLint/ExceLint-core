@@ -62,9 +62,15 @@ for (const parms of args.parameters) {
       args.numSheets += facts.numSheets;
 
       const t = new Timer("full analysis");
-      const output = Colorize.process_workbook(inp, "", !args.suppressOutput); // no bug processing for now; just get all sheets
+      for (let j = 0; j < inp.sheets.length; j++) {
+        // process the given worksheet
+        const sheet = inp.sheets[j];
+        console.warn("processing sheet " + sheet.sheetName);
+        const output = Colorize.process_workbook(inp, sheet.sheetName, !args.suppressOutput); // no bug processing for now; just get all sheets
+        outputs.push(output);
+      }
+
       const elapsed_us = t.elapsedTime();
-      outputs.push(output);
       time_arr.push(elapsed_us);
     }
   }
