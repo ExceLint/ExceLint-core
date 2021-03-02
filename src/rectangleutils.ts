@@ -2,8 +2,10 @@ import { ExceLintVector, Rectangle } from "./ExceLintTypes";
 
 export class RectangleUtils {
   public static is_adjacent(A: Rectangle, B: Rectangle): boolean {
-    const [a1, a2] = A;
-    const [b1, b2] = B;
+    const a1 = A.topleft;
+    const a2 = A.bottomright;
+    const b1 = B.topleft;
+    const b2 = B.bottomright;
 
     const tolerance = 1;
     const adj = !(
@@ -16,31 +18,38 @@ export class RectangleUtils {
   }
 
   public static bounding_box(A: Rectangle, B: Rectangle): Rectangle {
-    const [a1, a2] = A;
-    const [b1, b2] = B;
-    return [
+    const a1 = A.topleft;
+    const a2 = A.bottomright;
+    const b1 = B.topleft;
+    const b2 = B.bottomright;
+
+    return new Rectangle(
       new ExceLintVector(Math.min(a1.x, b1.x), Math.min(a1.y, b1.y), 0),
-      new ExceLintVector(Math.max(a2.x, b2.x), Math.max(a2.y, b2.y), 0),
-    ];
+      new ExceLintVector(Math.max(a2.x, b2.x), Math.max(a2.y, b2.y), 0)
+    );
   }
 
   public static area(A: Rectangle): number {
-    const [a1, a2] = A;
+    const a1 = A.topleft;
+    const a2 = A.bottomright;
     const length = a2.x - a1.x + 1;
     const width = a2.y - a1.y + 1;
     return length * width;
   }
 
   public static diagonal(A: Rectangle): number {
-    const [a1, a2] = A;
+    const a1 = A.topleft;
+    const a2 = A.bottomright;
     const length = a2.x - a1.x + 1;
     const width = a2.y - a1.y + 1;
     return Math.sqrt(length * length + width * width);
   }
 
   public static overlap(A: Rectangle, B: Rectangle): number {
-    const [a1, a2] = A;
-    const [b1, b2] = B;
+    const a1 = A.topleft;
+    const a2 = A.bottomright;
+    const b1 = B.topleft;
+    const b2 = B.bottomright;
     let width = 0,
       height = 0;
     if (a2.x > b2.x) {

@@ -4,7 +4,7 @@ import path = require("path");
 import * as XLSX from "xlsx";
 import * as sha224 from "crypto-js/sha224";
 import * as base64 from "crypto-js/enc-base64";
-import { Dict, Spreadsheet } from "./ExceLintTypes";
+import { Spreadsheet } from "./ExceLintTypes";
 
 export class WorksheetOutput {
   sheetName: string;
@@ -124,7 +124,7 @@ export class ExcelJSON {
   public static processWorkbookFromXLSX(f: XLSX.WorkBook, filename: string): WorkbookOutput {
     const output = new WorkbookOutput(filename);
     const sheetNames = f.SheetNames;
-    const sheets: Dict<XLSX.WorkSheet> = f.Sheets;
+    const sheets = f.Sheets;
     for (const sheetName of sheetNames) {
       const sheet = sheets[sheetName];
       if (!sheet) {

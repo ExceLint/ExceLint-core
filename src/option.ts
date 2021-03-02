@@ -13,9 +13,23 @@ export class Some<T> {
   public get value(): T {
     return this.t;
   }
+
+  public equals(o: Option<T>): boolean {
+    if (o.hasValue) {
+      return this.t === o.t;
+    }
+    return false;
+  }
 }
 class NoneType {
   public hasValue: false = false;
+
+  public equals(o: Option<any>): boolean {
+    if (o.hasValue) {
+      return false;
+    }
+    return true;
+  }
 }
 export const None = new NoneType(); // singleton None
 

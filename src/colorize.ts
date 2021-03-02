@@ -7,10 +7,10 @@ import { RectangleUtils } from "./rectangleutils";
 import { JSONclone } from "./jsonclone";
 import { find_all_proposed_fixes } from "./groupme";
 import * as XLNT from "./ExceLintTypes";
-import { Dict } from "./ExceLintTypes";
 import { WorkbookOutput } from "./exceljson";
 import { Config } from "./config";
 import { Classification } from "./classification";
+import { Some, None } from "./option";
 
 export class Colorize {
   // Color-blind friendly color palette.
@@ -39,7 +39,7 @@ export class Colorize {
 
   // A hash string indicating no dependencies; in other words,
   // either a formula that makes no references (like `=RAND()`) or a data cell (like `1`)
-  private static noDependenciesHash = "12345";
+  private static noDependenciesHash = new XLNT.Fingerprint(12345);
 
   public static initialize() {
     if (!this.initialized) {
@@ -140,6 +140,115 @@ export class Colorize {
     }
   }
 
+  // Given a full analysis, map addresses to rectangles
+  public static rectangleDict(a: XLNT.Analysis): XLNT.Dictionary<XLNT.Rectangle> {
+    const _d = new XLNT.Dictionary<XLNT.Rectangle>();
+
+    // for every cell in the analysis, find its bounding rectangle
+    // and put it in the dictionary, indexed by address (vector)
+    const rects = Object.entries(a.grouped_formulas)
+      .map(([, value]) => value)
+      .flat();
+    for (let i = 0; i < rects.length; i++) {
+      const rect = rects[i];
+      const cells = rect.expand();
+      for (let j = 0; j < cells.length; j++) {
+        // index this rectangle by this address (vector)
+        _d.put(cells[j].asKey(), rect);
+      }
+    }
+
+    return _d;
+  }
+
+  public static refsForRect(r: XLNT.Rectangle): XLNT.ExceLintVector[] {
+    r = r;
+
+    return [];
+  }
+
+  // Given a set of rectangles indexed by their addresses, produce a set of
+  // adjacencies indexed by their addresses
+  public static adjacencyDict(rd: XLNT.Dictionary<XLNT.Rectangle>, a: XLNT.Analysis): XLNT.Dictionary<XLNT.Adjacency> {
+    const _d = new XLNT.Dictionary<XLNT.Adjacency>();
+
+    // for every cell in the given dictionary, find its adjacencies
+    // and index in dictionary by address (vector)
+    const addrs = rd.keys;
+    for (let i = 0; i < addrs.length; i++) {
+      // get the address (a string, because it's a JS dictionary key)
+      const addr = addrs[i];
+
+      // get the address vector
+      const v = XLNT.ExceLintVector.fromKey(addr);
+
+      // compute the addresses (as keys) of the cells above, below, to the left,
+      // and to the right of this cell.
+      const up_addr = v.up.asKey();
+      const down_addr = v.down.asKey();
+      const left_addr = v.left.asKey();
+      const right_addr = v.right.asKey();
+
+      // get the rectangle for each adjacency
+      // if there is no adjacency (i.e., cell lies on the used range border)
+      // store 'None'
+      const up_rect = rd.contains(up_addr) ? new Some(rd.get(up_addr)) : None;
+      const down_rect = rd.contains(down_addr) ? new Some(rd.get(down_addr)) : None;
+      const left_rect = rd.contains(left_addr) ? new Some(rd.get(left_addr)) : None;
+      const right_rect = rd.contains(right_addr) ? new Some(rd.get(right_addr)) : None;
+
+      // find fingerprints for adjacent rectangles
+      const up_fp = a.formula_fingerprints.get(up_addr);
+      const down_fp = a.formula_fingerprints.get(down_addr);
+      const left_fp = a.formula_fingerprints.get(left_addr);
+      const right_fp = a.formula_fingerprints.get(right_addr);
+
+      // generate tuples
+      const up_tup = new XLNT.Tuple2(up_rect, up_fp);
+      const down_tup = new XLNT.Tuple2(down_rect, down_fp);
+      const left_tup = new XLNT.Tuple2(left_rect, left_fp);
+      const right_tup = new XLNT.Tuple2(right_rect, right_fp);
+
+      // add adjacency to dict
+      _d.put(addr, new XLNT.Adjacency(up_tup, down_tup, left_tup, right_tup));
+    }
+
+    return _d;
+  }
+
+  // Prepare to perform an incremental analysis
+  public static initIncremental(
+    inp: WorkbookOutput,
+    sheetName: string,
+    beVerbose: boolean = false
+  ): XLNT.IncrementalWorkbookAnalysis {
+    // look for the requested sheet
+    for (let i = 0; i < inp.worksheets.length; i++) {
+      const sheet = inp.worksheets[i];
+
+      // skip sheets that don't match sheetName or are empty
+      if (Colorize.isNotSameSheet(sheetName, sheet.sheetName) || Colorize.isEmptySheet(sheet)) {
+        continue;
+      }
+
+      // get the used range
+      const usedRangeAddress = Colorize.normalizeAddress(sheet.usedRangeAddress);
+
+      // Get anomalous cells and proposed fixes, among others.
+      const a = Colorize.process_suspicious(usedRangeAddress, sheet.formulas, sheet.values, beVerbose);
+
+      // Index rectangles by their component addresses
+      const rects = Colorize.rectangleDict(a);
+
+      // Build adjacency map
+      const adjs = Colorize.adjacencyDict(rects, a);
+
+      console.log(adjs);
+    }
+
+    return new XLNT.IncrementalWorkbookAnalysis();
+  }
+
   // Performs an analysis on an entire workbook
   public static process_workbook(
     inp: WorkbookOutput,
@@ -147,6 +256,10 @@ export class Colorize {
     beVerbose: boolean = false
   ): XLNT.WorkbookAnalysis {
     const wba = new XLNT.WorkbookAnalysis(inp);
+
+    // DEBUG
+    let incr = Colorize.initIncremental(inp, sheetName, beVerbose);
+    console.log(incr);
 
     // look for the requested sheet
     for (let i = 0; i < inp.worksheets.length; i++) {
@@ -216,14 +329,21 @@ export class Colorize {
     return wba;
   }
 
-  // Generate dependence vectors and their hash for all formulas.
-  public static process_formulas(
+  /**
+   * Find all the fingerprints for all the formulas in the given used range.
+   * This is the actual fingerprint implementation; fingerprintFormulas is a
+   * helper method.
+   * @param formulas A spreadsheet of formula strings.
+   * @param origin_col A column offset from which to start.
+   * @param origin_row A row offset from which to start.
+   */
+  private static fingerprintFormulasImpl(
     formulas: XLNT.Spreadsheet,
     origin_col: number,
     origin_row: number
-  ): [XLNT.ExceLintVector, XLNT.Fingerprint][] {
+  ): XLNT.Dictionary<XLNT.Fingerprint> {
     const base_vector = ExcelUtils.baseVector();
-    const output: Array<[XLNT.ExceLintVector, XLNT.Fingerprint]> = [];
+    const _d = new XLNT.Dictionary<XLNT.Fingerprint>();
 
     // Compute the vectors for all of the formulas.
     for (let i = 0; i < formulas.length; i++) {
@@ -245,36 +365,39 @@ export class Colorize {
           if (vec_array.length === 0) {
             if (cell[0] === "=") {
               // It's a formula but it has no dependencies (i.e., it just has constants). Use a distinguished value.
-              output.push([new XLNT.ExceLintVector(adjustedX, adjustedY, 0), Colorize.noDependenciesHash]);
+              const v = new XLNT.ExceLintVector(adjustedX, adjustedY, 0);
+              _d.put(v.asKey(), Colorize.noDependenciesHash);
             }
           } else {
+            // compute resultant vector
             const vec = vec_array.reduce(XLNT.ExceLintVector.VectorSum);
+
+            // get the address vector
+            const v = new XLNT.ExceLintVector(adjustedX, adjustedY, 0);
+
+            // add to dict
             if (vec.equals(base_vector)) {
-              // No dependencies! Use a distinguished value.
-              // Emery's FIXME: RESTORE THIS output.push([[adjustedX, adjustedY, 0], Colorize.distinguishedZeroHash]);
-              // DAN TODO: I don't understand this case.
-              output.push([new XLNT.ExceLintVector(adjustedX, adjustedY, 0), Colorize.noDependenciesHash]);
+              _d.put(v.asKey(), Colorize.noDependenciesHash);
             } else {
               const hash = vec.hash();
-              output.push([new XLNT.ExceLintVector(adjustedX, adjustedY, 0), hash.toString()]);
+              _d.put(v.asKey(), new XLNT.Fingerprint(hash));
             }
           }
         }
       }
     }
-    return output;
+    return _d;
   }
 
   // Returns all referenced data so it can be colored later.
-  public static color_all_data(refs: Dict<boolean>): [XLNT.ExceLintVector, XLNT.Fingerprint][] {
-    const referenced_data: [XLNT.ExceLintVector, XLNT.Fingerprint][] = [];
-    for (const refvec of Object.keys(refs)) {
-      const rv = refvec.split(",");
-      const row = Number(rv[0]);
-      const col = Number(rv[1]);
-      referenced_data.push([new XLNT.ExceLintVector(row, col, 0), Colorize.noDependenciesHash]); // See comment at top of function declaration.
+  public static color_all_data(refs: XLNT.Dictionary<boolean>): XLNT.Dictionary<XLNT.Fingerprint> {
+    const _d = new XLNT.Dictionary<XLNT.Fingerprint>();
+
+    for (const refvec of refs.keys) {
+      _d.put(refvec, Colorize.noDependenciesHash);
     }
-    return referenced_data;
+
+    return _d;
   }
 
   // Take all values and return an array of each row and column.
@@ -311,33 +434,38 @@ export class Colorize {
   // Take in a list of [[row, col], color] pairs and group them,
   // sorting them (e.g., by columns).
   private static identify_ranges(
-    list: Array<[XLNT.ExceLintVector, string]>,
+    data_fingerprints: XLNT.Dictionary<XLNT.Fingerprint>,
     sortfn: (n1: XLNT.ExceLintVector, n2: XLNT.ExceLintVector) => number
-  ): Dict<XLNT.ExceLintVector[]> {
+  ): XLNT.Dictionary<XLNT.ExceLintVector[]> {
     // Separate into groups based on their XLNT.Fingerprint value.
-    const groups = {};
-    for (const r of list) {
-      const [vec, fp] = r;
-      groups[fp] = groups[fp] || []; // initialize array if necessary
-      groups[fp].push(vec);
+    const groups = new XLNT.Dictionary<XLNT.ExceLintVector[]>();
+    for (const key of data_fingerprints.keys) {
+      const vec = XLNT.ExceLintVector.fromKey(key);
+      const fp = data_fingerprints.get(key).asKey();
+      if (!groups.contains(fp)) {
+        groups.put(fp, []); // initialize array if necessary
+      }
+      groups.get(fp).push(vec);
     }
     // Now sort them all.
-    for (const k of Object.keys(groups)) {
-      groups[k].sort(sortfn);
+    for (const z of groups.keys) {
+      groups.get(z).sort(sortfn);
     }
     return groups;
   }
 
   // Collect all ranges of cells that share a XLNT.Fingerprint
-  private static find_contiguous_regions(groups: Dict<XLNT.ExceLintVector[]>): Dict<XLNT.Rectangle[]> {
-    const output: Dict<XLNT.Rectangle[]> = {};
+  private static find_contiguous_regions(
+    groups: XLNT.Dictionary<XLNT.ExceLintVector[]>
+  ): XLNT.Dictionary<XLNT.Rectangle[]> {
+    const output = new XLNT.Dictionary<XLNT.Rectangle[]>();
 
     for (const key of Object.keys(groups)) {
       // Here, we scan all of the vectors in this group, accumulating
       // all adjacent vectors by tracking the start and end. Whevener
       // we encounter a non-adjacent vector, push the region to the output
       // list and then start tracking a new region.
-      output[key] = [];
+      output.put(key, []); // initialize
       let start = groups[key].shift(); // remove the first vector from the list
       let end = start;
       for (const v of groups[key]) {
@@ -345,18 +473,20 @@ export class Colorize {
         if (v.x === end.x && v.y === end.y + 1) {
           end = v;
         } else {
-          output[key].push([start, end]);
+          output.get(key).push(new XLNT.Rectangle(start, end));
           start = v;
           end = v;
         }
       }
-      output[key].push([start, end]);
+      output.get(key).push(new XLNT.Rectangle(start, end));
     }
     return output;
   }
 
-  public static identify_groups(theList: [XLNT.ExceLintVector, string][]): Dict<XLNT.Rectangle[]> {
-    const id = Colorize.identify_ranges(theList, ExcelUtils.ColumnSort);
+  public static identify_groups(
+    data_fingerprints: XLNT.Dictionary<XLNT.Fingerprint>
+  ): XLNT.Dictionary<XLNT.Rectangle[]> {
+    const id = Colorize.identify_ranges(data_fingerprints, ExcelUtils.ColumnSort);
     const gr = Colorize.find_contiguous_regions(id);
     // Now try to merge stuff with the same hash.
     const newGr1 = JSONclone.clone(gr);
@@ -399,37 +529,99 @@ export class Colorize {
     return cells;
   }
 
-  public static process_suspicious(
+  /**
+   * Determine whether the number of formulas in the spreadsheet exceeds
+   * a hand-tuned threshold (for analysis responsiveness).
+   * @param formulas A Spreadsheet of formulas
+   */
+  public static tooManyFormulas(formulas: XLNT.Spreadsheet) {
+    const totalFormulas = (formulas as any).flat().filter(Boolean).length;
+    return totalFormulas > Config.formulasThreshold;
+  }
+
+  /**
+   * Determine whether the number of values in the spreadsheet exceeds
+   * a hand-tuned threshold (for analysis responsiveness).
+   * @param values A Spreadsheet of values
+   */
+  public static tooManyValues(values: XLNT.Spreadsheet) {
+    const totalValues = (values as any).flat().filter(Boolean).length;
+    return totalValues > Config.valuesThreshold;
+  }
+
+  /**
+   * Find all the fingerprints for all the formulas in the given used range.
+   * TODO FIX: I'm not exactly sure how the used range is used here.
+   * @param usedRangeAddress A1 string representation of used range reference
+   * @param formulas A spreadsheet of formulas.
+   * @param beVerbose Print diagnostics to console when true.
+   */
+  public static fingerprintFormulas(
+    usedRangeAddress: string,
+    formulas: XLNT.Spreadsheet,
+    beVerbose: boolean
+  ): XLNT.Dictionary<XLNT.Fingerprint> {
+    const [, startCell] = ExcelUtils.extract_sheet_cell(usedRangeAddress);
+    const origin = ExcelUtils.cell_dependency(startCell, 0, 0);
+
+    // Filter out non-empty items from whole matrix.
+    if (Colorize.tooManyFormulas(formulas)) {
+      if (beVerbose) console.warn("Too many formulas to perform formula analysis.");
+      return new XLNT.Dictionary<XLNT.Fingerprint>();
+    } else {
+      return Colorize.fingerprintFormulasImpl(formulas, origin.x - 1, origin.y - 1);
+    }
+  }
+
+  /**
+   * Find all the fingerprints for all the data in the given used range.
+   * TODO FIX: I'm not exactly sure how the used range is used here.
+   * @param usedRangeAddress A1 string representation of used range reference
+   * @param formulas A spreadsheet of formula strings.
+   * @param values A spreadsheet of values.
+   * @param beVerbose Print diagnostics to console when true.
+   */
+  public static fingerprintData(
     usedRangeAddress: string,
     formulas: XLNT.Spreadsheet,
     values: XLNT.Spreadsheet,
     beVerbose: boolean
-  ): XLNT.Analysis {
+  ): XLNT.Dictionary<XLNT.Fingerprint> {
     const [, startCell] = ExcelUtils.extract_sheet_cell(usedRangeAddress);
     const origin = ExcelUtils.cell_dependency(startCell, 0, 0);
 
-    let processed_formulas: [XLNT.ExceLintVector, string][] = [];
     // Filter out non-empty items from whole matrix.
-    const totalFormulas = (formulas as any).flat().filter(Boolean).length;
-
-    if (totalFormulas > Config.formulasThreshold) {
-      if (beVerbose) console.warn("Too many formulas to perform formula analysis.");
-    } else {
-      processed_formulas = Colorize.process_formulas(formulas, origin.x - 1, origin.y - 1);
-    }
-
-    let referenced_data: [XLNT.ExceLintVector, XLNT.Fingerprint][] = [];
-
-    // Filter out non-empty items from whole matrix.
-    const totalValues = (values as any).flat().filter(Boolean).length;
-    if (totalValues > Config.valuesThreshold) {
+    if (Colorize.tooManyValues(values)) {
       if (beVerbose) console.warn("Too many values to perform reference analysis.");
+      return new XLNT.Dictionary<XLNT.Fingerprint>();
     } else {
       // Compute references (to color referenced data).
-      const refs: Dict<boolean> = ExcelUtils.generate_all_references(formulas, origin.x - 1, origin.y - 1);
+      const refs: XLNT.Dictionary<boolean> = ExcelUtils.generate_all_references(formulas, origin.x - 1, origin.y - 1);
 
-      referenced_data = Colorize.color_all_data(refs);
+      return Colorize.color_all_data(refs);
     }
+  }
+
+  /**
+   * This is the core of an ExceLint analysis.  It fingerprints formulas and data,
+   * partitions them into rectangular regions, and then returns an Analysis object
+   * that contains ProposedFixes.
+   * @param usedRangeAddr A1 string representation of used range reference.
+   * @param formulas A spreadsheet of formula strings.
+   * @param values A spreadsheet of value (data) strings.
+   * @param beVerbose Print diagnostics to console when true.
+   */
+  public static process_suspicious(
+    usedRangeAddr: string,
+    formulas: XLNT.Spreadsheet,
+    values: XLNT.Spreadsheet,
+    beVerbose: boolean
+  ): XLNT.Analysis {
+    // fingerprint all the formulas
+    const processed_formulas = this.fingerprintFormulas(usedRangeAddr, formulas, beVerbose);
+
+    // fingerprint all the data
+    const referenced_data = Colorize.fingerprintData(usedRangeAddr, formulas, values, beVerbose);
 
     // find regions for data
     const grouped_data = Colorize.identify_groups(referenced_data);
@@ -443,7 +635,14 @@ export class Colorize {
     // find proposed fixes
     const proposed_fixes = Colorize.generate_proposed_fixes(grouped_formulas);
 
-    return new XLNT.Analysis(suspicious_cells, grouped_formulas, grouped_data, proposed_fixes);
+    return new XLNT.Analysis(
+      suspicious_cells,
+      grouped_formulas,
+      grouped_data,
+      proposed_fixes,
+      processed_formulas,
+      referenced_data
+    );
   }
 
   // Shannon entropy.
@@ -466,16 +665,16 @@ export class Colorize {
     merge_with_norm: number,
     merge_with: XLNT.Rectangle
   ): XLNT.Metric {
-    const [t1, t2] = target;
-    const [m1, m2] = merge_with;
-    const n_target = RectangleUtils.area([
-      new XLNT.ExceLintVector(t1.x, t1.y, 0),
-      new XLNT.ExceLintVector(t2.x, t2.y, 0),
-    ]);
-    const n_merge_with = RectangleUtils.area([
-      new XLNT.ExceLintVector(m1.x, m1.y, 0),
-      new XLNT.ExceLintVector(m2.x, m2.y, 0),
-    ]);
+    const t1 = target.topleft;
+    const t2 = target.bottomright;
+    const m1 = merge_with.topleft;
+    const m2 = merge_with.bottomright;
+    const n_target = RectangleUtils.area(
+      new XLNT.Rectangle(new XLNT.ExceLintVector(t1.x, t1.y, 0), new XLNT.ExceLintVector(t2.x, t2.y, 0))
+    );
+    const n_merge_with = RectangleUtils.area(
+      new XLNT.Rectangle(new XLNT.ExceLintVector(m1.x, m1.y, 0), new XLNT.ExceLintVector(m2.x, m2.y, 0))
+    );
     const n_min = Math.min(n_target, n_merge_with);
     const n_max = Math.max(n_target, n_merge_with);
     const norm_min = Math.min(merge_with_norm, target_norm);
@@ -492,27 +691,25 @@ export class Colorize {
   }
 
   // Iterate through the size of proposed fixes.
-  public static count_proposed_fixes(
-    fixes: Array<[number, [XLNT.ExceLintVector, XLNT.ExceLintVector], [XLNT.ExceLintVector, XLNT.ExceLintVector]]>
-  ): number {
+  public static count_proposed_fixes(fixes: Array<[number, XLNT.Rectangle, XLNT.Rectangle]>): number {
     let count = 0;
     // tslint:disable-next-line: forin
     for (const k in fixes) {
-      const [f11, f12] = fixes[k][1];
-      const [f21, f22] = fixes[k][2];
-      count += RectangleUtils.diagonal([
-        new XLNT.ExceLintVector(f11.x, f11.y, 0),
-        new XLNT.ExceLintVector(f12.x, f12.y, 0),
-      ]);
-      count += RectangleUtils.diagonal([
-        new XLNT.ExceLintVector(f21.x, f21.y, 0),
-        new XLNT.ExceLintVector(f22.x, f22.y, 0),
-      ]);
+      const f11 = fixes[k][1].topleft;
+      const f12 = fixes[k][1].bottomright;
+      const f21 = fixes[k][2].topleft;
+      const f22 = fixes[k][2].bottomright;
+      count += RectangleUtils.diagonal(
+        new XLNT.Rectangle(new XLNT.ExceLintVector(f11.x, f11.y, 0), new XLNT.ExceLintVector(f12.x, f12.y, 0))
+      );
+      count += RectangleUtils.diagonal(
+        new XLNT.Rectangle(new XLNT.ExceLintVector(f21.x, f21.y, 0), new XLNT.ExceLintVector(f22.x, f22.y, 0))
+      );
     }
     return count;
   }
 
-  public static generate_proposed_fixes(groups: Dict<XLNT.Rectangle[]>): XLNT.ProposedFix[] {
+  public static generate_proposed_fixes(groups: XLNT.Dictionary<XLNT.Rectangle[]>): XLNT.ProposedFix[] {
     const proposed_fixes_new = find_all_proposed_fixes(groups);
     // sort by fix metric
     proposed_fixes_new.sort((a, b) => {
@@ -521,10 +718,10 @@ export class Colorize {
     return proposed_fixes_new;
   }
 
-  public static merge_groups(groups: Dict<XLNT.Rectangle[]>): Dict<XLNT.Rectangle[]> {
-    for (const k of Object.keys(groups)) {
-      const g = groups[k].slice();
-      groups[k] = this.merge_individual_groups(g);
+  public static merge_groups(groups: XLNT.Dictionary<XLNT.Rectangle[]>): XLNT.Dictionary<XLNT.Rectangle[]> {
+    for (const k of groups.keys) {
+      const g = groups.get(k).slice();
+      groups.put(k, Colorize.merge_individual_groups(g));
     }
     return groups;
   }
@@ -567,7 +764,9 @@ export class Colorize {
       numIterations++;
       if (numIterations > 2000) {
         // This is a hack to guarantee convergence.
-        return [[new XLNT.ExceLintVector(-1, -1, 0), new XLNT.ExceLintVector(-1, -1, 0)]];
+        const tl = new XLNT.ExceLintVector(-1, -1, 0);
+        const br = new XLNT.ExceLintVector(-1, -1, 0);
+        return [new XLNT.Rectangle(tl, br)];
       }
     }
   }
@@ -589,8 +788,8 @@ export class Colorize {
       const [first, second] = XLNT.rectangleComparator(rect1, rect2) <= 0 ? [rect1, rect2] : [rect2, rect1];
 
       // get the upper-left and bottom-right vectors for the two XLNT.rectangles
-      const [ul] = first;
-      const [, br] = second;
+      const ul = first.topleft;
+      const br = second.bottomright;
 
       // get the column and row for the upper-left and bottom-right vectors
       const ul_col = ul.x - origin_col - 1;

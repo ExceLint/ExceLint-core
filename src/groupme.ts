@@ -1,11 +1,11 @@
 import { binsearch, strict_binsearch } from "./binsearch";
 import { Colorize } from "./colorize";
-import { ExceLintVector, Dict, ProposedFix, Rectangle, Fingerprint, upperleft, bottomright } from "./ExceLintTypes";
+import { ExceLintVector, Dictionary, ProposedFix, Rectangle, upperleft, bottomright } from "./ExceLintTypes";
 
 // A comparison function to sort by x-coordinate.
 function sort_x_coord(a: Rectangle, b: Rectangle): number {
-  const [a1] = a;
-  const [b1] = b;
+  const a1 = a.topleft;
+  const b1 = b.topleft;
   if (a1.x !== b1.x) {
     return a1.x - b1.x;
   } else {
@@ -14,21 +14,20 @@ function sort_x_coord(a: Rectangle, b: Rectangle): number {
 }
 
 // Returns a dictionary containing a bounding box for each group (indexed by hash).
-function generate_bounding_box(g: Dict<Rectangle[]>): Dict<Rectangle> {
-  const bb: Dict<Rectangle> = {};
+function generate_bounding_box(g: Dictionary<Rectangle[]>): Dictionary<Rectangle> {
+  const bb = new Dictionary<Rectangle>();
   for (const hash of Object.keys(g)) {
-    //	console.log("length of formulas for " + i + " = " + g[i].length);
     let xMin = 1000000;
     let yMin = 1000000;
     let xMax = -1000000;
     let yMax = -1000000;
 
     // find the max/min x and y that bound all the rectangles in the group
-    for (let j = 0; j < g[hash].length; j++) {
-      const x_tl = g[hash][j][0].x; // top left x
-      const x_br = g[hash][j][1].x; // bottom right x
-      const y_tl = g[hash][j][0].y; // top left y
-      const y_br = g[hash][j][1].y; // bottom right y
+    for (let j = 0; j < g.get(hash).length; j++) {
+      const x_tl = g.get(hash)[j][0].x; // top left x
+      const x_br = g.get(hash)[j][1].x; // bottom right x
+      const y_tl = g.get(hash)[j][0].y; // top left y
+      const y_br = g.get(hash)[j][1].y; // bottom right y
       if (x_br > xMax) {
         xMax = x_br;
       }
@@ -42,17 +41,16 @@ function generate_bounding_box(g: Dict<Rectangle[]>): Dict<Rectangle> {
         yMin = y_tl;
       }
     }
-    bb[hash] = [new ExceLintVector(xMin, yMin, 0), new ExceLintVector(xMax, yMax, 0)];
-    //	console.log("bounding rectangle = (" + xMin + ", " + yMin + "), (" + xMax + ", " + yMax + ")");
+    bb.put(hash, new Rectangle(new ExceLintVector(xMin, yMin, 0), new ExceLintVector(xMax, yMax, 0)));
   }
   return bb;
 }
 
 // Sort formulas in each group by x coordinate
-function sort_grouped_formulas(grouped_formulas: Dict<Rectangle[]>): Dict<Rectangle[]> {
-  const newGnum: Dict<Rectangle[]> = {};
-  for (const key of Object.keys(grouped_formulas)) {
-    newGnum[key] = grouped_formulas[key].sort(sort_x_coord);
+function sort_grouped_formulas(grouped_formulas: Dictionary<Rectangle[]>): Dictionary<Rectangle[]> {
+  const newGnum = new Dictionary<Rectangle[]>();
+  for (const key of grouped_formulas.keys) {
+    newGnum.put(key, grouped_formulas.get(key).sort(sort_x_coord));
   }
   return newGnum;
 }
@@ -116,28 +114,28 @@ function matching_rectangles(
   ind = strict_binsearch(rect_lrs, left, numComparator);
   if (ind !== -1) {
     if (rect_uls[ind].y === y1) {
-      const candidate: Rectangle = [rect_uls[ind], rect_lrs[ind]];
+      const candidate: Rectangle = new Rectangle(rect_uls[ind], rect_lrs[ind]);
       matches.push(candidate);
     }
   }
   ind = strict_binsearch(rect_lrs, up, numComparator);
   if (ind !== -1) {
     if (rect_uls[ind].x === x1) {
-      const candidate: Rectangle = [rect_uls[ind], rect_lrs[ind]];
+      const candidate: Rectangle = new Rectangle(rect_uls[ind], rect_lrs[ind]);
       matches.push(candidate);
     }
   }
   ind = strict_binsearch(rect_uls, right, numComparator);
   if (ind !== -1) {
     if (rect_lrs[ind].y === y2) {
-      const candidate: Rectangle = [rect_uls[ind], rect_lrs[ind]];
+      const candidate: Rectangle = new Rectangle(rect_uls[ind], rect_lrs[ind]);
       matches.push(candidate);
     }
   }
   ind = strict_binsearch(rect_uls, down, numComparator);
   if (ind !== -1) {
     if (rect_lrs[ind].x === x2) {
-      const candidate: Rectangle = [rect_uls[ind], rect_lrs[ind]];
+      const candidate: Rectangle = new Rectangle(rect_uls[ind], rect_lrs[ind]);
       matches.push(candidate);
     }
   }
@@ -151,23 +149,24 @@ function find_all_matching_rectangles(
   rect: Rectangle,
   fingerprintsX: string[],
   fingerprintsY: string[],
-  x_ul: Dict<ExceLintVector[]>,
-  x_lr: Dict<ExceLintVector[]>,
-  bb: Dict<Rectangle>,
+  x_ul: Dictionary<ExceLintVector[]>,
+  x_lr: Dictionary<ExceLintVector[]>,
+  bb: Dictionary<Rectangle>,
   bbsX: Rectangle[],
   bbsY: Rectangle[]
 ): ProposedFix[] {
   // get the upper-left and lower-right vectors for the given rectangle
-  const [base_ul, base_lr] = rect;
+  const base_ul = rect.topleft;
+  const base_lr = rect.bottomright;
 
   // this is the output
   let match_list: ProposedFix[] = [];
 
   // find the index of the given rectangle in the list of rects sorted by X
-  const ind1 = binsearch(bbsX, rect, (a: Rectangle, b: Rectangle) => a[0].x - b[0].x);
+  const ind1 = binsearch(bbsX, rect, (a: Rectangle, b: Rectangle) => a.topleft.x - b.topleft.x);
 
   // find the index of the given rectangle in the list of rects sorted by Y
-  const ind2 = binsearch(bbsY, rect, (a: Rectangle, b: Rectangle) => a[0].y - b[0].y);
+  const ind2 = binsearch(bbsY, rect, (a: Rectangle, b: Rectangle) => a.topleft.y - b.topleft.y);
 
   // Pick the coordinate axis that takes us the furthest in the fingerprint list.
   const [fps, itmp, axis] = ind1 > ind2 ? [fingerprintsX, ind1, 0] : [fingerprintsY, ind2, 1];
@@ -179,7 +178,7 @@ function find_all_matching_rectangles(
     }
 
     // Check bounding box.
-    const box = bb[fp];
+    const box = bb.get(fp);
 
     /* Since fingerprints are sorted in x-axis order,
 	     we can stop once we have gone too far on the x-axis to ever merge again;
@@ -189,7 +188,7 @@ function find_all_matching_rectangles(
     if (axis === 0) {
       /* [rect] ... [box]  */
       // if left side of box is too far away from right-most edge of the rectangle
-      if (base_lr.x + 1 < box[0].x) {
+      if (base_lr.x + 1 < box.topleft.x) {
         break;
       }
     } else {
@@ -197,7 +196,7 @@ function find_all_matching_rectangles(
                            ...
                    [box]  */
       // if the top side of box is too far away from bottom-most edge of the rectangle
-      if (base_lr.y + 1 < box[0].y) {
+      if (base_lr.y + 1 < box.topleft.y) {
         break;
       }
     }
@@ -221,15 +220,15 @@ function find_all_matching_rectangles(
 	  */
 
     if (
-      base_lr.x + 1 < box[0].x || // left
-      base_lr.y + 1 < box[0].y || // top
-      box[1].x + 1 < base_ul.x || // right
-      box[1].y + 1 < base_ul.y
+      base_lr.x + 1 < box.topleft.x || // left
+      base_lr.y + 1 < box.topleft.y || // top
+      box.bottomright.x + 1 < base_ul.x || // right
+      box.bottomright.y + 1 < base_ul.y
     ) {
       // Skip. Outside the bounding box.
       //		console.log("outside bounding box.");
     } else {
-      const matches: Rectangle[] = matching_rectangles([base_ul, base_lr], x_ul[fp], x_lr[fp]);
+      const matches: Rectangle[] = matching_rectangles(rect, x_ul.get(fp), x_lr.get(fp));
       if (matches.length > 0) {
         // compute the fix metric for every potential merge and
         // concatenate them into the match_list
@@ -268,51 +267,51 @@ function dedup_fixes(pfs: ProposedFix[]): ProposedFix[] {
   return rv;
 }
 
-export function find_all_proposed_fixes(grouped_formulas: Dict<Rectangle[]>): ProposedFix[] {
+export function find_all_proposed_fixes(grouped_formulas: Dictionary<Rectangle[]>): ProposedFix[] {
   let all_matches: ProposedFix[] = [];
 
   // sort each group of rectangles by their x coordinates
   const aNum = sort_grouped_formulas(grouped_formulas);
 
   // extract from rects the upper-left and lower-right vectors into dicts, indexed by hash
-  const x_ul: Dict<ExceLintVector[]> = {}; // upper-left
-  const x_lr: Dict<ExceLintVector[]> = {}; // lower-right
+  const x_ul = new Dictionary<ExceLintVector[]>(); // upper-left
+  const x_lr = new Dictionary<ExceLintVector[]>(); // lower-right
   for (const fp of Object.keys(grouped_formulas)) {
-    x_ul[fp] = aNum[fp].map((rect) => upperleft(rect));
-    x_lr[fp] = aNum[fp].map((rect) => bottomright(rect));
+    x_ul.put(fp, aNum.get(fp).map(upperleft));
+    x_lr.put(fp, aNum.get(fp).map(bottomright));
   }
 
   // find the bounding box for each group
   const bb = generate_bounding_box(grouped_formulas);
 
-  // extract fingerprints
-  const fingerprintsX: Fingerprint[] = Object.keys(grouped_formulas);
+  // extract fingerprints (we're going to sort list in place)
+  const fpStringsX: string[] = grouped_formulas.keys;
 
   // sort fingerprints by the x-coordinate of the upper-left corner of their bounding box.
-  fingerprintsX.sort((a: Fingerprint, b: Fingerprint) => bb[a][0].x - bb[b][0].x);
+  fpStringsX.sort((a: string, b: string) => bb.get(a).topleft.x - bb.get(b).topleft.x);
 
   // generate a sorted list of rectangles
-  const bbsX: Rectangle[] = fingerprintsX.map((fp) => bb[fp]);
+  const bbsX: Rectangle[] = fpStringsX.map(bb.get);
 
-  // extract fingerprints again
-  const fingerprintsY = Object.keys(grouped_formulas);
+  // extract fingerprints again (we're going to sort list in place)
+  const fpStringsY = grouped_formulas.keys;
 
   // sort fingerprints by the x-coordinate of the upper-left corner of their bounding box.
-  fingerprintsY.sort((a: Fingerprint, b: Fingerprint) => bb[a][0].y - bb[b][0].y);
+  fpStringsY.sort((a: string, b: string) => bb.get(a).topleft.y - bb.get(b).topleft.y);
 
   // generate a sorted list of rectangles
-  const bbsY: Rectangle[] = fingerprintsY.map((fp) => bb[fp]);
+  const bbsY: Rectangle[] = fpStringsY.map(bb.get);
 
   // for every group
-  for (const fp of Object.keys(grouped_formulas)) {
+  for (const fp of grouped_formulas.keys) {
     // and every rectangle in the group
-    for (let i = 0; i < aNum[fp].length; i++) {
+    for (let i = 0; i < aNum.get(fp).length; i++) {
       // find all matching rectangles and compute their fix scores
       const matches = find_all_matching_rectangles(
         fp,
-        aNum[fp][i],
-        fingerprintsX,
-        fingerprintsY,
+        aNum.get(fp)[i],
+        fpStringsX,
+        fpStringsY,
         x_ul,
         x_lr,
         bb,

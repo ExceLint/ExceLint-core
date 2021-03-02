@@ -4,7 +4,7 @@ import { Classification } from "./classification";
 import { Config } from "./config";
 import { Option, Some, None, flatMap } from "./option";
 
-export interface Dict<V> {
+interface Dict<V> {
   [key: string]: V;
 }
 
@@ -150,12 +150,54 @@ export class Address implements IComparable<Address> {
   }
 }
 
-export type Fingerprint = string;
+export class Fingerprint implements IComparable<Fingerprint> {
+  private _fp: number;
+
+  constructor(fpval: number) {
+    this._fp = fpval;
+  }
+
+  public equals(f: Fingerprint): boolean {
+    return this._fp === f._fp;
+  }
+
+  public asKey(): string {
+    return this._fp.toString();
+  }
+
+  public static fromKey(key: string): Fingerprint {
+    return new Fingerprint(parseInt(key));
+  }
+}
 
 export type Metric = number;
 
 // a rectangle is defined by its start and end vectors
-export type Rectangle = [ExceLintVector, ExceLintVector];
+export class Rectangle implements IComparable<Rectangle> {
+  private _tl: ExceLintVector;
+  private _br: ExceLintVector;
+
+  constructor(tl: ExceLintVector, br: ExceLintVector) {
+    this._tl = tl;
+    this._br = br;
+  }
+
+  public equals(r: Rectangle): boolean {
+    return this._tl.equals(r._tl) && this._br.equals(r._br);
+  }
+
+  public get topleft() {
+    return this._tl;
+  }
+
+  public get bottomright() {
+    return this._br;
+  }
+
+  public expand(): ExceLintVector[] {
+    return expand(this._tl, this._br);
+  }
+}
 
 export class ProposedFix implements IComparable<ProposedFix> {
   // This comment no longer holds, since there is a data type for ProposedFix,
@@ -218,19 +260,7 @@ export class ProposedFix implements IComparable<ProposedFix> {
   }
 
   public equals(other: ProposedFix): boolean {
-    const [this_r1_ul, this_r1_br] = this.rect1;
-    const [this_r2_ul, this_r2_br] = this.rect2;
-
-    const [other_r1_ul, other_r1_br] = other.rect1;
-    const [other_r2_ul, other_r2_br] = other.rect2;
-
-    return (
-      this_r1_ul.equals(other_r1_ul) &&
-      this_r1_br.equals(other_r1_br) &&
-      this_r2_ul.equals(other_r2_ul) &&
-      this_r2_br.equals(other_r2_br) &&
-      this.score === other.score
-    );
+    return this._rect1.equals(other._rect1) && this._rect2.equals(other._rect2);
   }
 
   public includesCellAt(addr: Address): boolean {
@@ -238,10 +268,8 @@ export class ProposedFix implements IComparable<ProposedFix> {
     const v = new ExceLintVector(addr.column, addr.row, 0);
 
     // check the rectangles
-    const [r1_ul, r1_br] = this.rect1;
-    const [r2_ul, r2_br] = this.rect2;
-    const first_cells = expand(r1_ul, r1_br);
-    const second_cells = expand(r2_ul, r2_br);
+    const first_cells = this.rect1.expand();
+    const second_cells = this.rect2.expand();
     const all_cells = first_cells.concat(second_cells);
     for (let i = 0; i < all_cells.length; i++) {
       const cell = all_cells[i];
@@ -301,6 +329,15 @@ export class ExceLintVector {
     return this.x.toString() + "," + this.y.toString() + "," + this.c.toString();
   }
 
+  // Turn a key into a vector
+  public static fromKey(key: string): ExceLintVector {
+    const parts = key.split(",");
+    const x = parseInt(parts[0]);
+    const y = parseInt(parts[1]);
+    const c = parseInt(parts[2]);
+    return new ExceLintVector(x, y, c);
+  }
+
   // Return true if this vector encodes a reference
   public isReference(): boolean {
     return !(this.x === 0 && this.y === 0 && this.c !== 0);
@@ -322,6 +359,34 @@ export class ExceLintVector {
     const v1 = Math.abs(this.y);
     const v2 = this.c;
     return ExceLintVector.Multiplier * (v0 + v1 + v2);
+  }
+
+  /**
+   * Gets the vector of the cell above this one
+   */
+  public get up(): ExceLintVector {
+    return new ExceLintVector(this.x, this.y - 1, this.c);
+  }
+
+  /**
+   * Gets the vector of the cell below this one
+   */
+  public get down(): ExceLintVector {
+    return new ExceLintVector(this.x, this.y + 1, this.c);
+  }
+
+  /**
+   * Gets the vector of the cell to the left of this one
+   */
+  public get left(): ExceLintVector {
+    return new ExceLintVector(this.x - 1, this.y, this.c);
+  }
+
+  /**
+   * Gets the vector of the cell to the right of this one
+   */
+  public get right(): ExceLintVector {
+    return new ExceLintVector(this.x + 1, this.y, this.c);
   }
 
   // vector sum reduction
@@ -376,20 +441,26 @@ export class ExceLintVector {
 
 export class Analysis {
   suspicious_cells: ExceLintVector[];
-  grouped_formulas: Dict<Rectangle[]>;
-  grouped_data: Dict<Rectangle[]>;
+  grouped_formulas: Dictionary<Rectangle[]>;
+  grouped_data: Dictionary<Rectangle[]>;
   proposed_fixes: ProposedFix[];
+  formula_fingerprints: Dictionary<Fingerprint>;
+  data_fingerprints: Dictionary<Fingerprint>;
 
   constructor(
     suspicious_cells: ExceLintVector[],
-    grouped_formulas: Dict<Rectangle[]>,
-    grouped_data: Dict<Rectangle[]>,
-    proposed_fixes: ProposedFix[]
+    grouped_formulas: Dictionary<Rectangle[]>,
+    grouped_data: Dictionary<Rectangle[]>,
+    proposed_fixes: ProposedFix[],
+    formula_fingerprints: Dictionary<Fingerprint>,
+    data_fingerprints: Dictionary<Fingerprint>
   ) {
     this.suspicious_cells = suspicious_cells;
     this.grouped_formulas = grouped_formulas;
     this.grouped_data = grouped_data;
     this.proposed_fixes = proposed_fixes;
+    this.formula_fingerprints = formula_fingerprints;
+    this.data_fingerprints = data_fingerprints;
   }
 }
 
@@ -513,12 +584,12 @@ export class WorksheetAnalysis {
   }
 
   // Get the grouped data
-  get groupedData(): Dict<Rectangle[]> {
+  get groupedData(): Dictionary<Rectangle[]> {
     return this.analysis.grouped_data;
   }
 
   // Get the grouped formulas
-  get groupedFormulas(): Dict<Rectangle[]> {
+  get groupedFormulas(): Dictionary<Rectangle[]> {
     return this.analysis.grouped_formulas;
   }
 
@@ -671,3 +742,62 @@ export class CArray<V extends IComparable<V>> extends Array<V> implements ICompa
     return this.data.length;
   }
 }
+
+export class Tuple2<T extends IComparable<T>, U extends IComparable<U>> implements IComparable<Tuple2<T, U>> {
+  private _elem1: T;
+  private _elem2: U;
+
+  constructor(elem1: T, elem2: U) {
+    this._elem1 = elem1;
+    this._elem2 = elem2;
+  }
+
+  public get first(): T {
+    return this._elem1;
+  }
+
+  public get second(): U {
+    return this._elem2;
+  }
+
+  public equals(t: Tuple2<T, U>): boolean {
+    return this._elem1.equals(t._elem1) && this._elem2.equals(t._elem2);
+  }
+}
+
+export class Adjacency {
+  private _up: Tuple2<Option<Rectangle>, Fingerprint>;
+  private _down: Tuple2<Option<Rectangle>, Fingerprint>;
+  private _left: Tuple2<Option<Rectangle>, Fingerprint>;
+  private _right: Tuple2<Option<Rectangle>, Fingerprint>;
+
+  constructor(
+    up: Tuple2<Option<Rectangle>, Fingerprint>,
+    down: Tuple2<Option<Rectangle>, Fingerprint>,
+    left: Tuple2<Option<Rectangle>, Fingerprint>,
+    right: Tuple2<Option<Rectangle>, Fingerprint>
+  ) {
+    this._up = up;
+    this._down = down;
+    this._left = left;
+    this._right = right;
+  }
+
+  public get up() {
+    return this._up;
+  }
+
+  public get down() {
+    return this._down;
+  }
+
+  public get left() {
+    return this._left;
+  }
+
+  public get right() {
+    return this._right;
+  }
+}
+
+export class IncrementalWorkbookAnalysis {}

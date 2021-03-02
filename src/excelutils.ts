@@ -1,10 +1,19 @@
 // excel-utils
-// Emery Berger, Microsoft Research / UMass Amherst
-// https://emeryberger.com
+// Emery Berger, Microsoft Research / UMass Amherst (https://emeryberger.com)
+// Daniel W. Barowy, Microsoft Research / Williams College
 
 import * as sjcl from "sjcl";
 import { RectangleUtils } from "./rectangleutils";
-import { ProposedFix, ExceLintVector, Dict, Spreadsheet, upperleft, bottomright, Address } from "./ExceLintTypes";
+import {
+  ProposedFix,
+  ExceLintVector,
+  Dictionary,
+  Spreadsheet,
+  upperleft,
+  bottomright,
+  Address,
+  Rectangle,
+} from "./ExceLintTypes";
 
 export class ExcelUtils {
   // sort routine
@@ -86,7 +95,7 @@ export class ExcelUtils {
     const usedRangeAddresses = ExcelUtils.extract_sheet_range(address);
     const upperLeftCorner = ExcelUtils.cell_dependency(usedRangeAddresses[1], 0, 0);
     const lowerRightCorner = ExcelUtils.cell_dependency(usedRangeAddresses[2], 0, 0);
-    const numberOfCellsUsed = RectangleUtils.area([upperLeftCorner, lowerRightCorner]);
+    const numberOfCellsUsed = RectangleUtils.area(new Rectangle(upperLeftCorner, lowerRightCorner));
     return numberOfCellsUsed;
   }
 
@@ -463,9 +472,13 @@ export class ExcelUtils {
   // This function returns a dictionary (Dict<boolean>)) of all of the addresses
   // that are referenced by some formula, where the key is the address and the
   // value is always the boolean true.
-  public static generate_all_references(formulas: Spreadsheet, origin_col: number, origin_row: number): Dict<boolean> {
+  public static generate_all_references(
+    formulas: Spreadsheet,
+    origin_col: number,
+    origin_row: number
+  ): Dictionary<boolean> {
     // initialize dictionary
-    const refs: Dict<boolean> = {};
+    const _d = new Dictionary<boolean>();
 
     let counter = 0;
     for (let i = 0; i < formulas.length; i++) {
@@ -501,14 +514,14 @@ export class ExcelUtils {
                 }
               }
               if (addReference) {
-                refs[dep.asKey()] = true;
+                _d.put(dep.asKey(), true);
               }
             }
           }
         }
       }
     }
-    return refs;
+    return _d;
   }
 
   /**
