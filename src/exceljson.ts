@@ -64,11 +64,11 @@ export class ExcelJSON {
   private static general_re = "\\$?[A-Z][A-Z]?\\$?\\d+"; // column and row number, optionally with $
   private static pair_re = new RegExp("(" + ExcelJSON.general_re + "):(" + ExcelJSON.general_re + ")");
 
-  public static processWorksheet(sheet, selection: ExcelJSON.selections) {
-    let ref = "A1:A1"; // for empty sheets.
+  public static processWorksheet(sheet: XLSX.WorkSheet, selection: ExcelJSON.selections) {
+    let ref: string = "A1:A1"; // for empty sheets.
     if ("!ref" in sheet) {
       // Not empty.
-      ref = sheet["!ref"];
+      ref = sheet["!ref"] as string;
     }
     const decodedRange = XLSX.utils.decode_range(ref);
     const startColumn = 0; // decodedRange['s']['c'];
@@ -136,7 +136,7 @@ export class ExcelJSON {
       // If the latter, make it into a pair (e.g., C9:C9).
       let ref;
       if ("!ref" in sheet) {
-        ref = sheet["!ref"];
+        ref = sheet["!ref"] as string;
       } else {
         // Empty sheet.
         ref = "A1:A1";

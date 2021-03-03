@@ -35,7 +35,7 @@ export class Colorize {
   private static initialized = false;
 
   // The array of colors (used to hash into).
-  private static color_list = [];
+  private static color_list: string[] = [];
 
   // A hash string indicating no dependencies; in other words,
   // either a formula that makes no references (like `=RAND()`) or a data cell (like `1`)
@@ -466,9 +466,9 @@ export class Colorize {
       // we encounter a non-adjacent vector, push the region to the output
       // list and then start tracking a new region.
       output.put(key, []); // initialize
-      let start = groups[key].shift(); // remove the first vector from the list
+      let start = groups.get(key).shift() as XLNT.ExceLintVector; // remove the first vector from the list
       let end = start;
-      for (const v of groups[key]) {
+      for (const v of groups.get(key)) {
         // Check if v is in the same column as last, adjacent row
         if (v.x === end.x && v.y === end.y + 1) {
           end = v;
@@ -494,40 +494,40 @@ export class Colorize {
     return mg;
   }
 
-  public static generate_suspicious_cells(
-    cols: number,
-    rows: number,
-    origin_col: number,
-    origin_row: number,
-    matrix: Array<Array<number>>,
-    probs: Array<Array<number>>,
-    threshold = 0.01
-  ): Array<XLNT.ExceLintVector> {
-    const cells = [];
-    let sumValues = 0;
-    let countValues = 0;
-    for (let i = 0; i < cols; i++) {
-      for (let j = 0; j < rows; j++) {
-        const adjustedX = j + origin_col + 1;
-        const adjustedY = i + origin_row + 1;
-        if (probs[i][j] > 0) {
-          sumValues += matrix[i][j];
-          countValues += 1;
-          if (probs[i][j] <= threshold) {
-            if (matrix[i][j] !== 0) {
-              // Never push an empty cell.
-              cells.push([adjustedX, adjustedY, probs[i][j]]);
-            }
-          }
-        }
-      }
-    }
-    const avgValues = sumValues / countValues;
-    cells.sort((a, b) => {
-      return Math.abs(b[2] - avgValues) - Math.abs(a[2] - avgValues);
-    });
-    return cells;
-  }
+  // public static generate_suspicious_cells(
+  //   cols: number,
+  //   rows: number,
+  //   origin_col: number,
+  //   origin_row: number,
+  //   matrix: Array<Array<number>>,
+  //   probs: Array<Array<number>>,
+  //   threshold = 0.01
+  // ): Array<XLNT.ExceLintVector> {
+  //   const cells = [];
+  //   let sumValues = 0;
+  //   let countValues = 0;
+  //   for (let i = 0; i < cols; i++) {
+  //     for (let j = 0; j < rows; j++) {
+  //       const adjustedX = j + origin_col + 1;
+  //       const adjustedY = i + origin_row + 1;
+  //       if (probs[i][j] > 0) {
+  //         sumValues += matrix[i][j];
+  //         countValues += 1;
+  //         if (probs[i][j] <= threshold) {
+  //           if (matrix[i][j] !== 0) {
+  //             // Never push an empty cell.
+  //             cells.push([adjustedX, adjustedY, probs[i][j]]);
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
+  //   const avgValues = sumValues / countValues;
+  //   cells.sort((a, b) => {
+  //     return Math.abs(b[2] - avgValues) - Math.abs(a[2] - avgValues);
+  //   });
+  //   return cells;
+  // }
 
   /**
    * Determine whether the number of formulas in the spreadsheet exceeds
@@ -651,7 +651,7 @@ export class Colorize {
   }
 
   // Take two counts and compute the normalized entropy difference that would result if these were 'merged'.
-  public static entropydiff(oldcount1, oldcount2) {
+  public static entropydiff(oldcount1: number, oldcount2: number) {
     const total = oldcount1 + oldcount2;
     const prevEntropy = this.entropy(oldcount1 / total) + this.entropy(oldcount2 / total);
     const normalizedEntropy = prevEntropy / Math.log2(total);
@@ -665,9 +665,9 @@ export class Colorize {
     merge_with_norm: number,
     merge_with: XLNT.Rectangle
   ): XLNT.Metric {
-    const t1 = target.topleft;
+    const t1 = target.upperleft;
     const t2 = target.bottomright;
-    const m1 = merge_with.topleft;
+    const m1 = merge_with.upperleft;
     const m2 = merge_with.bottomright;
     const n_target = RectangleUtils.area(
       new XLNT.Rectangle(new XLNT.ExceLintVector(t1.x, t1.y, 0), new XLNT.ExceLintVector(t2.x, t2.y, 0))
@@ -695,9 +695,9 @@ export class Colorize {
     let count = 0;
     // tslint:disable-next-line: forin
     for (const k in fixes) {
-      const f11 = fixes[k][1].topleft;
+      const f11 = fixes[k][1].upperleft;
       const f12 = fixes[k][1].bottomright;
-      const f21 = fixes[k][2].topleft;
+      const f21 = fixes[k][2].upperleft;
       const f22 = fixes[k][2].bottomright;
       count += RectangleUtils.diagonal(
         new XLNT.Rectangle(new XLNT.ExceLintVector(f11.x, f11.y, 0), new XLNT.ExceLintVector(f12.x, f12.y, 0))
@@ -731,11 +731,11 @@ export class Colorize {
     group = group.sort();
     while (true) {
       let merged_one = false;
-      const deleted_rectangles = {};
+      const deleted_rectangles = new XLNT.Dictionary<boolean>();
       const updated_rectangles = [];
       const working_group = group.slice();
       while (working_group.length > 0) {
-        const head = working_group.shift();
+        const head = working_group.shift() as XLNT.Rectangle;
         for (let i = 0; i < working_group.length; i++) {
           if (RectangleUtils.is_mergeable(head, working_group[i])) {
             const head_str = JSON.stringify(head);
@@ -743,8 +743,8 @@ export class Colorize {
             // NB: 12/7/19 New check below, used to be unconditional.
             if (!(head_str in deleted_rectangles) && !(working_group_i_str in deleted_rectangles)) {
               updated_rectangles.push(RectangleUtils.bounding_box(head, working_group[i]));
-              deleted_rectangles[head_str] = true;
-              deleted_rectangles[working_group_i_str] = true;
+              deleted_rectangles.put(head_str, true);
+              deleted_rectangles.put(working_group_i_str, true);
               merged_one = true;
               break; // was disabled
             }
@@ -788,7 +788,7 @@ export class Colorize {
       const [first, second] = XLNT.rectangleComparator(rect1, rect2) <= 0 ? [rect1, rect2] : [rect2, rect1];
 
       // get the upper-left and bottom-right vectors for the two XLNT.rectangles
-      const ul = first.topleft;
+      const ul = first.upperleft;
       const br = second.bottomright;
 
       // get the column and row for the upper-left and bottom-right vectors

@@ -4,8 +4,8 @@ import { ExceLintVector, Dictionary, ProposedFix, Rectangle, upperleft, bottomri
 
 // A comparison function to sort by x-coordinate.
 function sort_x_coord(a: Rectangle, b: Rectangle): number {
-  const a1 = a.topleft;
-  const b1 = b.topleft;
+  const a1 = a.upperleft;
+  const b1 = b.upperleft;
   if (a1.x !== b1.x) {
     return a1.x - b1.x;
   } else {
@@ -24,10 +24,10 @@ function generate_bounding_box(g: Dictionary<Rectangle[]>): Dictionary<Rectangle
 
     // find the max/min x and y that bound all the rectangles in the group
     for (let j = 0; j < g.get(hash).length; j++) {
-      const x_tl = g.get(hash)[j][0].x; // top left x
-      const x_br = g.get(hash)[j][1].x; // bottom right x
-      const y_tl = g.get(hash)[j][0].y; // top left y
-      const y_br = g.get(hash)[j][1].y; // bottom right y
+      const x_tl = g.get(hash)[j].upperleft.x; // top left x
+      const x_br = g.get(hash)[j].bottomright.x; // bottom right x
+      const y_tl = g.get(hash)[j].upperleft.y; // top left y
+      const y_br = g.get(hash)[j].bottomright.y; // bottom right y
       if (x_br > xMax) {
         xMax = x_br;
       }
@@ -84,8 +84,8 @@ function matching_rectangles(
   rect_lrs: Array<ExceLintVector>
 ): Rectangle[] {
   // Assumes uls and lrs are already sorted and the same length.
-  const rect_ul = rect[0];
-  const rect_lr = rect[1];
+  const rect_ul = rect.upperleft;
+  const rect_lr = rect.bottomright;
   const x1 = rect_ul.x;
   const y1 = rect_ul.y;
   const x2 = rect_lr.x;
@@ -156,17 +156,17 @@ function find_all_matching_rectangles(
   bbsY: Rectangle[]
 ): ProposedFix[] {
   // get the upper-left and lower-right vectors for the given rectangle
-  const base_ul = rect.topleft;
+  const base_ul = rect.upperleft;
   const base_lr = rect.bottomright;
 
   // this is the output
   let match_list: ProposedFix[] = [];
 
   // find the index of the given rectangle in the list of rects sorted by X
-  const ind1 = binsearch(bbsX, rect, (a: Rectangle, b: Rectangle) => a.topleft.x - b.topleft.x);
+  const ind1 = binsearch(bbsX, rect, (a: Rectangle, b: Rectangle) => a.upperleft.x - b.upperleft.x);
 
   // find the index of the given rectangle in the list of rects sorted by Y
-  const ind2 = binsearch(bbsY, rect, (a: Rectangle, b: Rectangle) => a.topleft.y - b.topleft.y);
+  const ind2 = binsearch(bbsY, rect, (a: Rectangle, b: Rectangle) => a.upperleft.y - b.upperleft.y);
 
   // Pick the coordinate axis that takes us the furthest in the fingerprint list.
   const [fps, itmp, axis] = ind1 > ind2 ? [fingerprintsX, ind1, 0] : [fingerprintsY, ind2, 1];
@@ -188,7 +188,7 @@ function find_all_matching_rectangles(
     if (axis === 0) {
       /* [rect] ... [box]  */
       // if left side of box is too far away from right-most edge of the rectangle
-      if (base_lr.x + 1 < box.topleft.x) {
+      if (base_lr.x + 1 < box.upperleft.x) {
         break;
       }
     } else {
@@ -196,7 +196,7 @@ function find_all_matching_rectangles(
                            ...
                    [box]  */
       // if the top side of box is too far away from bottom-most edge of the rectangle
-      if (base_lr.y + 1 < box.topleft.y) {
+      if (base_lr.y + 1 < box.upperleft.y) {
         break;
       }
     }
@@ -220,8 +220,8 @@ function find_all_matching_rectangles(
 	  */
 
     if (
-      base_lr.x + 1 < box.topleft.x || // left
-      base_lr.y + 1 < box.topleft.y || // top
+      base_lr.x + 1 < box.upperleft.x || // left
+      base_lr.y + 1 < box.upperleft.y || // top
       box.bottomright.x + 1 < base_ul.x || // right
       box.bottomright.y + 1 < base_ul.y
     ) {
@@ -288,7 +288,7 @@ export function find_all_proposed_fixes(grouped_formulas: Dictionary<Rectangle[]
   const fpStringsX: string[] = grouped_formulas.keys;
 
   // sort fingerprints by the x-coordinate of the upper-left corner of their bounding box.
-  fpStringsX.sort((a: string, b: string) => bb.get(a).topleft.x - bb.get(b).topleft.x);
+  fpStringsX.sort((a: string, b: string) => bb.get(a).upperleft.x - bb.get(b).upperleft.x);
 
   // generate a sorted list of rectangles
   const bbsX: Rectangle[] = fpStringsX.map(bb.get);
@@ -297,7 +297,7 @@ export function find_all_proposed_fixes(grouped_formulas: Dictionary<Rectangle[]
   const fpStringsY = grouped_formulas.keys;
 
   // sort fingerprints by the x-coordinate of the upper-left corner of their bounding box.
-  fpStringsY.sort((a: string, b: string) => bb.get(a).topleft.y - bb.get(b).topleft.y);
+  fpStringsY.sort((a: string, b: string) => bb.get(a).upperleft.y - bb.get(b).upperleft.y);
 
   // generate a sorted list of rectangles
   const bbsY: Rectangle[] = fpStringsY.map(bb.get);

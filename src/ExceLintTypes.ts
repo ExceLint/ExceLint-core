@@ -186,7 +186,7 @@ export class Rectangle implements IComparable<Rectangle> {
     return this._tl.equals(r._tl) && this._br.equals(r._br);
   }
 
-  public get topleft() {
+  public get upperleft() {
     return this._tl;
   }
 
@@ -282,11 +282,11 @@ export class ProposedFix implements IComparable<ProposedFix> {
 }
 
 export function upperleft(r: Rectangle): ExceLintVector {
-  return r[0];
+  return r.upperleft;
 }
 
 export function bottomright(r: Rectangle): ExceLintVector {
-  return r[1];
+  return r.bottomright;
 }
 
 // Convert a rectangle into a list of vectors.
@@ -489,9 +489,9 @@ export function vectorComparator(v1: ExceLintVector, v2: ExceLintVector): number
 // A comparator that sorts rectangles by their upper-left and then lower-right
 // vectors.
 export function rectangleComparator(r1: Rectangle, r2: Rectangle): number {
-  const cmp = vectorComparator(r1[0], r2[0]);
+  const cmp = vectorComparator(r1.upperleft, r2.upperleft);
   if (cmp == 0) {
-    return vectorComparator(r1[1], r2[1]);
+    return vectorComparator(r1.bottomright, r2.bottomright);
   } else {
     return cmp;
   }
@@ -510,7 +510,7 @@ export class RectInfo {
 
   constructor(rect: Rectangle, sheet: WorksheetOutput) {
     // the coordinates of the cell containing the first formula in the proposed fix range
-    const formulaCoord = rect[0];
+    const formulaCoord = rect.upperleft;
     const y = formulaCoord.y - 1; // row
     const x = formulaCoord.x - 1; // col
     this.formula = sheet.formulas[y][x]; // the formula itself
@@ -630,7 +630,7 @@ export class WorksheetAnalysis {
 
   // Produce a sum total of all of the entropy scores for use as a weight
   get weightedAnomalousRanges(): number {
-    return this.pf.map((x) => x[0]).reduce((x, y) => x + y, 0);
+    return this.pf.map((x) => x.score).reduce((x, y) => x + y, 0);
   }
 
   // Get the total number of anomalous cells
@@ -660,45 +660,45 @@ export class WorksheetAnalysis {
   }
 }
 
-/**
- * Represents the start and end positions of an edit.
- */
-export class Range {
-  /**
-   * The range's start position in a formula string.
-   */
-  startpos: number;
+// /**
+//  * Represents the start and end positions of an edit.
+//  */
+// export class Range {
+//   /**
+//    * The range's start position in a formula string.
+//    */
+//   startpos: number;
 
-  /**
-   * The range's end position.
-   */
-  endpos: number;
-}
+//   /**
+//    * The range's end position.
+//    */
+//   endpos: number;
+// }
 
-export class Edit {
-  /**
-   * The starting and ending positions of the edit in the cell.
-   */
-  range: Range;
-  /**
-   * The length of the replacement text.
-   */
-  rangeLength: number;
-  /**
-   * The replacement text.
-   */
-  text: string;
-  /**
-   * The address of the cell where the edit occurred.
-   */
-  addr: Address;
+// export class Edit {
+//   /**
+//    * The starting and ending positions of the edit in the cell.
+//    */
+//   range: Range;
+//   /**
+//    * The length of the replacement text.
+//    */
+//   rangeLength: number;
+//   /**
+//    * The replacement text.
+//    */
+//   text: string;
+//   /**
+//    * The address of the cell where the edit occurred.
+//    */
+//   addr: Address;
 
-  constructor(range: Range, text: string, addr: Address) {
-    this.range = range;
-    this.text = text;
-    this.addr = addr;
-  }
-}
+//   constructor(range: Range, text: string, addr: Address) {
+//     this.range = range;
+//     this.text = text;
+//     this.addr = addr;
+//   }
+// }
 
 /**
  * A generic, comparable array.

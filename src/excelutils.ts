@@ -4,16 +4,7 @@
 
 import * as sjcl from "sjcl";
 import { RectangleUtils } from "./rectangleutils";
-import {
-  ProposedFix,
-  ExceLintVector,
-  Dictionary,
-  Spreadsheet,
-  upperleft,
-  bottomright,
-  Address,
-  Rectangle,
-} from "./ExceLintTypes";
+import { ExceLintVector, Dictionary, Spreadsheet, Address, Rectangle } from "./ExceLintTypes";
 
 export class ExcelUtils {
   // sort routine
@@ -72,22 +63,22 @@ export class ExcelUtils {
     return sjcl.codec.base32.fromBits(sjcl.hash.sha256.hash(uid)).slice(0, maxlen);
   }
 
-  public static get_rectangle(proposed_fixes: ProposedFix[], current_fix: number): [string, string, string, string] {
-    if (!proposed_fixes) {
-      return null;
-    }
-    if (proposed_fixes.length > 0) {
-      const r = RectangleUtils.bounding_box(proposed_fixes[current_fix].rect1, proposed_fixes[current_fix].rect2);
-      // convert to sheet notation
-      const col0 = ExcelUtils.column_index_to_name(upperleft(r).x);
-      const row0 = upperleft(r).y.toString();
-      const col1 = ExcelUtils.column_index_to_name(bottomright(r).x);
-      const row1 = bottomright(r).y.toString();
-      return [col0, row0, col1, row1];
-    } else {
-      return null;
-    }
-  }
+  // public static get_rectangle(proposed_fixes: ProposedFix[], current_fix: number): [string, string, string, string] {
+  //   if (!proposed_fixes) {
+  //     return null;
+  //   }
+  //   if (proposed_fixes.length > 0) {
+  //     const r = RectangleUtils.bounding_box(proposed_fixes[current_fix].rect1, proposed_fixes[current_fix].rect2);
+  //     // convert to sheet notation
+  //     const col0 = ExcelUtils.column_index_to_name(upperleft(r).x);
+  //     const row0 = upperleft(r).y.toString();
+  //     const col1 = ExcelUtils.column_index_to_name(bottomright(r).x);
+  //     const row1 = bottomright(r).y.toString();
+  //     return [col0, row0, col1, row1];
+  //   } else {
+  //     return null;
+  //   }
+  // }
 
   // Take a range string and compute the number of cells.
   public static get_number_of_cells(address: string): number {
@@ -218,7 +209,7 @@ export class ExcelUtils {
       if (resultVec.y === 0) {
         resultStr += R;
       } else {
-        resultStr += R + "[" + resultVec[1] + "]";
+        resultStr += R + "[" + resultVec.y + "]";
       }
       resultStr += C + vec2.x;
     } else if (ExcelUtils.cell_row_absolute.exec(destCell)) {
@@ -233,7 +224,7 @@ export class ExcelUtils {
       if (resultVec.y === 0) {
         resultStr += R;
       } else {
-        resultStr += R + "[" + resultVec[1] + "]";
+        resultStr += R + "[" + resultVec.y + "]";
       }
       if (resultVec.x === 0) {
         resultStr += C;
@@ -248,22 +239,26 @@ export class ExcelUtils {
     let range = formula.slice();
     const origin = ExcelUtils.column_index_to_name(origin_col) + origin_row;
     // First, get all the range pairs out.
-    let found_pair: RegExpExecArray;
-    while ((found_pair = ExcelUtils.range_pair.exec(range))) {
+    while (true) {
+      const found_pair = ExcelUtils.range_pair.exec(range);
       if (found_pair) {
         range = range.replace(
           found_pair[0],
           ExcelUtils.toR1C1(origin, found_pair[1], true) + ":" + ExcelUtils.toR1C1(origin, found_pair[2], true)
         );
+      } else {
+        break;
       }
     }
 
     // Now look for singletons.
-    let singleton: RegExpExecArray;
-    while ((singleton = ExcelUtils.single_dep.exec(range))) {
+    while (true) {
+      const singleton = ExcelUtils.single_dep.exec(range);
       if (singleton) {
         const first_cell = singleton[1];
         range = range.replace(singleton[0], ExcelUtils.toR1C1(origin, first_cell, true));
+      } else {
+        break;
       }
     }
     // Now, we de-greek.
@@ -325,11 +320,10 @@ export class ExcelUtils {
     origin_row: number,
     include_numbers = true
   ): ExceLintVector[] {
-    let found_pair: RegExpExecArray;
     const all_vectors: ExceLintVector[] = [];
 
     if (typeof range !== "string") {
-      return null;
+      return [];
     }
 
     // Zap all the formulas with the below characteristics.
@@ -344,7 +338,8 @@ export class ExcelUtils {
     /// FIX ME - should we count the same range multiple times? Or just once?
 
     // First, get all the range pairs out.
-    while ((found_pair = ExcelUtils.range_pair.exec(range))) {
+    while (true) {
+      const found_pair = ExcelUtils.range_pair.exec(range);
       if (found_pair) {
         const first_cell = found_pair[1];
         const first_vec = ExcelUtils.cell_dependency(first_cell, origin_col, origin_row);
@@ -365,29 +360,35 @@ export class ExcelUtils {
 
         // Wipe out the matched contents of range.
         range = range.replace(found_pair[0], "_");
+      } else {
+        break;
       }
     }
 
     // Now look for singletons.
-    let singleton = null;
-    while ((singleton = ExcelUtils.single_dep.exec(range))) {
+    while (true) {
+      const singleton = ExcelUtils.single_dep.exec(range);
       if (singleton) {
         const first_cell = singleton[1];
         const vec = ExcelUtils.cell_dependency(first_cell, origin_col, origin_row);
         all_vectors.push(vec);
         // Wipe out the matched contents of range.
         range = range.replace(singleton[0], "_");
+      } else {
+        break;
       }
     }
 
     if (include_numbers) {
       // Optionally roll numbers in formulas into the dependency vectors. Each number counts as "1".
-      let number: RegExpExecArray;
-      while ((number = ExcelUtils.number_dep.exec(range))) {
+      while (true) {
+        const number = ExcelUtils.number_dep.exec(range);
         if (number) {
           all_vectors.push(new ExceLintVector(0, 0, 1)); // just add 1 for every number
           // Wipe out the matched contents of range.
           range = range.replace(number[0], "_");
+        } else {
+          break;
         }
       }
     }
@@ -395,8 +396,8 @@ export class ExcelUtils {
     return all_vectors;
   }
 
-  public static numeric_constants(range: string): Array<number> {
-    const numbers = [];
+  public static numeric_constants(range: string): number[] {
+    const numbers: number[] = [];
     range = range.slice();
     if (typeof range !== "string") {
       return numbers;
@@ -412,32 +413,36 @@ export class ExcelUtils {
     range = range.replace(this.formulas_with_structured_references, "_");
 
     // First, get all the range pairs out.
-    let found_pair: RegExpExecArray;
-    while ((found_pair = ExcelUtils.range_pair.exec(range))) {
+    while (true) {
+      const found_pair = ExcelUtils.range_pair.exec(range);
       if (found_pair) {
         // Wipe out the matched contents of range.
         range = range.replace(found_pair[0], "_");
+      } else {
+        break;
       }
     }
 
     // Now look for singletons.
-    let singleton: RegExpExecArray;
-    while ((singleton = ExcelUtils.single_dep.exec(range))) {
+    while (true) {
+      const singleton = ExcelUtils.single_dep.exec(range);
       if (singleton) {
         // Wipe out the matched contents of range.
         range = range.replace(singleton[0], "_");
+      } else {
+        break;
       }
     }
 
     // Now aggregate total numeric constants (sum them).
-    let number: RegExpExecArray;
-    //	let total = 0.0;
-    while ((number = ExcelUtils.number_dep.exec(range))) {
+    while (true) {
+      const number = ExcelUtils.number_dep.exec(range);
       if (number) {
         numbers.push(parseFloat(number[0]));
-        //		total += parseFloat(number);
         // Wipe out the matched contents of range.
         range = range.replace(number[0], "_");
+      } else {
+        break;
       }
     }
     return numbers; // total;

@@ -12,6 +12,7 @@
     "noUnusedParameters": true,
     "noUnusedLocals": false,
     "downlevelIteration": true,
+    "strict": true,
     "pretty": true,
     "typeRoots": [
       "node_modules/@types"
