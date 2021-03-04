@@ -39,6 +39,14 @@ export class Dictionary<V> {
     }
     return output;
   }
+  public get values(): V[] {
+    const output: V[] = [];
+    for (let key in this._d) {
+      output.push(this._d[key]);
+    }
+    return output;
+  }
+
   /**
    * Performs a shallow copy of the dictionary.
    */
@@ -776,16 +784,16 @@ export class Tuple2<T extends IComparable<T>, U extends IComparable<U>> implemen
 }
 
 export class Adjacency {
-  private _up: Tuple2<Option<Rectangle>, Fingerprint>;
-  private _down: Tuple2<Option<Rectangle>, Fingerprint>;
-  private _left: Tuple2<Option<Rectangle>, Fingerprint>;
-  private _right: Tuple2<Option<Rectangle>, Fingerprint>;
+  private _up: Option<Tuple2<Rectangle, Fingerprint>>;
+  private _down: Option<Tuple2<Rectangle, Fingerprint>>;
+  private _left: Option<Tuple2<Rectangle, Fingerprint>>;
+  private _right: Option<Tuple2<Rectangle, Fingerprint>>;
 
   constructor(
-    up: Tuple2<Option<Rectangle>, Fingerprint>,
-    down: Tuple2<Option<Rectangle>, Fingerprint>,
-    left: Tuple2<Option<Rectangle>, Fingerprint>,
-    right: Tuple2<Option<Rectangle>, Fingerprint>
+    up: Option<Tuple2<Rectangle, Fingerprint>>,
+    down: Option<Tuple2<Rectangle, Fingerprint>>,
+    left: Option<Tuple2<Rectangle, Fingerprint>>,
+    right: Option<Tuple2<Rectangle, Fingerprint>>
   ) {
     this._up = up;
     this._down = down;

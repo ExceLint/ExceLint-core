@@ -145,9 +145,7 @@ export class Colorize {
 
     // for every cell in the analysis, find its bounding rectangle
     // and put it in the dictionary, indexed by address (vector)
-    const rects = Object.entries(a.grouped_formulas)
-      .map(([, value]) => value)
-      .flat();
+    const rects = a.grouped_formulas.values.flat();
     for (let i = 0; i < rects.length; i++) {
       const rect = rects[i];
       const cells = rect.expand();
@@ -158,12 +156,6 @@ export class Colorize {
     }
 
     return _d;
-  }
-
-  public static refsForRect(r: XLNT.Rectangle): XLNT.ExceLintVector[] {
-    r = r;
-
-    return [];
   }
 
   // Given a set of rectangles indexed by their addresses, produce a set of
@@ -188,25 +180,21 @@ export class Colorize {
       const left_addr = v.left.asKey();
       const right_addr = v.right.asKey();
 
-      // get the rectangle for each adjacency
+      // get the rectangle and fingerprint for each adjacency
       // if there is no adjacency (i.e., cell lies on the used range border)
       // store 'None'
-      const up_rect = rd.contains(up_addr) ? new Some(rd.get(up_addr)) : None;
-      const down_rect = rd.contains(down_addr) ? new Some(rd.get(down_addr)) : None;
-      const left_rect = rd.contains(left_addr) ? new Some(rd.get(left_addr)) : None;
-      const right_rect = rd.contains(right_addr) ? new Some(rd.get(right_addr)) : None;
-
-      // find fingerprints for adjacent rectangles
-      const up_fp = a.formula_fingerprints.get(up_addr);
-      const down_fp = a.formula_fingerprints.get(down_addr);
-      const left_fp = a.formula_fingerprints.get(left_addr);
-      const right_fp = a.formula_fingerprints.get(right_addr);
-
-      // generate tuples
-      const up_tup = new XLNT.Tuple2(up_rect, up_fp);
-      const down_tup = new XLNT.Tuple2(down_rect, down_fp);
-      const left_tup = new XLNT.Tuple2(left_rect, left_fp);
-      const right_tup = new XLNT.Tuple2(right_rect, right_fp);
+      const up_tup = rd.contains(up_addr)
+        ? new Some(new XLNT.Tuple2(rd.get(up_addr), a.formula_fingerprints.get(up_addr)))
+        : None;
+      const down_tup = rd.contains(down_addr)
+        ? new Some(new XLNT.Tuple2(rd.get(down_addr), a.formula_fingerprints.get(down_addr)))
+        : None;
+      const left_tup = rd.contains(left_addr)
+        ? new Some(new XLNT.Tuple2(rd.get(left_addr), a.formula_fingerprints.get(left_addr)))
+        : None;
+      const right_tup = rd.contains(right_addr)
+        ? new Some(new XLNT.Tuple2(rd.get(right_addr), a.formula_fingerprints.get(right_addr)))
+        : None;
 
       // add adjacency to dict
       _d.put(addr, new XLNT.Adjacency(up_tup, down_tup, left_tup, right_tup));

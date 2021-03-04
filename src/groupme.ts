@@ -291,7 +291,7 @@ export function find_all_proposed_fixes(grouped_formulas: Dictionary<Rectangle[]
   fpStringsX.sort((a: string, b: string) => bb.get(a).upperleft.x - bb.get(b).upperleft.x);
 
   // generate a sorted list of rectangles
-  const bbsX: Rectangle[] = fpStringsX.map(bb.get);
+  const bbsX: Rectangle[] = fpStringsX.map((fp) => bb.get(fp));
 
   // extract fingerprints again (we're going to sort list in place)
   const fpStringsY = grouped_formulas.keys;
@@ -300,7 +300,7 @@ export function find_all_proposed_fixes(grouped_formulas: Dictionary<Rectangle[]
   fpStringsY.sort((a: string, b: string) => bb.get(a).upperleft.y - bb.get(b).upperleft.y);
 
   // generate a sorted list of rectangles
-  const bbsY: Rectangle[] = fpStringsY.map(bb.get);
+  const bbsY: Rectangle[] = fpStringsY.map((fp) => bb.get(fp));
 
   // for every group
   for (const fp of grouped_formulas.keys) {
