@@ -16,9 +16,9 @@ export class CLIConfig {
   numSheets: number = 0;
   numSheetsWithErrors: number = 0;
   args: any;
-  formattingDiscount: number;
-  reportingThreshold: number;
-  maxEntropy: number;
+  formattingDiscount: number = this.defaultFormattingDiscount;
+  reportingThreshold: number = this.defaultReportingThreshold;
+  maxEntropy: number = this.defaultMaxEntropy;
   allFiles: string[] = [];
 
   public get directory(): string {
@@ -133,7 +133,6 @@ export function process_arguments(): CLIConfig {
 
   // argument:
   // formattingDiscount = amount of impact of formatting on fix reporting (0-100%).
-  conf.formattingDiscount = conf.defaultFormattingDiscount;
   if ("formattingDiscount" in args) {
     conf.formattingDiscount = args.formattingDiscount as number;
   }
@@ -178,7 +177,6 @@ export function process_arguments(): CLIConfig {
   }
 
   // As above, but for reporting threshold.
-  conf.reportingThreshold = conf.defaultReportingThreshold;
   if ("reportingThreshold" in args) {
     conf.reportingThreshold = args.reportingThreshold as number;
   }
@@ -199,7 +197,6 @@ export function process_arguments(): CLIConfig {
     Config.minFixSize = args.minFixSize as number;
   }
 
-  conf.maxEntropy = conf.defaultMaxEntropy;
   if ("maxEntropy" in args) {
     conf.maxEntropy = args.maxEntropy as number;
     // Entropy must be between 0 and 1.

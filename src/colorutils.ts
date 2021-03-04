@@ -12,7 +12,7 @@ export class ColorUtils {
    * @param   Number  b       The blue color value
    * @return  Array           The HSV representation
    */
-  public static RGBtoHSV(r, g, b): [number, number, number] {
+  public static RGBtoHSV(r: number, g: number, b: number): [number, number, number] {
     (r /= 255), (g /= 255), (b /= 255);
 
     const max = Math.max(r, g, b),
@@ -37,6 +37,8 @@ export class ColorUtils {
         case b:
           h = (r - g) / d + 4;
           break;
+        default:
+          throw new Error("Impossible case in RGBtoHSV conversion.");
       }
 
       h /= 6;
@@ -56,7 +58,7 @@ export class ColorUtils {
    * @param   Number  v       The value
    * @return  Array           The RGB representation
    */
-  public static HSVtoRGB(h, s, v): [number, number, number] {
+  public static HSVtoRGB(h: number, s: number, v: number): [number, number, number] {
     let r, g, b;
 
     const i = Math.floor(h * 6);
@@ -84,22 +86,19 @@ export class ColorUtils {
       case 5:
         (r = v), (g = p), (b = q);
         break;
+      default:
+        throw new Error("Impossible case in HSVtoRGB conversion.");
     }
 
     return [r * 255, g * 255, b * 255];
   }
 
-  private static rgb_ex = new RegExp(
-    '#([A-Za-z0-9][A-Za-z0-9])([A-Za-z0-9][A-Za-z0-9])([A-Za-z0-9][A-Za-z0-9])'
-  );
+  private static rgb_ex = new RegExp("#([A-Za-z0-9][A-Za-z0-9])([A-Za-z0-9][A-Za-z0-9])([A-Za-z0-9][A-Za-z0-9])");
 
   public static adjust_brightness(color: string, multiplier: number): string {
     const c = ColorUtils.rgb_ex.exec(color);
-    const [r, g, b] = [
-      parseInt(c[1], 16),
-      parseInt(c[2], 16),
-      parseInt(c[3], 16),
-    ];
+    if (!c) throw new Error("Unable to adjust brightness.");
+    const [r, g, b] = [parseInt(c[1], 16), parseInt(c[2], 16), parseInt(c[3], 16)];
     let [h, s, v] = ColorUtils.RGBtoHSV(r, g, b);
     v = multiplier * v;
     if (v <= 0.0) {
@@ -109,10 +108,10 @@ export class ColorUtils {
       v = 0.99;
     }
     const rgb = ColorUtils.HSVtoRGB(h, s, v);
-    const [rs, gs, bs] = rgb.map(x => {
-      return Math.round(x).toString(16).padStart(2, '0');
+    const [rs, gs, bs] = rgb.map((x) => {
+      return Math.round(x).toString(16).padStart(2, "0");
     });
-    let str = '#' + rs + gs + bs;
+    let str = "#" + rs + gs + bs;
     str = str.toUpperCase();
     return str;
   }

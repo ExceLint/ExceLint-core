@@ -2,6 +2,7 @@ const fs = require("fs");
 const textdiff = require("text-diff");
 const diff = new textdiff();
 
+import { Dictionary } from "./ExceLintTypes";
 import { ExcelUtils } from "./excelutils";
 
 class CellEncoder {
@@ -41,6 +42,7 @@ class CellEncoder {
 
   public static decodeFromChar(chr: string): [number, number, boolean, boolean] {
     let decodedNum = chr.codePointAt(0);
+    if (decodedNum === undefined) throw new Error("Character '" + chr + "' cannot be decoded.");
     let absoluteColumn = false;
     let absoluteRow = false;
     if (decodedNum & CellEncoder.absoluteRowMultiplier) {
@@ -83,23 +85,23 @@ class CellEncoder {
 
 export class FixDiff {
   // Load the JSON file containing all the Excel functions.
-  private fns = JSON.parse(fs.readFileSync("functions.json", "utf-8"));
+  private fns: string[] = JSON.parse(fs.readFileSync("functions.json", "utf-8"));
   // console.log(JSON.stringify(fns));
 
   // Build a map of Excel functions to crazy Unicode characters and back
   // again.  We do this so that diffs are in effect "token by token"
   // (e.g., so ROUND and RAND don't get a diff of "O|A" but are instead
   // considered entirely different).
-  private fn2unicode = {};
-  private unicode2fn = {};
+  private fn2unicode = new Dictionary<string>();
+  private unicode2fn = new Dictionary<string>();
 
   // Construct the arrays above.
   private initArrays() {
     let i = 0;
     for (const fnName of this.fns) {
       const str = String.fromCharCode(256 + i);
-      this.fn2unicode[fnName] = str;
-      this.unicode2fn[str] = fnName;
+      this.fn2unicode.put(fnName, str);
+      this.unicode2fn.put(str, fnName);
       i++;
       // console.log(fnName + " " + this.fn2unicode[fnName] + " " + this.unicode2fn[this.fn2unicode[fnName]]);
     }
@@ -143,19 +145,19 @@ export class FixDiff {
     let resultStr = "";
     if (ExcelUtils.cell_both_absolute.exec(destCell)) {
       console.log("both absolute");
-      resultStr = CellEncoder.encodeToChar(vec2[0], vec2[1], true, true);
+      resultStr = CellEncoder.encodeToChar(vec2.x, vec2.y, true, true);
     } else if (ExcelUtils.cell_col_absolute.exec(destCell)) {
       console.log("column absolute, row relative");
-      console.log(vec2[0]);
-      console.log(resultVec[1]);
-      resultStr = CellEncoder.encodeToChar(vec2[0], resultVec[1], true, false);
+      console.log(vec2.x);
+      console.log(resultVec.y);
+      resultStr = CellEncoder.encodeToChar(vec2.x, resultVec.y, true, false);
     } else if (ExcelUtils.cell_row_absolute.exec(destCell)) {
       console.log("row absolute, column relative");
-      resultStr = CellEncoder.encodeToChar(resultVec[0], vec2[1], false, true);
+      resultStr = CellEncoder.encodeToChar(resultVec.x, vec2.y, false, true);
     } else {
       // Common case, both relative.
       console.log("both relative");
-      resultStr = CellEncoder.encodeToChar(resultVec[0], resultVec[1], false, false);
+      resultStr = CellEncoder.encodeToChar(resultVec.x, resultVec.y, false, false);
     }
     console.log("to pseudo r1c1: " + resultStr);
     return resultStr;
@@ -188,7 +190,7 @@ export class FixDiff {
 
   public tokenize(formula: string): string {
     for (let i = 0; i < this.fns.length; i++) {
-      formula = formula.replace(this.fns[i], this.fn2unicode[this.fns[i]]);
+      formula = formula.replace(this.fns[i], this.fn2unicode.get(this.fns[i]));
     }
     formula = formula.replace(/(\-?\d+)/g, (_, num) => {
       // Make sure the unicode characters are far away from the encoded cell values.
@@ -200,13 +202,13 @@ export class FixDiff {
 
   public detokenize(formula: string): string {
     for (let i = 0; i < this.fns.length; i++) {
-      formula = formula.replace(this.fn2unicode[this.fns[i]], this.fns[i]);
+      formula = formula.replace(this.fn2unicode.get(this.fns[i]), this.fns[i]);
     }
     return formula;
   }
 
   // Return the diffs (with formulas treated specially).
-  public compute_fix_diff(str1, str2, c1, r1, c2, r2) {
+  public compute_fix_diff(str1: string, str2: string, c1: number, r1: number, c2: number, r2: number): any[][] {
     //c2, r2) {
     // Convert to pseudo R1C1 format.
     let rc_str1 = FixDiff.formulaToPseudoR1C1(str1, c1, r1); // ExcelUtils.formulaToR1C1(str1, c1, r1);
@@ -252,7 +254,7 @@ export class FixDiff {
         return encoded_char;
       }
       const [co, ro, absCo, absRo] = CellEncoder.decodeFromChar(encoded_char);
-      let result: string;
+      let result: string = "";
       if (!absCo && !absRo) {
         // Both relative (R[..]C[...])
         // console.log("both relative");
@@ -285,8 +287,8 @@ export class FixDiff {
   private static resettext = "\u001b[0m";
   private static textcolor = [FixDiff.redtext, FixDiff.yellowtext, FixDiff.greentext];
 
-  public pretty_diffs(diffs): string[] {
-    const strList = [];
+  public pretty_diffs(diffs: any[]): string[] {
+    const strList: string[] = [];
     // Iterate for -1 and 1.
     for (const i of [-1, 1]) {
       // console.log(i);
@@ -305,7 +307,7 @@ export class FixDiff {
   }
 }
 
-function showDiffs(str1, row1, col1, str2, row2, col2) {
+function showDiffs(str1: string, row1: number, col1: number, str2: string, row2: number, col2: number) {
   const nd = new FixDiff();
   const [diff0, diff1] = nd.compute_fix_diff(str1, str2, col1 - 1, row1 - 1, col2 - 1, row2 - 1);
   console.log(diff0);
