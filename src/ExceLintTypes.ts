@@ -39,6 +39,16 @@ export class Dictionary<V> {
     }
     return output;
   }
+  /**
+   * Performs a shallow copy of the dictionary.
+   */
+  public clone(): Dictionary<V> {
+    const dict = new Dictionary<V>();
+    for (const key of this.keys) {
+      dict.put(key, this.get(key));
+    }
+    return dict;
+  }
 }
 
 export interface IComparable<V> {

@@ -4,7 +4,6 @@ flat.shim();
 
 import { ExcelUtils } from "./excelutils";
 import { RectangleUtils } from "./rectangleutils";
-import { JSONclone } from "./jsonclone";
 import { find_all_proposed_fixes } from "./groupme";
 import * as XLNT from "./ExceLintTypes";
 import { WorkbookOutput } from "./exceljson";
@@ -489,7 +488,7 @@ export class Colorize {
     const id = Colorize.identify_ranges(data_fingerprints, ExcelUtils.ColumnSort);
     const gr = Colorize.find_contiguous_regions(id);
     // Now try to merge stuff with the same hash.
-    const newGr1 = JSONclone.clone(gr);
+    const newGr1 = gr.clone();
     const mg = Colorize.merge_groups(newGr1);
     return mg;
   }

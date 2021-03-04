@@ -16,7 +16,7 @@ function sort_x_coord(a: Rectangle, b: Rectangle): number {
 // Returns a dictionary containing a bounding box for each group (indexed by hash).
 function generate_bounding_box(g: Dictionary<Rectangle[]>): Dictionary<Rectangle> {
   const bb = new Dictionary<Rectangle>();
-  for (const hash of Object.keys(g)) {
+  for (const hash of g.keys) {
     let xMin = 1000000;
     let yMin = 1000000;
     let xMax = -1000000;
@@ -276,7 +276,7 @@ export function find_all_proposed_fixes(grouped_formulas: Dictionary<Rectangle[]
   // extract from rects the upper-left and lower-right vectors into dicts, indexed by hash
   const x_ul = new Dictionary<ExceLintVector[]>(); // upper-left
   const x_lr = new Dictionary<ExceLintVector[]>(); // lower-right
-  for (const fp of Object.keys(grouped_formulas)) {
+  for (const fp of grouped_formulas.keys) {
     x_ul.put(fp, aNum.get(fp).map(upperleft));
     x_lr.put(fp, aNum.get(fp).map(bottomright));
   }
