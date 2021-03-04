@@ -460,7 +460,7 @@ export class Colorize {
   ): XLNT.Dictionary<XLNT.Rectangle[]> {
     const output = new XLNT.Dictionary<XLNT.Rectangle[]>();
 
-    for (const key of Object.keys(groups)) {
+    for (const key of groups.keys) {
       // Here, we scan all of the vectors in this group, accumulating
       // all adjacent vectors by tracking the start and end. Whevener
       // we encounter a non-adjacent vector, push the region to the output
