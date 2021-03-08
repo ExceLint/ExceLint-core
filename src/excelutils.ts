@@ -540,7 +540,9 @@ export class ExcelUtils {
     const addrs = parts[1];
     const addrSpl = addrs.split(":");
     const addr1 = sheet + "!" + addrSpl[0];
-    const addr2 = sheet + "!" + addrSpl[1];
+    // if, after splitting on the colon, we only have one element,
+    // then we were given a singleton range, so duplicate aadr1
+    const addr2 = addrSpl.length == 1 ? addr1 : sheet + "!" + addrSpl[1];
     const r1c1_1 = ExcelUtils.addrA1toR1C1(addr1);
     const r1c1_2 = ExcelUtils.addrA1toR1C1(addr2);
     return new Range(r1c1_1, r1c1_2);

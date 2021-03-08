@@ -159,8 +159,27 @@ export class Address implements IComparable<Address> {
   public equals(a: Address): boolean {
     return this._sheet === a._sheet && this._row === a._row && this._column === a._column;
   }
+  public toR1C1Ref(): string {
+    return "R" + this._row + "C" + this._column;
+  }
+  public toA1Ref(): string {
+    return Address.intToColChars(this._column) + this._row.toString();
+  }
+  private static intToColChars(dividend: number): string {
+    let quot = Math.floor(dividend / 26);
+    const rem = dividend % 26;
+    if (rem === 0) {
+      quot -= 1;
+    }
+    const ltr = rem === 0 ? "Z" : String.fromCharCode(64 + rem);
+    if (quot === 0) {
+      return ltr;
+    } else {
+      return Address.intToColChars(quot) + ltr;
+    }
+  }
   public toString(): string {
-    return "R" + this._column + "C" + this._row;
+    return this.toR1C1Ref();
   }
 }
 
@@ -186,7 +205,13 @@ export class Range implements IComparable<Range> {
     return this._addrStart.equals(r._addrStart) && this._addrEnd.equals(r._addrEnd);
   }
   public toString(): string {
-    return this._addrStart.toString() + ":" + this._addrEnd.toString();
+    return this.toR1C1Ref();
+  }
+  public toR1C1Ref(): string {
+    return this._addrStart.toR1C1Ref() + ":" + this._addrEnd.toR1C1Ref();
+  }
+  public toA1Ref(): String {
+    return this._addrStart.toA1Ref() + ":" + this._addrEnd.toA1Ref();
   }
 }
 

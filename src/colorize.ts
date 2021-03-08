@@ -211,8 +211,8 @@ export class Colorize {
   }
 
   // /**
-  //  * Returns an array of rectangles, grouped by their fingerprints, ordered from
-  //  * closest to the start position to furthest, by scanning up to dist cells.
+  //  * Returns an array of rectangles along the given direction, grouped by their fingerprints,
+  //  * and ordered from closest to the start position to furthest, up to dist cells away.
   //  * @param start
   //  * @param dir
   //  * @param formulas
