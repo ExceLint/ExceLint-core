@@ -11,6 +11,13 @@ import { Config } from "./config";
 import { Classification } from "./classification";
 import { Some, None } from "./option";
 
+// enum Direction {
+//   Up,
+//   Down,
+//   Left,
+//   Right,
+// }
+
 export class Colorize {
   // Color-blind friendly color palette.
   public static palette = [
@@ -203,37 +210,58 @@ export class Colorize {
     return _d;
   }
 
-  // Prepare to perform an incremental analysis
-  public static initIncremental(
-    inp: WorkbookOutput,
-    sheetName: string,
-    beVerbose: boolean = false
-  ): XLNT.IncrementalWorkbookAnalysis {
-    // look for the requested sheet
-    for (let i = 0; i < inp.worksheets.length; i++) {
-      const sheet = inp.worksheets[i];
+  // /**
+  //  * Returns an array of rectangles, grouped by their fingerprints, ordered from
+  //  * closest to the start position to furthest, by scanning up to dist cells.
+  //  * @param start
+  //  * @param dir
+  //  * @param formulas
+  //  * @param data
+  //  * @param distance
+  //  */
+  // public static rectangles(
+  //   start: XLNT.ExceLintVector,
+  //   dir: Direction,
+  //   formulas: XLNT.Spreadsheet,
+  //   data: XLNT.Spreadsheet,
+  //   dist: number
+  // ): XLNT.Tuple2<XLNT.ExceLintVector, XLNT.Rectangle>[] {
+  //   return [];
+  // }
 
-      // skip sheets that don't match sheetName or are empty
-      if (Colorize.isNotSameSheet(sheetName, sheet.sheetName) || Colorize.isEmptySheet(sheet)) {
-        continue;
+  /**
+   * This is a low-latency, generator version of the process_workbook call.
+   * @param inp The input workbook as a WorkbookOutput object.
+   * @param sheetName The name of the sheet of interest.
+   * @param beVerbose If true, print diagnostics to the console.
+   */
+  public static fastAnalysis(inp: WorkbookOutput, sheetName: string, beVerbose: boolean = false): Generator<any> {
+    const f = function* (): Generator<any> {
+      // look for the requested sheet
+      for (let i = 0; i < inp.worksheets.length; i++) {
+        const sheet = inp.worksheets[i];
+
+        // skip sheets that don't match sheetName or are empty
+        if (Colorize.isNotSameSheet(sheetName, sheet.sheetName) || Colorize.isEmptySheet(sheet)) {
+          continue;
+        }
+
+        // get the used range
+        const usedRangeAddress = Colorize.normalizeAddress(sheet.usedRangeAddress);
+
+        // Get anomalous cells and proposed fixes, among others.
+        const a = Colorize.process_suspicious(usedRangeAddress, sheet.formulas, sheet.values, beVerbose);
+
+        // Index rectangles by their component addresses
+        const rects = Colorize.rectangleDict(a);
+
+        // Build adjacency map
+        const adjs = Colorize.adjacencyDict(rects, a);
+
+        console.log(adjs);
       }
-
-      // get the used range
-      const usedRangeAddress = Colorize.normalizeAddress(sheet.usedRangeAddress);
-
-      // Get anomalous cells and proposed fixes, among others.
-      const a = Colorize.process_suspicious(usedRangeAddress, sheet.formulas, sheet.values, beVerbose);
-
-      // Index rectangles by their component addresses
-      const rects = Colorize.rectangleDict(a);
-
-      // Build adjacency map
-      const adjs = Colorize.adjacencyDict(rects, a);
-
-      console.log(adjs);
-    }
-
-    return new XLNT.IncrementalWorkbookAnalysis();
+    };
+    return f();
   }
 
   // Performs an analysis on an entire workbook
@@ -243,10 +271,6 @@ export class Colorize {
     beVerbose: boolean = false
   ): XLNT.WorkbookAnalysis {
     const wba = new XLNT.WorkbookAnalysis(inp);
-
-    // DEBUG
-    let incr = Colorize.initIncremental(inp, sheetName, beVerbose);
-    console.log(incr);
 
     // look for the requested sheet
     for (let i = 0; i < inp.worksheets.length; i++) {

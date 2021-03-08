@@ -2,7 +2,7 @@ import { WorkbookOutput, WorksheetOutput } from "./exceljson";
 import { ExcelUtils } from "./excelutils";
 import { Classification } from "./classification";
 import { Config } from "./config";
-import { Option, Some, None, flatMap } from "./option";
+import { IComparable, Option, Some, None, flatMap } from "./option";
 
 interface Dict<V> {
   [key: string]: V;
@@ -57,10 +57,6 @@ export class Dictionary<V> {
     }
     return dict;
   }
-}
-
-export interface IComparable<V> {
-  equals(v: IComparable<V>): boolean;
 }
 
 export class CSet<V extends IComparable<V>> implements IComparable<CSet<V>> {
@@ -165,6 +161,32 @@ export class Address implements IComparable<Address> {
   }
   public toString(): string {
     return "R" + this._column + "C" + this._row;
+  }
+}
+
+export class Range implements IComparable<Range> {
+  private _addrStart: Address;
+  private _addrEnd: Address;
+  constructor(addrStart: Address, addrEnd: Address) {
+    this._addrStart = addrStart;
+    this._addrEnd = addrEnd;
+  }
+  public get addressStart() {
+    return this._addrStart;
+  }
+  public get addressEnd() {
+    return this._addrEnd;
+  }
+  public rectangle() {
+    const v1 = new ExceLintVector(this._addrStart.column, this._addrStart.row, 0);
+    const v2 = new ExceLintVector(this._addrEnd.column, this._addrEnd.row, 0);
+    return new Rectangle(v1, v2);
+  }
+  public equals(r: Range): boolean {
+    return this._addrStart.equals(r._addrStart) && this._addrEnd.equals(r._addrEnd);
+  }
+  public toString(): string {
+    return this._addrStart.toString() + ":" + this._addrEnd.toString();
   }
 }
 

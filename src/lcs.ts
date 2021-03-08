@@ -5,7 +5,8 @@
  * by D. Barowy (2021-02-12)
  */
 
-import { IComparable, CSet, CArray } from "./ExceLintTypes";
+import { CSet, CArray } from "./ExceLintTypes";
+import { IComparable } from "./option";
 
 /**
  * Throws an error if the condition is false.
@@ -240,9 +241,7 @@ export function findMinEdit(x: string, y: string): LCSEdit[] {
   }
 
   // find all of the edits of length min
-  const candidateEdits = editSet.filter(
-    (ed) => ed.length === editSet[min].length
-  );
+  const candidateEdits = editSet.filter((ed) => ed.length === editSet[min].length);
 
   // sort by edit consistency
   candidateEdits.sort((e1, e2) => editConsistency(e1) - editConsistency(e2));
@@ -372,13 +371,7 @@ function union(a: string[], b: string[]): string[] {
  * @param y String y.
  * @param j Length of string y.
  */
-function backtrackAll(
-  C: number[][],
-  x: string,
-  i: number,
-  y: string,
-  j: number
-): string[] {
+function backtrackAll(C: number[][], x: string, i: number, y: string, j: number): string[] {
   if (i === 0 || j === 0) {
     // if both indices are zero, we're just starting
     return [""];
@@ -415,13 +408,7 @@ function backtrackAll(
  * @param y A string y.
  * @param j The length of y.
  */
-function getCharPairs(
-  C: number[][],
-  x: string,
-  i: number,
-  y: string,
-  j: number
-): CSet<CArray<NumPair>> {
+function getCharPairs(C: number[][], x: string, i: number, y: string, j: number): CSet<CArray<NumPair>> {
   if (i === 0 || j === 0) {
     // base case: if both strings are empty, then clearly the LCS
     //   is the empty string, so return the set containing the empty

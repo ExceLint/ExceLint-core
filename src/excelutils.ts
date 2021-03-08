@@ -4,7 +4,7 @@
 
 import * as sjcl from "sjcl";
 import { RectangleUtils } from "./rectangleutils";
-import { ExceLintVector, Dictionary, Spreadsheet, Address, Rectangle } from "./ExceLintTypes";
+import { ExceLintVector, Dictionary, Spreadsheet, Range, Address, Rectangle } from "./ExceLintTypes";
 
 export class ExcelUtils {
   // sort routine
@@ -530,8 +530,24 @@ export class ExcelUtils {
   }
 
   /**
-   * Converts an A1 address string into an R1C1 tuple where the first
-   * element is the column number and the second element is the row number.
+   * Converts an A1 range reference string into an R1C1 range object.
+   * @param a1rng An A1 range string.
+   */
+  public static rngA1toR1C1(a1rng: string): Range {
+    // split by sheet name, then split by colon
+    const parts = a1rng.split("!");
+    const sheet = parts[0];
+    const addrs = parts[1];
+    const addrSpl = addrs.split(":");
+    const addr1 = sheet + "!" + addrSpl[0];
+    const addr2 = sheet + "!" + addrSpl[1];
+    const r1c1_1 = ExcelUtils.addrA1toR1C1(addr1);
+    const r1c1_2 = ExcelUtils.addrA1toR1C1(addr2);
+    return new Range(r1c1_1, r1c1_2);
+  }
+
+  /**
+   * Converts an A1 address string into an R1C1 address object.
    * @param a1addr An address string in A1 format
    */
   public static addrA1toR1C1(a1addr: string): Address {

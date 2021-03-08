@@ -1,9 +1,9 @@
-// I basically cannot live without this
+export interface IComparable<V> {
+  equals(v: IComparable<V>): boolean;
+}
+
 export class Some<T> {
   private t: T;
-  // The person who decided that the default
-  // value of the 'true' datatype should be
-  // 'undefined' is an ASSHOLE.
   public hasValue: true = true;
 
   constructor(t: T) {
@@ -25,10 +25,7 @@ class NoneType {
   public hasValue: false = false;
 
   public equals(o: Option<any>): boolean {
-    if (o.hasValue) {
-      return false;
-    }
-    return true;
+    return !o.hasValue;
   }
 }
 export const None = new NoneType(); // singleton None
@@ -50,3 +47,60 @@ export function flatMap<U, T>(f: (u: U) => Option<T>, us: U[]): T[] {
   }
   return ts;
 }
+
+export abstract class Maybe<T extends IComparable<T>> implements IComparable<Maybe<T>> {
+  public kind: string = "maybe";
+  public abstract equals(o: Maybe<T>): boolean;
+}
+
+export class Definitely<T extends IComparable<T>> extends Maybe<T> {
+  private t: T;
+  public kind: string = "definitely";
+
+  constructor(t: T) {
+    super();
+    this.t = t;
+  }
+
+  public get value(): T {
+    return this.t;
+  }
+
+  public equals(o: Maybe<T>): boolean {
+    if (this.kind === o.kind) {
+      return this.t.equals((o as Definitely<T>).t);
+    }
+    return false;
+  }
+}
+
+export class Possibly<T extends IComparable<T>> extends Maybe<T> {
+  private t: T;
+  public kind: string = "possibly";
+
+  constructor(t: T) {
+    super();
+    this.t = t;
+  }
+
+  public get value(): T {
+    return this.t;
+  }
+
+  public equals(o: Maybe<T>): boolean {
+    if (this.kind === o.kind) {
+      return this.t.equals((o as Possibly<T>).t);
+    }
+    return false;
+  }
+}
+
+export class NoType extends Maybe<any> {
+  public kind: string = "no";
+
+  public equals(o: Maybe<any>): boolean {
+    return this.kind === o.kind;
+  }
+}
+
+export const No = new NoType();
