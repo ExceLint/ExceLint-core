@@ -139,9 +139,9 @@ export class CSet<V extends IComparable<V>> implements IComparable<CSet<V>> {
 export type Spreadsheet = string[][];
 
 export class Address implements IComparable<Address> {
-  private _sheet: string;
-  private _row: number;
-  private _column: number;
+  private readonly _sheet: string;
+  private readonly _row: number;
+  private readonly _column: number;
   constructor(sheet: string, row: number, column: number) {
     this._sheet = sheet;
     this._row = row;
@@ -160,10 +160,10 @@ export class Address implements IComparable<Address> {
     return this._sheet === a._sheet && this._row === a._row && this._column === a._column;
   }
   public toR1C1Ref(): string {
-    return "R" + this._row + "C" + this._column;
+    return this._sheet + "!R" + this._row + "C" + this._column;
   }
   public toA1Ref(): string {
-    return Address.intToColChars(this._column) + this._row.toString();
+    return this._sheet + "!" + Address.intToColChars(this._column) + this._row.toString();
   }
   private static intToColChars(dividend: number): string {
     let quot = Math.floor(dividend / 26);
@@ -181,11 +181,20 @@ export class Address implements IComparable<Address> {
   public toString(): string {
     return this.toR1C1Ref();
   }
+  public asKey(): string {
+    return this.toR1C1Ref();
+  }
+  public static fromKey(k: string): Address {
+    return ExcelUtils.addrA1toR1C1(k);
+  }
+  public asVector(): ExceLintVector {
+    return new ExceLintVector(this._column, this._row, 0);
+  }
 }
 
 export class Range implements IComparable<Range> {
-  private _addrStart: Address;
-  private _addrEnd: Address;
+  private readonly _addrStart: Address;
+  private readonly _addrEnd: Address;
   constructor(addrStart: Address, addrEnd: Address) {
     this._addrStart = addrStart;
     this._addrEnd = addrEnd;
@@ -213,10 +222,34 @@ export class Range implements IComparable<Range> {
   public toA1Ref(): string {
     return this._addrStart.toA1Ref() + ":" + this._addrEnd.toA1Ref();
   }
+  /**
+   * Returns the 1-based upper left column coordinate.
+   */
+  public get upperLeftColumn(): number {
+    return this._addrStart.column;
+  }
+  /**
+   * Returns the 1-based upper left row coordinate.
+   */
+  public get upperLeftRow(): number {
+    return this._addrStart.row;
+  }
+  /**
+   * Returns the 1-based bottom right column coordinate.
+   */
+  public get bottomRightColumn(): number {
+    return this._addrEnd.column;
+  }
+  /**
+   * Returns the 1-based bottom right row coordinate.
+   */
+  public get bottomRightRow(): number {
+    return this._addrEnd.row;
+  }
 }
 
 export class Fingerprint implements IComparable<Fingerprint> {
-  private _fp: number;
+  private readonly _fp: number;
 
   constructor(fpval: number) {
     this._fp = fpval;
@@ -239,8 +272,8 @@ export type Metric = number;
 
 // a rectangle is defined by its start and end vectors
 export class Rectangle implements IComparable<Rectangle> {
-  private _tl: ExceLintVector;
-  private _br: ExceLintVector;
+  private readonly _tl: ExceLintVector;
+  private readonly _br: ExceLintVector;
 
   constructor(tl: ExceLintVector, br: ExceLintVector) {
     this._tl = tl;
@@ -366,9 +399,9 @@ export function expand(first: ExceLintVector, second: ExceLintVector): ExceLintV
 }
 
 export class ExceLintVector {
-  public x: number;
-  public y: number;
-  public c: number;
+  public readonly x: number;
+  public readonly y: number;
+  public readonly c: number;
 
   constructor(x: number, y: number, c: number) {
     this.x = x;
