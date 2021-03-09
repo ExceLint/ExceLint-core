@@ -20,12 +20,19 @@ export class Some<T> {
     }
     return false;
   }
+  public toString(): string {
+    return "Some(" + this.t + ")";
+  }
 }
 class NoneType {
   public hasValue: false = false;
 
   public equals(o: Option<any>): boolean {
     return !o.hasValue;
+  }
+
+  public toString(): string {
+    return "None";
   }
 }
 export const None = new NoneType(); // singleton None

@@ -210,7 +210,7 @@ export class Range implements IComparable<Range> {
   public toR1C1Ref(): string {
     return this._addrStart.toR1C1Ref() + ":" + this._addrEnd.toR1C1Ref();
   }
-  public toA1Ref(): String {
+  public toA1Ref(): string {
     return this._addrStart.toA1Ref() + ":" + this._addrEnd.toA1Ref();
   }
 }
