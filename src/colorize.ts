@@ -210,25 +210,6 @@ export class Colorize {
     return _d;
   }
 
-  // /**
-  //  * Returns an array of rectangles along the given direction, grouped by their fingerprints,
-  //  * and ordered from closest to the start position to furthest, up to dist cells away.
-  //  * @param start
-  //  * @param dir
-  //  * @param formulas
-  //  * @param data
-  //  * @param distance
-  //  */
-  // public static rectangles(
-  //   start: XLNT.ExceLintVector,
-  //   dir: Direction,
-  //   formulas: XLNT.Spreadsheet,
-  //   data: XLNT.Spreadsheet,
-  //   dist: number
-  // ): XLNT.Tuple2<XLNT.ExceLintVector, XLNT.Rectangle>[] {
-  //   return [];
-  // }
-
   /**
    * This is a low-latency, generator version of the process_workbook call.
    * @param inp The input workbook as a WorkbookOutput object.
@@ -353,7 +334,6 @@ export class Colorize {
     origin_col: number,
     origin_row: number
   ): XLNT.Dictionary<XLNT.Fingerprint> {
-    const base_vector = ExcelUtils.baseVector();
     const _d = new XLNT.Dictionary<XLNT.Fingerprint>();
 
     // Compute the vectors for all of the formulas.
@@ -387,13 +367,67 @@ export class Colorize {
             const v = new XLNT.ExceLintVector(adjustedX, adjustedY, 0);
 
             // add to dict
-            if (vec.equals(base_vector)) {
+            if (vec.equals(ExcelUtils.baseVector)) {
               _d.put(v.asKey(), Colorize.noDependenciesHash);
             } else {
               const hash = vec.hash();
               _d.put(v.asKey(), new XLNT.Fingerprint(hash));
             }
           }
+        }
+      }
+    }
+    return _d;
+  }
+
+  /**
+   * Given a dictionary of formulas indexed by ExceLintVector addresses, return
+   * a mapping from ExceLintVector addresses to a formula's reference set.
+   * @param formulas Formula string dictionary.
+   * @returns Reference set dictionary.
+   */
+  public static formulaRefs(formulas: XLNT.Dictionary<string>) {
+    const _d = new XLNT.Dictionary<XLNT.ExceLintVector[]>();
+    for (const addrKey of formulas.keys) {
+      // get formula itself
+      const f = formulas.get(addrKey);
+
+      // compute dependencies for formula
+      const vec_array: XLNT.ExceLintVector[] = ExcelUtils.all_cell_dependencies(f, 0, 0);
+
+      // add to set
+      _d.put(addrKey, vec_array);
+    }
+    return _d;
+  }
+
+  /**
+   * Given a dictionary of formula refs indexed by ExceLintVector addresses, return
+   * a mapping from ExceLintVector addresses to that formulas's fingerprints (resultant).
+   * @param refDict Reference set dictionary.
+   * @returns Fingerprint dictionary.
+   */
+  public static fingerprints(refDict: XLNT.Dictionary<XLNT.ExceLintVector[]>) {
+    const _d = new XLNT.Dictionary<XLNT.Fingerprint>();
+    for (const addrKey of refDict.keys) {
+      // get refs
+      const refs = refDict.get(addrKey);
+
+      // no refs
+      if (refs.length === 0) {
+        _d.put(addrKey, Colorize.noDependenciesHash);
+      } else {
+        // compute resultant vector
+        const vec = refs.reduce(XLNT.ExceLintVector.VectorSum);
+
+        // add to dict
+        if (vec.equals(ExcelUtils.baseVector)) {
+          // refs are internal?
+          _d.put(addrKey, Colorize.noDependenciesHash);
+        } else {
+          // normal resultant
+          const hash = vec.hash();
+          _d.put(addrKey, new XLNT.Fingerprint(hash));
         }
       }
     }
@@ -735,6 +769,39 @@ export class Colorize {
       groups.put(k, Colorize.merge_individual_groups(g));
     }
     return groups;
+  }
+
+  public static formulaSpreadsheetToDict(
+    s: XLNT.Spreadsheet,
+    origin_x: number,
+    origin_y: number
+  ): XLNT.Dictionary<string> {
+    const d = new XLNT.Dictionary<string>();
+    // spreadsheets are row-major
+    for (let row = 0; row < s.length; row++) {
+      for (let col = 0; col < s[row].length; col++) {
+        const val = s[row][col];
+        /*
+         * 'If the returned value starts with a plus ("+"), minus ("-"),
+         * or equal sign ("="), Excel interprets this value as a formula.'
+         * https://docs.microsoft.com/en-us/javascript/api/excel/excel.range?view=excel-js-preview#values
+         */
+        if (val[0] === "=" || val[0] === "+" || val[0] === "-") {
+          // save as 1-based Excel vector
+          const key = new XLNT.ExceLintVector(origin_x + col, origin_y + row, 0).asKey();
+
+          if (val[0] === "=") {
+            // remove "=" from start of string and
+            d.put(key, val.substr(1));
+          } else {
+            // it's a "+/-" formula
+            d.put(key, val);
+          }
+        }
+      }
+    }
+
+    return d;
   }
 
   public static merge_individual_groups(group: XLNT.Rectangle[]): XLNT.Rectangle[] {

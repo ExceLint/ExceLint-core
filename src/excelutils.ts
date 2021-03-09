@@ -16,6 +16,9 @@ export class ExcelUtils {
     }
   };
 
+  // base vector singleton
+  public static readonly baseVector = new ExceLintVector(0, 0, 0);
+
   // Matchers for all kinds of Excel expressions.
   private static general_re = "\\$?[A-Z][A-Z]?\\$?[\\d\\u2000-\\u6000]+"; // column and row number, optionally with $
   private static sheet_re = "[^\\!]+";
@@ -446,10 +449,6 @@ export class ExcelUtils {
       }
     }
     return numbers; // total;
-  }
-
-  public static baseVector(): ExceLintVector {
-    return new ExceLintVector(0, 0, 0);
   }
 
   public static all_dependencies(
