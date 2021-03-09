@@ -160,10 +160,16 @@ export class Address implements IComparable<Address> {
     return this._sheet === a._sheet && this._row === a._row && this._column === a._column;
   }
   public toR1C1Ref(): string {
-    return this._sheet + "!R" + this._row + "C" + this._column;
+    return "R" + this._row + "C" + this._column;
+  }
+  public toFullyQualifiedR1C1Ref(): string {
+    return this._sheet + "!" + this.toR1C1Ref();
   }
   public toA1Ref(): string {
-    return this._sheet + "!" + Address.intToColChars(this._column) + this._row.toString();
+    return Address.intToColChars(this._column) + this._row.toString();
+  }
+  public toFullyQualifiedA1Ref(): string {
+    return this._sheet + "!" + this.toA1Ref();
   }
   private static intToColChars(dividend: number): string {
     let quot = Math.floor(dividend / 26);
@@ -179,10 +185,10 @@ export class Address implements IComparable<Address> {
     }
   }
   public toString(): string {
-    return this.toR1C1Ref();
+    return this.toFullyQualifiedR1C1Ref();
   }
   public asKey(): string {
-    return this.toR1C1Ref();
+    return this.toFullyQualifiedR1C1Ref();
   }
   public static fromKey(k: string): Address {
     return ExcelUtils.addrA1toR1C1(k);
@@ -216,8 +222,14 @@ export class Range implements IComparable<Range> {
   public toString(): string {
     return this.toR1C1Ref();
   }
+  public toFullyQualifiedR1C1Ref(): string {
+    return this._addrStart.worksheet + "!" + this.toR1C1Ref();
+  }
   public toR1C1Ref(): string {
     return this._addrStart.toR1C1Ref() + ":" + this._addrEnd.toR1C1Ref();
+  }
+  public toFullyQualifiedA1Ref(): string {
+    return this._addrStart.worksheet + "!" + this.toA1Ref();
   }
   public toA1Ref(): string {
     return this._addrStart.toA1Ref() + ":" + this._addrEnd.toA1Ref();
