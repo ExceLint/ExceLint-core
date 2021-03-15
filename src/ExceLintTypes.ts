@@ -199,64 +199,64 @@ export class Address implements IComparable<Address> {
 }
 
 export class Range implements IComparable<Range> {
-  private readonly _addrStart: Address;
-  private readonly _addrEnd: Address;
+  readonly start: Address;
+  readonly end: Address;
   constructor(addrStart: Address, addrEnd: Address) {
-    this._addrStart = addrStart;
-    this._addrEnd = addrEnd;
+    this.start = addrStart;
+    this.end = addrEnd;
   }
   public get addressStart() {
-    return this._addrStart;
+    return this.start;
   }
   public get addressEnd() {
-    return this._addrEnd;
+    return this.end;
   }
   public rectangle() {
-    const v1 = new ExceLintVector(this._addrStart.column, this._addrStart.row, 0);
-    const v2 = new ExceLintVector(this._addrEnd.column, this._addrEnd.row, 0);
+    const v1 = new ExceLintVector(this.start.column, this.start.row, 0);
+    const v2 = new ExceLintVector(this.end.column, this.end.row, 0);
     return new Rectangle(v1, v2);
   }
   public equals(r: Range): boolean {
-    return this._addrStart.equals(r._addrStart) && this._addrEnd.equals(r._addrEnd);
+    return this.start.equals(r.start) && this.end.equals(r.end);
   }
   public toString(): string {
     return this.toR1C1Ref();
   }
   public toFullyQualifiedR1C1Ref(): string {
-    return this._addrStart.worksheet + "!" + this.toR1C1Ref();
+    return this.start.worksheet + "!" + this.toR1C1Ref();
   }
   public toR1C1Ref(): string {
-    return this._addrStart.toR1C1Ref() + ":" + this._addrEnd.toR1C1Ref();
+    return this.start.toR1C1Ref() + ":" + this.end.toR1C1Ref();
   }
   public toFullyQualifiedA1Ref(): string {
-    return this._addrStart.worksheet + "!" + this.toA1Ref();
+    return this.start.worksheet + "!" + this.toA1Ref();
   }
   public toA1Ref(): string {
-    return this._addrStart.toA1Ref() + ":" + this._addrEnd.toA1Ref();
+    return this.start.toA1Ref() + ":" + this.end.toA1Ref();
   }
   /**
    * Returns the 1-based upper left column coordinate.
    */
   public get upperLeftColumn(): number {
-    return this._addrStart.column;
+    return this.start.column;
   }
   /**
    * Returns the 1-based upper left row coordinate.
    */
   public get upperLeftRow(): number {
-    return this._addrStart.row;
+    return this.start.row;
   }
   /**
    * Returns the 1-based bottom right column coordinate.
    */
   public get bottomRightColumn(): number {
-    return this._addrEnd.column;
+    return this.end.column;
   }
   /**
    * Returns the 1-based bottom right row coordinate.
    */
   public get bottomRightRow(): number {
-    return this._addrEnd.row;
+    return this.end.row;
   }
 }
 
