@@ -618,12 +618,12 @@ export class RectInfo {
   r1c1_print_formula: string; // as above, but for R1C1 formulas
   print_formula: string; // formula with a preface (the cell name containing each)
 
-  constructor(rect: Rectangle, sheet: WorksheetOutput) {
+  constructor(rect: Rectangle, firstFormula: string) {
     // the coordinates of the cell containing the first formula in the proposed fix range
     const formulaCoord = rect.upperleft;
     const y = formulaCoord.y - 1; // row
     const x = formulaCoord.x - 1; // col
-    this.formula = sheet.formulas[y][x]; // the formula itself
+    this.formula = firstFormula; // the formula itself
     this.constants = ExcelUtils.numeric_constants(this.formula); // all numeric constants in the formula
     this.sum = this.constants.reduce((a, b) => a + b, 0); // the sum of all numeric constants
     this.dependencies = ExcelUtils.all_cell_dependencies(this.formula, x + 1, y + 1, false);

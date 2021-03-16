@@ -245,6 +245,47 @@ export class Colorize {
     return f();
   }
 
+  /**
+   * Keep or reject a fix based on some heuristics.
+   * @param fix The ProposedFix in question.
+   * @param rectf A function that gets RectInfo for a Rectangle.
+   * @param beVerbose If true, write rejections to JS console.
+   * @returns An optional fix.
+   */
+  public static filterFix(fix: XLNT.ProposedFix, rectf: (r: XLNT.Rectangle) => XLNT.RectInfo, beVerbose: boolean) {
+    // Determine the direction of the range (vertical or horizontal) by looking at the axes.
+    const is_vert: boolean = Colorize.fixIsVertical(fix);
+
+    // Formula info for each rectangle
+    const rect_info = fix.rectangles.map(rectf);
+
+    // Omit fixes that are too small (too few cells).
+    if (Colorize.fixCellCount(fix) < Config.minFixSize) {
+      const print_formulas = JSON.stringify(rect_info.map((fi) => fi.print_formula));
+      if (beVerbose) console.warn("Omitted " + print_formulas + "(too small)");
+      return None;
+    }
+
+    // Omit fixes with entropy change over threshold
+    if (Colorize.fixEntropy(fix) > Config.maxEntropy) {
+      const print_formulas = JSON.stringify(rect_info.map((fi) => fi.print_formula));
+      if (beVerbose) console.warn("Omitted " + JSON.stringify(print_formulas) + "(too high entropy)");
+      return None;
+    }
+
+    // Classify fixes & prune based on the best explanation
+    const bin = Classification.pruneFixes(Classification.classifyFixes(fix, is_vert, rect_info));
+
+    // IMPORTANT:
+    // Exclude reported bugs subject to certain conditions.
+    if (Classification.omitFixes(bin, rect_info, beVerbose)) return None;
+
+    // If we're still here, accept this fix
+    // Package everything up with the fix
+    fix.analysis = new XLNT.FixAnalysis(bin, rect_info, is_vert);
+    return new Some(fix);
+  }
+
   // Performs an analysis on an entire workbook
   public static process_workbook(
     inp: WorkbookOutput,
@@ -256,6 +297,16 @@ export class Colorize {
     // look for the requested sheet
     for (let i = 0; i < inp.worksheets.length; i++) {
       const sheet = inp.worksheets[i];
+
+      // function to get rectangle info for a rectangle;
+      // closes over sheet data
+      const rectf = (rect: XLNT.Rectangle) => {
+        const formulaCoord = rect.upperleft;
+        const y = formulaCoord.y - 1; // row
+        const x = formulaCoord.x - 1; // col
+        const firstFormula = sheet.formulas[y][x];
+        return new XLNT.RectInfo(rect, firstFormula);
+      };
 
       // skip sheets that don't match sheetName or are empty
       if (Colorize.isNotSameSheet(sheetName, sheet.sheetName) || Colorize.isEmptySheet(sheet)) {
@@ -281,38 +332,9 @@ export class Colorize {
         // Get this fix
         const fix = a.proposed_fixes[ind];
 
-        // Determine the direction of the range (vertical or horizontal) by looking at the axes.
-        const is_vert: boolean = Colorize.fixIsVertical(fix);
-
-        // Formula info for each rectangle
-        const rect_info = fix.rectangles.map((rect) => new XLNT.RectInfo(rect, sheet));
-
-        // Omit fixes that are too small (too few cells).
-        if (Colorize.fixCellCount(fix) < Config.minFixSize) {
-          const print_formulas = JSON.stringify(rect_info.map((fi) => fi.print_formula));
-          if (beVerbose) console.warn("Omitted " + print_formulas + "(too small)");
-          continue;
-        }
-
-        // Omit fixes with entropy change over threshold
-        if (Colorize.fixEntropy(fix) > Config.maxEntropy) {
-          const print_formulas = JSON.stringify(rect_info.map((fi) => fi.print_formula));
-          if (beVerbose) console.warn("Omitted " + JSON.stringify(print_formulas) + "(too high entropy)");
-          continue;
-        }
-
-        // Classify fixes & prune based on the best explanation
-        const bin = Classification.pruneFixes(Classification.classifyFixes(fix, is_vert, rect_info));
-
-        // IMPORTANT:
-        // Exclude reported bugs subject to certain conditions.
-        if (Classification.omitFixes(bin, rect_info, beVerbose)) continue;
-
-        // If we're still here, accept this fix
-        final_adjusted_fixes.push(fix);
-
-        // Package everything up with the fix
-        fix.analysis = new XLNT.FixAnalysis(bin, rect_info, is_vert);
+        // check to see whether the fix should be rejected
+        const ffix = this.filterFix(fix, rectf, beVerbose);
+        if (ffix.hasValue) final_adjusted_fixes.push(fix);
       }
 
       // gather all statistics about the sheet
