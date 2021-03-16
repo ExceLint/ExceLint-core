@@ -334,7 +334,7 @@ export class Colorize {
 
         // check to see whether the fix should be rejected
         const ffix = this.filterFix(fix, rectf, beVerbose);
-        if (ffix.hasValue) final_adjusted_fixes.push(fix);
+        if (ffix.hasValue) final_adjusted_fixes.push(ffix.value);
       }
 
       // gather all statistics about the sheet
