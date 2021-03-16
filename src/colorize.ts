@@ -81,7 +81,7 @@ export class Colorize {
   }
 
   // Filter fixes by entropy score threshold
-  private static filterFixesByUserThreshold(fixes: XLNT.ProposedFix[], thresh: number): XLNT.ProposedFix[] {
+  public static filterFixesByUserThreshold(fixes: XLNT.ProposedFix[], thresh: number): XLNT.ProposedFix[] {
     const fixes2: XLNT.ProposedFix[] = [];
     for (let ind = 0; ind < fixes.length; ind++) {
       const pf = fixes[ind];
@@ -382,18 +382,21 @@ export class Colorize {
 
   /**
    * Given a dictionary of formulas indexed by ExceLintVector addresses, return
-   * a mapping from ExceLintVector addresses to a formula's reference set.
+   * a mapping from ExceLintVector addresses to a formula's relative reference set.
    * @param formulas Formula string dictionary.
-   * @returns Reference set dictionary.
+   * @returns A dictionary of reference vector sets, indexed by address vector.
    */
-  public static formulaRefs(formulas: XLNT.Dictionary<string>) {
+  public static relativeFormulaRefs(formulas: XLNT.Dictionary<string>): XLNT.Dictionary<XLNT.ExceLintVector[]> {
     const _d = new XLNT.Dictionary<XLNT.ExceLintVector[]>();
     for (const addrKey of formulas.keys) {
       // get formula itself
       const f = formulas.get(addrKey);
 
+      // get address vector for formula
+      const addr = XLNT.ExceLintVector.fromKey(addrKey);
+
       // compute dependencies for formula
-      const vec_array: XLNT.ExceLintVector[] = ExcelUtils.all_cell_dependencies(f, 0, 0);
+      const vec_array: XLNT.ExceLintVector[] = ExcelUtils.all_cell_dependencies(f, addr.x, addr.y);
 
       // add to set
       _d.put(addrKey, vec_array);
@@ -405,7 +408,7 @@ export class Colorize {
    * Given a dictionary of formula refs indexed by ExceLintVector addresses, return
    * a mapping from ExceLintVector addresses to that formulas's fingerprints (resultant).
    * @param refDict Reference set dictionary.
-   * @returns Fingerprint dictionary.
+   * @returns Fingerprint dictionary, indexed by address vector.
    */
   public static fingerprints(refDict: XLNT.Dictionary<XLNT.ExceLintVector[]>) {
     const _d = new XLNT.Dictionary<XLNT.Fingerprint>();
@@ -528,10 +531,8 @@ export class Colorize {
     return output;
   }
 
-  public static identify_groups(
-    data_fingerprints: XLNT.Dictionary<XLNT.Fingerprint>
-  ): XLNT.Dictionary<XLNT.Rectangle[]> {
-    const id = Colorize.identify_ranges(data_fingerprints, ExcelUtils.ColumnSort);
+  public static identify_groups(fingerprints: XLNT.Dictionary<XLNT.Fingerprint>): XLNT.Dictionary<XLNT.Rectangle[]> {
+    const id = Colorize.identify_ranges(fingerprints, ExcelUtils.ColumnSort);
     const gr = Colorize.find_contiguous_regions(id);
     // Now try to merge stuff with the same hash.
     const newGr1 = gr.clone();
