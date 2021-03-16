@@ -199,8 +199,8 @@ export class Address implements IComparable<Address> {
 }
 
 export class Range implements IComparable<Range> {
-  readonly start: Address;
-  readonly end: Address;
+  private readonly start: Address;
+  private readonly end: Address;
   constructor(addrStart: Address, addrEnd: Address) {
     this.start = addrStart;
     this.end = addrEnd;
