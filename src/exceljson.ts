@@ -165,6 +165,17 @@ export class ExcelJSON {
     const f = XLSX.readFile(base + filename, { cellStyles: true });
     return this.processWorkbookFromXLSX(f, filename);
   }
+
+  /**
+   * After converting an Excel.RangeFormat to a JSON string using
+   * JSON.stringify, use this method to compute a hash of the style.
+   * @param styleString
+   * @returns a style hash
+   */
+  public static styleHash(styleString: string): string {
+    const str = base64.stringify(sha224(styleString));
+    return str.slice(0, 10);
+  }
 }
 
 export namespace ExcelJSON {

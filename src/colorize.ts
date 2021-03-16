@@ -902,4 +902,53 @@ export class Colorize {
       }
     }
   }
+
+  // Mark proposed fixes that do not have the same format.
+  // Modifies ProposedFix objects, including their scores.
+  public static adjustProposedFixesByStyleHash(fixes: XLNT.ProposedFix[], stylehashes: XLNT.Dictionary<string>): void {
+    for (const k in fixes) {
+      const fix = fixes[k];
+      const rect1 = fix.rect1;
+      const rect2 = fix.rect2;
+
+      // Find out which range is "first," i.e., sort by x and then by y.
+      const [first, second] = XLNT.rectangleComparator(rect1, rect2) <= 0 ? [rect1, rect2] : [rect2, rect1];
+
+      // get the upper-left and bottom-right vectors for the two XLNT.rectangles
+      const ul = first.upperleft;
+      const br = second.bottomright;
+
+      // get the column and row for the upper-left and bottom-right vectors
+      const ul_col = ul.x;
+      const ul_row = ul.y;
+      const br_col = br.x;
+      const br_row = br.y;
+
+      // Now check whether the formats are all the same or not.
+      // Get the first format and then check that all other cells in the
+      // range have the same format.
+      // We can iterate over the combination of both ranges at the same
+      // time because all proposed fixes must be "merge compatible," i.e.,
+      // adjacent XLNT.rectangles that, when merged, form a new rectangle.
+      const firstAddr = new XLNT.ExceLintVector(ul_col, ul_row, 0);
+      const firstFormat = stylehashes.get(firstAddr.asKey());
+      for (let i = ul_row; i <= br_row; i++) {
+        // if we've already determined that the formats are different
+        // stop looking for differences
+        if (!fix.sameFormat) {
+          break;
+        }
+        for (let j = ul_col; j <= br_col; j++) {
+          const secondAddr = new XLNT.ExceLintVector(j, i, 0);
+          const secondFormat = stylehashes.get(secondAddr.asKey());
+          if (secondFormat !== firstFormat) {
+            // stop looking for differences and modify fix
+            fix.sameFormat = false;
+            fix.score *= (100 - Config.getFormattingDiscount()) / 100;
+            break;
+          }
+        }
+      }
+    }
+  }
 }
