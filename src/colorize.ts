@@ -1,7 +1,3 @@
-// Polyfill for flat (IE & Edge)
-const flat = require("array.prototype.flat");
-flat.shim();
-
 import { ExcelUtils } from "./excelutils";
 import { RectangleUtils } from "./rectangleutils";
 import { find_all_proposed_fixes } from "./groupme";
