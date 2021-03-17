@@ -421,6 +421,10 @@ export class ExceLintVector {
     this.c = c;
   }
 
+  public static baseVector(): ExceLintVector {
+    return new ExceLintVector(0, 0, 0);
+  }
+
   public isConstant(): boolean {
     return this.c === 1;
   }

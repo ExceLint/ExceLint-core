@@ -6,6 +6,8 @@ import * as sjcl from "sjcl";
 import { RectangleUtils } from "./rectangleutils";
 import { ExceLintVector, Dictionary, Spreadsheet, Range, Address, Rectangle } from "./ExceLintTypes";
 
+declare var console: Console;
+
 export class ExcelUtils {
   // sort routine
   static readonly ColumnSort = (a: ExceLintVector, b: ExceLintVector) => {
@@ -15,9 +17,6 @@ export class ExcelUtils {
       return a.x - b.x;
     }
   };
-
-  // base vector singleton
-  public static readonly baseVector = new ExceLintVector(0, 0, 0);
 
   // Matchers for all kinds of Excel expressions.
   private static general_re = "\\$?[A-Z][A-Z]?\\$?[\\d\\u2000-\\u6000]+"; // column and row number, optionally with $
@@ -187,7 +186,6 @@ export class ExcelUtils {
 
     console.log("cell is " + cell + ", origin_col = " + origin_col + ", origin_row = " + origin_row);
     throw new Error("We should never get here.");
-    return ExceLintVector.Zero();
   }
 
   public static toR1C1(srcCell: string, destCell: string, greek = false): string {

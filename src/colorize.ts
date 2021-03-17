@@ -11,12 +11,7 @@ import { Config } from "./config";
 import { Classification } from "./classification";
 import { Some, None } from "./option";
 
-// enum Direction {
-//   Up,
-//   Down,
-//   Left,
-//   Right,
-// }
+declare var console: Console;
 
 export class Colorize {
   // Color-blind friendly color palette.
@@ -118,34 +113,6 @@ export class Colorize {
     return fixEntropy;
   }
 
-  /**
-   * Performs an incremental ExceLint analysis.
-   * @param inp The workbook to analysis.
-   * @param prev The previous analysis result, including last observed workbook state.
-   * @param edit The sequence of updates to the formula string.
-   * @param addr The location of the formula.
-   */
-  public static update_analysis(
-    inp: WorkbookOutput,
-    prev: XLNT.WorkbookAnalysis,
-    edit: [number, string],
-    addr: XLNT.Address
-  ): XLNT.WorkbookAnalysis {
-    // to make TS compiler stop complaining while I develop
-    // TODO REMOVE
-    edit = edit;
-
-    // run analysis
-    if (false) {
-      // incremental analysis
-      // TODO
-      return prev;
-    } else {
-      // run the entire big analysis
-      return this.process_workbook(inp, addr.worksheet);
-    }
-  }
-
   // Given a full analysis, map addresses to rectangles
   public static rectangleDict(a: XLNT.Analysis): XLNT.Dictionary<XLNT.Rectangle> {
     const _d = new XLNT.Dictionary<XLNT.Rectangle>();
@@ -208,41 +175,6 @@ export class Colorize {
     }
 
     return _d;
-  }
-
-  /**
-   * This is a low-latency, generator version of the process_workbook call.
-   * @param inp The input workbook as a WorkbookOutput object.
-   * @param sheetName The name of the sheet of interest.
-   * @param beVerbose If true, print diagnostics to the console.
-   */
-  public static fastAnalysis(inp: WorkbookOutput, sheetName: string, beVerbose: boolean = false): Generator<any> {
-    const f = function* (): Generator<any> {
-      // look for the requested sheet
-      for (let i = 0; i < inp.worksheets.length; i++) {
-        const sheet = inp.worksheets[i];
-
-        // skip sheets that don't match sheetName or are empty
-        if (Colorize.isNotSameSheet(sheetName, sheet.sheetName) || Colorize.isEmptySheet(sheet)) {
-          continue;
-        }
-
-        // get the used range
-        const usedRangeAddress = Colorize.normalizeAddress(sheet.usedRangeAddress);
-
-        // Get anomalous cells and proposed fixes, among others.
-        const a = Colorize.process_suspicious(usedRangeAddress, sheet.formulas, sheet.values, beVerbose);
-
-        // Index rectangles by their component addresses
-        const rects = Colorize.rectangleDict(a);
-
-        // Build adjacency map
-        const adjs = Colorize.adjacencyDict(rects, a);
-
-        console.log(adjs);
-      }
-    };
-    return f();
   }
 
   /**
@@ -389,7 +321,7 @@ export class Colorize {
             const v = new XLNT.ExceLintVector(adjustedX, adjustedY, 0);
 
             // add to dict
-            if (vec.equals(ExcelUtils.baseVector)) {
+            if (vec.equals(XLNT.ExceLintVector.baseVector())) {
               _d.put(v.asKey(), Colorize.noDependenciesHash);
             } else {
               const hash = vec.hash();
@@ -446,7 +378,7 @@ export class Colorize {
         const vec = refs.reduce(XLNT.ExceLintVector.VectorSum);
 
         // add to dict
-        if (vec.equals(ExcelUtils.baseVector)) {
+        if (vec.equals(XLNT.ExceLintVector.baseVector())) {
           // refs are internal?
           _d.put(addrKey, Colorize.noDependenciesHash);
         } else {
