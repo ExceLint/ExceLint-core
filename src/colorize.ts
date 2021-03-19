@@ -481,6 +481,11 @@ export class Colorize {
     return output;
   }
 
+  /**
+   * Partition spreadsheet into rectangular regions.
+   * @param fingerprints A dictionary of fingerprints, indexed by ExceLint address vectors.
+   * @returns A dictionary of rectangle groups, indexed by ExceLint fingerprint vectors.
+   */
   public static identify_groups(fingerprints: XLNT.Dictionary<XLNT.Fingerprint>): XLNT.Dictionary<XLNT.Rectangle[]> {
     const id = Colorize.identify_ranges(fingerprints, ExcelUtils.ColumnSort);
     const gr = Colorize.find_contiguous_regions(id);
@@ -489,41 +494,6 @@ export class Colorize {
     const mg = Colorize.merge_groups(newGr1);
     return mg;
   }
-
-  // public static generate_suspicious_cells(
-  //   cols: number,
-  //   rows: number,
-  //   origin_col: number,
-  //   origin_row: number,
-  //   matrix: Array<Array<number>>,
-  //   probs: Array<Array<number>>,
-  //   threshold = 0.01
-  // ): Array<XLNT.ExceLintVector> {
-  //   const cells = [];
-  //   let sumValues = 0;
-  //   let countValues = 0;
-  //   for (let i = 0; i < cols; i++) {
-  //     for (let j = 0; j < rows; j++) {
-  //       const adjustedX = j + origin_col + 1;
-  //       const adjustedY = i + origin_row + 1;
-  //       if (probs[i][j] > 0) {
-  //         sumValues += matrix[i][j];
-  //         countValues += 1;
-  //         if (probs[i][j] <= threshold) {
-  //           if (matrix[i][j] !== 0) {
-  //             // Never push an empty cell.
-  //             cells.push([adjustedX, adjustedY, probs[i][j]]);
-  //           }
-  //         }
-  //       }
-  //     }
-  //   }
-  //   const avgValues = sumValues / countValues;
-  //   cells.sort((a, b) => {
-  //     return Math.abs(b[2] - avgValues) - Math.abs(a[2] - avgValues);
-  //   });
-  //   return cells;
-  // }
 
   /**
    * Determine whether the number of formulas in the spreadsheet exceeds
