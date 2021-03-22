@@ -55,17 +55,11 @@ export function flatMap<U, T>(f: (u: U) => Option<T>, us: U[]): T[] {
   return ts;
 }
 
-export abstract class Maybe<T extends IComparable<T>> implements IComparable<Maybe<T>> {
-  public kind: string = "maybe";
-  public abstract equals(o: Maybe<T>): boolean;
-}
-
-export class Definitely<T extends IComparable<T>> extends Maybe<T> {
+export class Definitely<T> {
   private t: T;
-  public kind: string = "definitely";
+  public type = "definitely" as const;
 
   constructor(t: T) {
-    super();
     this.t = t;
   }
 
@@ -74,19 +68,18 @@ export class Definitely<T extends IComparable<T>> extends Maybe<T> {
   }
 
   public equals(o: Maybe<T>): boolean {
-    if (this.kind === o.kind) {
-      return this.t.equals((o as Definitely<T>).t);
+    if (this.type === o.type) {
+      return this.t === (o as Definitely<T>).t;
     }
     return false;
   }
 }
 
-export class Possibly<T extends IComparable<T>> extends Maybe<T> {
+export class Possibly<T> {
   private t: T;
-  public kind: string = "possibly";
+  public type = "possibly" as const;
 
   constructor(t: T) {
-    super();
     this.t = t;
   }
 
@@ -95,19 +88,21 @@ export class Possibly<T extends IComparable<T>> extends Maybe<T> {
   }
 
   public equals(o: Maybe<T>): boolean {
-    if (this.kind === o.kind) {
-      return this.t.equals((o as Possibly<T>).t);
+    if (this.type === o.type) {
+      return this.t === (o as Possibly<T>).t;
     }
     return false;
   }
 }
 
-export class NoType extends Maybe<any> {
-  public kind: string = "no";
+export class NoKind {
+  public type = "no" as const;
 
   public equals(o: Maybe<any>): boolean {
-    return this.kind === o.kind;
+    return this.type === o.type;
   }
 }
 
-export const No = new NoType();
+export const No = new NoKind();
+
+export type Maybe<T> = Definitely<T> | Possibly<T> | NoKind;
