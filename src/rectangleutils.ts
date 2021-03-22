@@ -119,7 +119,7 @@ export class RectangleUtils {
     const rightmost_x = Math.min(rngContainer.bottomRightColumn, rngTarget.bottomRightColumn);
     const uppermost_y = Math.max(rngContainer.upperLeftRow, rngTarget.upperLeftRow);
     const bottommost_y = Math.min(rngContainer.bottomRightRow, rngTarget.bottomRightRow);
-    return new Range(new Address(sheet, leftmost_x, uppermost_y), new Address(sheet, rightmost_x, bottommost_y));
+    return new Range(new Address(sheet, uppermost_y, leftmost_x), new Address(sheet, bottommost_y, rightmost_x));
   }
 
   /**
