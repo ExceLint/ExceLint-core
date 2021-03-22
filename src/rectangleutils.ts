@@ -1,4 +1,20 @@
-import { ExceLintVector, Rectangle } from "./ExceLintTypes";
+import { ExceLintVector, Rectangle, Range, Address } from "./ExceLintTypes";
+
+export class FatCross {
+  public readonly center: Range;
+  public readonly up: Range;
+  public readonly down: Range;
+  public readonly left: Range;
+  public readonly right: Range;
+
+  constructor(center: Range, up: Range, down: Range, left: Range, right: Range) {
+    this.center = center;
+    this.up = up;
+    this.down = down;
+    this.left = left;
+    this.right = right;
+  }
+}
 
 export class RectangleUtils {
   public static is_adjacent(A: Rectangle, B: Rectangle): boolean {
@@ -71,6 +87,80 @@ export class RectangleUtils {
       RectangleUtils.area(A) + RectangleUtils.area(B) - RectangleUtils.overlap(A, B) ===
         RectangleUtils.area(RectangleUtils.bounding_box(A, B))
     );
+  }
+
+  /**
+   * Returns true if the target is contained within the given range.
+   * @param rng A range.
+   * @param target The cell in question.
+   * @returns True if the target is inside the range.
+   */
+  public static targetInRange(rng: Range, target: Address): boolean {
+    return (
+      target.column >= rng.upperLeftColumn &&
+      target.column <= rng.bottomRightColumn &&
+      target.row >= rng.upperLeftRow &&
+      target.row <= rng.bottomRightRow
+    );
+  }
+
+  /**
+   * Ensure that the target range is entirely contained within the containing range.
+   * @param rngContainer Containing range.
+   * @param rngTarget Target range
+   * @returns A truncated Range.
+   */
+  public static truncateRangeInRange(rngContainer: Range, rngTarget: Range): Range {
+    if (rngContainer.addressStart.worksheet !== rngTarget.addressStart.worksheet) {
+      throw new Error("Both ranges must be on the same worksheet.");
+    }
+    const sheet = rngContainer.addressStart.worksheet;
+    const leftmost_x = Math.max(rngContainer.upperLeftColumn, rngTarget.upperLeftColumn);
+    const rightmost_x = Math.min(rngContainer.bottomRightColumn, rngTarget.bottomRightColumn);
+    const uppermost_y = Math.max(rngContainer.upperLeftRow, rngTarget.upperLeftRow);
+    const bottommost_y = Math.min(rngContainer.bottomRightRow, rngTarget.bottomRightRow);
+    return new Range(new Address(sheet, leftmost_x, uppermost_y), new Address(sheet, rightmost_x, bottommost_y));
+  }
+
+  /**
+   * Finds the dimensions of the four analysis regions relevant to the given
+   * target inside the given range.
+   * @param rng A rectangular region.
+   * @param target The cell being analyzed.
+   */
+  public static findFatCross(rng: Range, target: Address): FatCross {
+    // sanity check
+    RectangleUtils.targetInRange(rng, target);
+
+    // get sheet
+    const sheet = rng.addressStart.worksheet;
+
+    // center region
+    const center_ul = new Address(sheet, target.row - 1, target.column - 1);
+    const center_br = new Address(sheet, target.row + 1, target.column + 1);
+    const center = RectangleUtils.truncateRangeInRange(rng, new Range(center_ul, center_br));
+
+    // top region
+    const up_ul = new Address(sheet, rng.upperLeftRow, target.column - 1);
+    const up_br = new Address(sheet, target.row - 2, target.column + 1);
+    const up = RectangleUtils.truncateRangeInRange(rng, new Range(up_ul, up_br));
+
+    // bottom region
+    const down_ul = new Address(sheet, target.row + 2, target.column - 1);
+    const down_br = new Address(sheet, rng.bottomRightRow, target.column + 1);
+    const down = RectangleUtils.truncateRangeInRange(rng, new Range(down_ul, down_br));
+
+    // left region
+    const left_ul = new Address(sheet, target.row - 1, rng.upperLeftColumn);
+    const left_br = new Address(sheet, target.row + 1, target.column - 2);
+    const left = RectangleUtils.truncateRangeInRange(rng, new Range(left_ul, left_br));
+
+    // right region
+    const right_ul = new Address(sheet, target.row - 1, target.column + 2);
+    const right_br = new Address(sheet, target.row + 1, rng.bottomRightColumn);
+    const right = RectangleUtils.truncateRangeInRange(rng, new Range(right_ul, right_br));
+
+    return new FatCross(center, up, down, left, right);
   }
 
   /*

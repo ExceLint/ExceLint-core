@@ -686,7 +686,7 @@ export class Colorize {
 
   public static merge_groups(groups: XLNT.Dictionary<XLNT.Rectangle[]>): XLNT.Dictionary<XLNT.Rectangle[]> {
     for (const k of groups.keys) {
-      const g = groups.get(k).slice();
+      const g = groups.get(k).slice(); // slice with no args makes a shallow copy
       groups.put(k, Colorize.merge_individual_groups(g));
     }
     return groups;
@@ -725,6 +725,11 @@ export class Colorize {
     return d;
   }
 
+  /**
+   * TODO: This method is problematic.
+   * @param group
+   * @returns
+   */
   public static merge_individual_groups(group: XLNT.Rectangle[]): XLNT.Rectangle[] {
     let numIterations = 0;
     group = group.sort();
@@ -740,7 +745,7 @@ export class Colorize {
             const head_str = JSON.stringify(head);
             const working_group_i_str = JSON.stringify(working_group[i]);
             // NB: 12/7/19 New check below, used to be unconditional.
-            if (!(head_str in deleted_rectangles) && !(working_group_i_str in deleted_rectangles)) {
+            if (!deleted_rectangles.contains(head_str) && !deleted_rectangles.contains(working_group_i_str)) {
               updated_rectangles.push(RectangleUtils.bounding_box(head, working_group[i]));
               deleted_rectangles.put(head_str, true);
               deleted_rectangles.put(working_group_i_str, true);
@@ -751,7 +756,7 @@ export class Colorize {
         }
       }
       for (let i = 0; i < group.length; i++) {
-        if (!(JSON.stringify(group[i]) in deleted_rectangles)) {
+        if (!deleted_rectangles.contains(JSON.stringify(group[i]))) {
           updated_rectangles.push(group[i]);
         }
       }
