@@ -57,6 +57,22 @@ export class Dictionary<V> {
     }
     return dict;
   }
+
+  /**
+   * Merges this dictionary with another dictionary.  Throws an exception if there are
+   * duplicate keys. Returns a copy.
+   * @param o The other dictionary.
+   */
+  public merge(o: Dictionary<V>): Dictionary<V> {
+    const merged = this.clone();
+    for (const key of o.keys) {
+      if (merged.contains(key)) {
+        throw new Error("Cannot merge dictionaries that contain copies of the same key.");
+      }
+      merged.put(key, o.get(key));
+    }
+    return merged;
+  }
 }
 
 export class CSet<V extends IComparable<V>> implements IComparable<CSet<V>> {
