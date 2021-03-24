@@ -333,7 +333,7 @@ export class Colorize {
   /**
    * Given a dictionary of formulas indexed by ExceLintVector addresses, return
    * a mapping from ExceLintVector addresses to a formula's relative reference set.
-   * @param formulas Formula string dictionary.
+   * @param formulas Dictionary mapping ExceLint address vectors to formula strings.
    * @returns A dictionary of reference vector sets, indexed by address vector.
    */
   public static relativeFormulaRefs(formulas: XLNT.Dictionary<string>): XLNT.Dictionary<XLNT.ExceLintVector[]> {
@@ -566,6 +566,22 @@ export class Colorize {
 
       return Colorize.color_all_data(refs);
     }
+  }
+
+  /**
+   * Find all the fingerprints for all the data in the given used range. Note that this
+   * is not the is-referenced-by analysis that fingerprintData does.  This analysis
+   * essentially produces L1 hashes of vectors of <0,0,1> whereever a cell is a numeric constant.
+   * @param data Dictionary mapping ExceLint address vectors to numeric values.
+   */
+  public static fingerprintNumericData(data: XLNT.Dictionary<number>): XLNT.Dictionary<XLNT.Fingerprint> {
+    const _d = new XLNT.Dictionary<XLNT.Fingerprint>();
+    for (const k of data.keys) {
+      const v = new XLNT.ExceLintVector(0, 0, 1); // compute this data's reference
+      const fp = new XLNT.Fingerprint(v.hash()); // compute this data's L1 hash
+      _d.put(k, fp);
+    }
+    return _d;
   }
 
   /**
