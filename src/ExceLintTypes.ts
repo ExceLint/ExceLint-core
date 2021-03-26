@@ -294,6 +294,13 @@ export class Fingerprint implements IComparable<Fingerprint> {
   public static fromKey(key: string): Fingerprint {
     return new Fingerprint(parseInt(key));
   }
+
+  /**
+   * Returns the fingerprint value (the L1 norm of the resultant vector).
+   */
+  public get value(): number {
+    return this._fp;
+  }
 }
 
 export type Metric = number;
