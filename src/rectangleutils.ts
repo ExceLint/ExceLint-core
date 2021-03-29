@@ -1,14 +1,12 @@
 import { ExceLintVector, Rectangle, Range, Address } from "./ExceLintTypes";
 
 export class FatCross {
-  public readonly center: Range;
   public readonly up: Range;
   public readonly down: Range;
   public readonly left: Range;
   public readonly right: Range;
 
-  constructor(center: Range, up: Range, down: Range, left: Range, right: Range) {
-    this.center = center;
+  constructor(up: Range, down: Range, left: Range, right: Range) {
     this.up = up;
     this.down = down;
     this.left = left;
@@ -124,7 +122,8 @@ export class RectangleUtils {
 
   /**
    * Finds the dimensions of the four analysis regions relevant to the given
-   * target inside the given range.
+   * target inside the given range. Note that regions are not likely to be
+   * the same size.
    * @param rng A rectangular region.
    * @param target The cell being analyzed.
    */
@@ -135,18 +134,13 @@ export class RectangleUtils {
     // get sheet
     const sheet = rng.addressStart.worksheet;
 
-    // center region
-    const center_ul = new Address(sheet, target.row - 1, target.column - 1);
-    const center_br = new Address(sheet, target.row + 1, target.column + 1);
-    const center = RectangleUtils.truncateRangeInRange(rng, new Range(center_ul, center_br));
-
     // top region
     const up_ul = new Address(sheet, rng.upperLeftRow, target.column - 1);
-    const up_br = new Address(sheet, target.row - 2, target.column + 1);
+    const up_br = new Address(sheet, target.row, target.column + 1);
     const up = RectangleUtils.truncateRangeInRange(rng, new Range(up_ul, up_br));
 
     // bottom region
-    const down_ul = new Address(sheet, target.row + 2, target.column - 1);
+    const down_ul = new Address(sheet, target.row + 1, target.column - 1);
     const down_br = new Address(sheet, rng.bottomRightRow, target.column + 1);
     const down = RectangleUtils.truncateRangeInRange(rng, new Range(down_ul, down_br));
 
@@ -160,7 +154,7 @@ export class RectangleUtils {
     const right_br = new Address(sheet, target.row + 1, rng.bottomRightColumn);
     const right = RectangleUtils.truncateRangeInRange(rng, new Range(right_ul, right_br));
 
-    return new FatCross(center, up, down, left, right);
+    return new FatCross(up, down, left, right);
   }
 
   /*
