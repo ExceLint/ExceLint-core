@@ -847,6 +847,11 @@ export class Colorize {
   // Mark proposed fixes that do not have the same format.
   // Modifies ProposedFix objects, including their scores.
   public static adjustProposedFixesByStyleHash(fixes: XLNT.ProposedFix[], stylehashes: XLNT.Dictionary<string>): void {
+    // short circuit if we don't have style information
+    if (stylehashes.size === 0) {
+      return;
+    }
+
     for (const k in fixes) {
       const fix = fixes[k];
       const rect1 = fix.rect1;

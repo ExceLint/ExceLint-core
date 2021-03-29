@@ -62,6 +62,9 @@ export class Dictionary<V> {
     }
     return output;
   }
+  public get size(): number {
+    return this.keys.length;
+  }
 
   /**
    * Performs a shallow copy of the dictionary.
