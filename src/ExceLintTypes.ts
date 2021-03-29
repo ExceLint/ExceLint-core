@@ -420,6 +420,58 @@ export class Rectangle implements IComparable<Rectangle> {
   public expand(): ExceLintVector[] {
     return expand(this._tl, this._br);
   }
+
+  /**
+   * Returns true if this rectangle is adjacent and merge-compatible with r.
+   * @param r
+   */
+  public isMergeableWith(r: Rectangle): boolean {
+    return this.above(r) || this.below(r) || this.left(r) || this.right(r);
+  }
+
+  /**
+   * Returns true if this rectangle is immediately above r and
+   * is merge-compatible.
+   * @param r The other rectangle
+   */
+  private above(r: Rectangle): boolean {
+    return (
+      this.upperleft.x === r.upperleft.x &&
+      this.bottomright.x === r.bottomright.x &&
+      this.bottomright.y + 1 === r.upperleft.y
+    );
+  }
+
+  /**
+   * Returns true if this rectangle is immediately below r and
+   * is merge-compatible.
+   * @param r The other rectangle
+   */
+  private below(r: Rectangle): boolean {
+    return r.above(this);
+  }
+
+  /**
+   * Returns true if this rectangle is immediately to the left of r and
+   * is merge-compatible.
+   * @param r The other rectangle
+   */
+  private left(r: Rectangle): boolean {
+    return (
+      this.upperleft.y === r.upperleft.y &&
+      this.bottomright.y === r.bottomright.y &&
+      this.bottomright.x + 1 === r.upperleft.x
+    );
+  }
+
+  /**
+   * Returns true if this rectangle is immediately to the right of r and
+   * is merge-compatible.
+   * @param r The other rectangle
+   */
+  private right(r: Rectangle): boolean {
+    return r.left(this);
+  }
 }
 
 export class ProposedFix implements IComparable<ProposedFix> {
