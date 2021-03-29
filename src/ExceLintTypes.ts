@@ -8,8 +8,24 @@ interface Dict<V> {
   [key: string]: V;
 }
 
+/**
+ * A true polymorphic fold left, unlike JavaScript's stupid reduce function.
+ * @param init The initial value of the fold.
+ * @param f A fold function.
+ * @param seq The input sequence.
+ * @returns The result of folding f across seq.
+ */
+function polyFold<A, B>(init: B, f: (acc: B, elem: A) => B, seq: A[]): B {
+  let myAcc = init;
+  for (const e of seq) {
+    myAcc = f(myAcc, e);
+  }
+  return myAcc;
+}
+
 export class Dictionary<V> {
   private _d: Dict<V> = {};
+
   public contains(key: string): boolean {
     return this._d[key] !== undefined;
   }
@@ -72,6 +88,22 @@ export class Dictionary<V> {
       merged.put(key, o.get(key));
     }
     return merged;
+  }
+
+  /**
+   * Return the dictionary that contains all of the elements from this
+   * dictionary for which f(key) is true.
+   * @param f A key predicate.
+   * @returns The filtered dictionary.
+   */
+  public keyFilter(f: (key: string) => boolean): Dictionary<V> {
+    const _d = new Dictionary<V>();
+    for (const k of this.keys) {
+      if (f(k)) {
+        _d.put(k, this.get(k));
+      }
+    }
+    return _d;
   }
 }
 
@@ -273,6 +305,61 @@ export class Range implements IComparable<Range> {
    */
   public get bottomRightRow(): number {
     return this.end.row;
+  }
+
+  /**
+   * Finds the range in the intersection between this range
+   * and another range, r.
+   * @param r Another range.
+   * @returns The intersecting range.
+   */
+  public intersectWith(r: Range): Range {
+    // intersection is stored here
+    const _d = new Dictionary<ExceLintVector>();
+
+    // get addresses in this range
+    const myVectors = this.rectangle().expand();
+
+    // get addresses in other range
+    const otherVectors = r.rectangle().expand();
+    const otherVectorSet = new Set<string>();
+    for (const v of otherVectors) {
+      otherVectorSet.add(v.asKey());
+    }
+
+    // find addresses in both ranges; store in _d
+    for (const v of myVectors) {
+      const key = v.asKey();
+      if (otherVectorSet.has(key)) {
+        _d.put(key, v);
+      }
+    }
+
+    // find the upperleft and bottomright addresses
+    const ul_x = polyFold(
+      Number.MAX_SAFE_INTEGER,
+      (acc: number, k: string) => (_d.get(k).x < acc ? _d.get(k).x : acc),
+      _d.keys
+    );
+    const ul_y = polyFold(
+      Number.MAX_SAFE_INTEGER,
+      (acc: number, k: string) => (_d.get(k).y < acc ? _d.get(k).y : acc),
+      _d.keys
+    );
+    const br_x = polyFold(
+      Number.MIN_SAFE_INTEGER,
+      (acc: number, k: string) => (_d.get(k).x > acc ? _d.get(k).x : acc),
+      _d.keys
+    );
+    const br_y = polyFold(
+      Number.MIN_SAFE_INTEGER,
+      (acc: number, k: string) => (_d.get(k).y > acc ? _d.get(k).y : acc),
+      _d.keys
+    );
+
+    // the intersection is rectangular, because the orthogonal intersection of two
+    // rectangles must be a rectangle, so ul = (ul_x, ul_y) and br = (br_x, br_y)
+    return new Range(new Address(this.start.worksheet, ul_y, ul_x), new Address(this.start.worksheet, br_y, br_x));
   }
 }
 
@@ -796,46 +883,6 @@ export class WorksheetAnalysis {
     return ExceLintVector.toSet(flattened);
   }
 }
-
-// /**
-//  * Represents the start and end positions of an edit.
-//  */
-// export class Range {
-//   /**
-//    * The range's start position in a formula string.
-//    */
-//   startpos: number;
-
-//   /**
-//    * The range's end position.
-//    */
-//   endpos: number;
-// }
-
-// export class Edit {
-//   /**
-//    * The starting and ending positions of the edit in the cell.
-//    */
-//   range: Range;
-//   /**
-//    * The length of the replacement text.
-//    */
-//   rangeLength: number;
-//   /**
-//    * The replacement text.
-//    */
-//   text: string;
-//   /**
-//    * The address of the cell where the edit occurred.
-//    */
-//   addr: Address;
-
-//   constructor(range: Range, text: string, addr: Address) {
-//     this.range = range;
-//     this.text = text;
-//     this.addr = addr;
-//   }
-// }
 
 /**
  * A generic, comparable array.
