@@ -1013,4 +1013,20 @@ export class Colorize {
     }
     return both;
   }
+
+  /**
+   * Remove all duplicate fixes.
+   * @param proposed_fixes An array of proposed fixes.
+   * @returns An array of proposed fixes with all dupes removed.
+   */
+  public static filterDuplicateFixes(proposed_fixes: XLNT.ProposedFix[]): XLNT.ProposedFix[] {
+    const keep = new XLNT.Dictionary<XLNT.ProposedFix>();
+    for (const pf of proposed_fixes) {
+      const hash = pf.rect1.hash() + pf.rect2.hash();
+      if (!keep.contains(hash)) {
+        keep.put(hash, pf);
+      }
+    }
+    return keep.values;
+  }
 }
