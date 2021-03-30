@@ -553,9 +553,9 @@ export class ExcelUtils {
     // split sheet name, remove absolute reference symbols, and
     // ensure address is uppercase
     const a1normed = a1addr.replace("$", "");
+    // the cell address may or may not include a worksheet
     const aa = a1normed.split("!");
-    const sheet = aa[0];
-    const addr = aa[1].toUpperCase();
+    const [sheet, addr] = aa.length === 1 ? ["", aa[0].toUpperCase()] : [aa[0], aa[1].toUpperCase()];
     let processCol = true;
 
     // accumulated characters go here
@@ -592,5 +592,15 @@ export class ExcelUtils {
     const col = x_list.map((t, i) => t * Math.pow(26, i)).reduce((acc, e) => acc + e, 0);
     const row = y_list.map((t, i) => t * Math.pow(10, i)).reduce((acc, e) => acc + e, 0);
     return new Address(sheet, row, col);
+  }
+
+  /**
+   * Returns true if the address references a cell; otherwise false.
+   * @param addr An Excel reference
+   */
+  public static isACell(addr: string): boolean {
+    if (addr.length === 0) throw new Error("Cannot call isACell on an empty string!");
+    const parts = addr.split(":");
+    return parts.length === 1;
   }
 }
