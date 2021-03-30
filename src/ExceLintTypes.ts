@@ -472,6 +472,29 @@ export class Rectangle implements IComparable<Rectangle> {
   private right(r: Rectangle): boolean {
     return r.left(this);
   }
+
+  /**
+   * A function that hashes rectangle dimensions.
+   */
+  public hash(): string {
+    return this._tl.toString() + this._br.toString();
+  }
+
+  /**
+   * Attempts to merge this rectangle with another rectangle.  If the two
+   * rectangles are not merge-compatible, returns None.
+   * @param Another rectangle.
+   * @returns Some merged rectangle, or None if not mergeable.
+   */
+  public merge(r: Rectangle): Option<Rectangle> {
+    if (this.above(r) || this.left(r)) {
+      return new Some(new Rectangle(this.upperleft, r.bottomright));
+    }
+    if (this.below(r) || this.right(r)) {
+      return new Some(new Rectangle(r.upperleft, this.bottomright));
+    }
+    return None;
+  }
 }
 
 export class ProposedFix implements IComparable<ProposedFix> {

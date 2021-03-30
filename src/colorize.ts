@@ -897,4 +897,113 @@ export class Colorize {
       }
     }
   }
+
+  /**
+   * Deep copies a dictionary of rectangles indexed by excelint fingerprint. Does
+   * not deep copy rectangles themselves.
+   * @param rects
+   * @returns
+   */
+  private static rectDictDeepCopy(rects: XLNT.Dictionary<XLNT.Rectangle[]>): XLNT.Dictionary<XLNT.Rectangle[]> {
+    const outer = new XLNT.Dictionary<XLNT.Rectangle[]>();
+    for (const key of rects.keys) {
+      const inner: XLNT.Rectangle[] = [];
+      outer.put(key, inner);
+      for (const r of rects.get(key)) {
+        inner.push(r);
+      }
+    }
+    return outer;
+  }
+
+  /**
+   * Generates all pairs of the elements of an array where order
+   * does not matter.
+   * @param xs An array of elements.
+   */
+  private static allPairsOrderIndependent<X>(xs: X[]): [X, X][] {
+    const _d = new XLNT.Dictionary<[X, X]>();
+    for (let i = 0; i < xs.length; i++) {
+      for (let j = 0; j < xs.length; j++) {
+        if (i === j) continue; // no self-pairing
+        /* a key is formed by putting the smaller of the two
+         * values first; this way, e.g., i = 2, j = 3 and
+         * i = 3, j = 2 have the same key
+         */
+        const key = i < j ? i + "," + j : j + "," + i;
+        if (_d.contains(key)) continue;
+        _d.put(key, [xs[i], xs[j]]);
+      }
+    }
+    return _d.values;
+  }
+
+  /**
+   * Merges all merge-compatible rectangles that share a fingerprint.
+   * This algorithm is greedy, and may produce suboptimal merges.
+   * @param rects A dictionary of rectangles, indexed by fingerprint.
+   */
+  public mergeRectangles(rects: XLNT.Dictionary<XLNT.Rectangle[]>): XLNT.Dictionary<XLNT.Rectangle[]> {
+    let working = Colorize.rectDictDeepCopy(rects);
+    let mergeHappened = true;
+    while (mergeHappened) {
+      mergeHappened = false; // reset
+      let merged = new XLNT.Dictionary<XLNT.Rectangle[]>(); // temporary storage for merges
+      // for each fingerprint
+      for (const fpKey of working.keys) {
+        // for each pair of rects not already merged
+        const pairs = Colorize.allPairsOrderIndependent(working.get(fpKey));
+        const processed = new XLNT.Dictionary<XLNT.Rectangle>(); // indexed by rectangle hash
+        for (const [a, b] of pairs) {
+          // if we haven't already processed these two and they're merge-compatible,
+          // merge them
+          if (!processed.contains(a.hash()) && !processed.contains(b.hash())) {
+            const m = a.merge(b);
+            if (m.hasValue) {
+              // did the merge succeed?
+              mergeHappened = true;
+              processed.put(a.hash(), a);
+              processed.put(b.hash(), b);
+              if (!merged.contains(fpKey)) {
+                // initialize merge storage, if necessary
+                merged.put(fpKey, []);
+              }
+              merged.get(fpKey).push(m.value); // store the merge
+            }
+          }
+        }
+      }
+
+      working = merged;
+    }
+    return working;
+  }
+
+  /**
+   * Produces a single dictionary, indexed by fingerprint, that contains
+   * all of the rectangles from both given dictionaries. Does not check
+   * for duplicate rectangles.
+   * @param a One dictionary.
+   * @param b Another dictionary.
+   * @returns A merged dictionary.
+   */
+  public mergeRectangleDictionaries(
+    a: XLNT.Dictionary<XLNT.Rectangle[]>,
+    b: XLNT.Dictionary<XLNT.Rectangle[]>
+  ): XLNT.Dictionary<XLNT.Rectangle[]> {
+    const both = Colorize.rectDictDeepCopy(a);
+    for (const k of b.keys) {
+      let tgt: XLNT.Rectangle[];
+      if (both.contains(k)) {
+        tgt = both.get(k);
+      } else {
+        tgt = [];
+        both.put(k, tgt);
+      }
+      for (const r of b.get(k)) {
+        tgt.push(r);
+      }
+    }
+    return both;
+  }
 }
