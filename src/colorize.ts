@@ -943,7 +943,7 @@ export class Colorize {
    * This algorithm is greedy, and may produce suboptimal merges.
    * @param rects A dictionary of rectangles, indexed by fingerprint.
    */
-  public mergeRectangles(rects: XLNT.Dictionary<XLNT.Rectangle[]>): XLNT.Dictionary<XLNT.Rectangle[]> {
+  public static mergeRectangles(rects: XLNT.Dictionary<XLNT.Rectangle[]>): XLNT.Dictionary<XLNT.Rectangle[]> {
     let working = Colorize.rectDictDeepCopy(rects);
     let mergeHappened = true;
     while (mergeHappened) {
@@ -952,8 +952,13 @@ export class Colorize {
       // for each fingerprint
       for (const fpKey of working.keys) {
         // for each pair of rects not already merged
-        const pairs = Colorize.allPairsOrderIndependent(working.get(fpKey));
+        const rects = working.get(fpKey);
+        const pairs = Colorize.allPairsOrderIndependent(rects);
         const processed = new XLNT.Dictionary<XLNT.Rectangle>(); // indexed by rectangle hash
+
+        // initialize merge storage
+        merged.put(fpKey, []);
+
         for (const [a, b] of pairs) {
           // if we haven't already processed these two and they're merge-compatible,
           // merge them
@@ -964,12 +969,14 @@ export class Colorize {
               mergeHappened = true;
               processed.put(a.hash(), a);
               processed.put(b.hash(), b);
-              if (!merged.contains(fpKey)) {
-                // initialize merge storage, if necessary
-                merged.put(fpKey, []);
-              }
               merged.get(fpKey).push(m.value); // store the merge
             }
+          }
+        }
+        // just add all unprocessed rects
+        for (const r of rects) {
+          if (!processed.contains(r.hash())) {
+            merged.get(fpKey).push(r);
           }
         }
       }
@@ -987,7 +994,7 @@ export class Colorize {
    * @param b Another dictionary.
    * @returns A merged dictionary.
    */
-  public mergeRectangleDictionaries(
+  public static mergeRectangleDictionaries(
     a: XLNT.Dictionary<XLNT.Rectangle[]>,
     b: XLNT.Dictionary<XLNT.Rectangle[]>
   ): XLNT.Dictionary<XLNT.Rectangle[]> {
