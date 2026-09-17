@@ -19,7 +19,7 @@
     "@types/sjcl": "^1.0.29",
     "array.prototype.flat": "^1.2.3",
     "crypto-js": "^4.0.0",
-    "sjcl": "^1.0.8",
+    "sjcl": "^1.0.9",
     "typescript": "^3.9.7",
     "xlsx": "^0.17.0",
     "yargs": "^16.0.0"
